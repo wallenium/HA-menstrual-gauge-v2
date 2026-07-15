@@ -96,62 +96,431 @@ class PeriodCountdownTimer extends HTMLElement {
       const cardContent = this.querySelector("#cardContent");
       if (cardContent) {
         if (status === "neutral") {
-          // Show neutral message - no timer needed
-          cardContent.innerHTML = `
-            <div class="neutral-message">
-              <div class="message-icon">✨</div>
-              <div class="message-text">
-                <h3>Keine Periode</h3>
-                <p>Aktuell werden keine Periodenprodukte benötigt.</p>
-              </div>
-            </div>
-          `;
-        } else {
-          // Show product selector and timer
-          cardContent.innerHTML = `
-            <div class="product-selector">
-              <label class="selector-label">Wähle Produkt</label>
-              <div class="product-dropdown-wrapper">
-                <select id="productSelect" class="product-select">
-                  <option value="">-- Produkt wählen --</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="timer-container">
-              <div class="timer-display" id="timerDisplay">
-                <div class="timer-icon" id="timerIcon">🩸</div>
-                <div class="timer-content">
-                  <div class="timer-time" id="timerTime">00:00</div>
-                  <div class="timer-label" id="timerLabel">Bereit</div>
-                </div>
-              </div>
-
-              <div class="timer-controls">
-                <button id="startBtn" class="btn btn-start">Start</button>
-                <button id="pauseBtn" class="btn btn-pause" disabled>Pause</button>
-                <button id="resetBtn" class="btn btn-reset">Zurück</button>
-              </div>
-
-              <div class="reminder-section">
-                <label class="reminder-label">
-                  <input type="checkbox" id="reminderCheckbox" checked />
-                  Benachrichtigungen aktivieren
-                </label>
-              </div>
-            </div>
-          `;
-
-          // Attach event listeners for timer controls
-          this.attachTimerEventListeners();
-          
-          // Update product dropdown
-          this.updateProductDropdown(status);
+          this.renderNeutralMode(cardContent);
+        } else if (status === "pre_menarche") {
+          this.renderPreMearcheMode(cardContent);
+        } else if (status === "pregnant") {
+          this.renderPregnancyMode(cardContent, stateObj.attributes);
+        } else if (status === "postpartum") {
+          this.renderPostpartumMode(cardContent, stateObj.attributes);
+        } else if (status === "menopause") {
+          this.renderMenopauseMode(cardContent);
+        } else if (status === "period" || status === "fertile" || status === "pms") {
+          this.renderPeriodMode(cardContent);
         }
       }
     } catch (error) {
       console.error("Error updating status:", error);
     }
+  }
+
+  renderNeutralMode(cardContent) {
+    cardContent.innerHTML = `
+      <div class="neutral-message">
+        <div class="message-icon">✨</div>
+        <div class="message-text">
+          <h3>Keine Periode</h3>
+          <p>Aktuell werden keine Periodenprodukte benötigt.</p>
+        </div>
+      </div>
+    `;
+  }
+
+  renderPreMearcheMode(cardContent) {
+    cardContent.innerHTML = `
+      <div class="premenarche-container">
+        <div class="premenarche-badge">
+          <div class="badge-emoji">🌸</div>
+          <div class="badge-text">
+            <h3>${this._t('pre_menarche')}</h3>
+            <p>${this._t('pre_menarche_desc')}</p>
+          </div>
+        </div>
+        
+        <div class="info-section">
+          <h4>${this._t('preparation_tips')}</h4>
+          <div class="tips-grid">
+            <div class="tip-card">
+              <div class="tip-emoji">📚</div>
+              <span>${this._t('learn_about_cycle')}</span>
+            </div>
+            <div class="tip-card">
+              <div class="tip-emoji">🛡️</div>
+              <span>${this._t('hygiene_products')}</span>
+            </div>
+            <div class="tip-card">
+              <div class="tip-emoji">🤝</div>
+              <span>${this._t('talk_to_parent')}</span>
+            </div>
+            <div class="tip-card">
+              <div class="tip-emoji">📱</div>
+              <span>${this._t('use_app_tracking')}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="reminder-section">
+          <label class="reminder-label">
+            <input type="checkbox" id="reminderCheckbox" checked />
+            ${this._t('enable_reminder')}
+          </label>
+        </div>
+      </div>
+    `;
+    this.attachReminderListener();
+  }
+
+  renderPregnancyMode(cardContent, attributes) {
+    const pregnancyWeek = attributes?.pregnancy_week || 0;
+    const dueDate = attributes?.due_date || "TBD";
+    const trimester = Math.ceil(pregnancyWeek / 13);
+
+    cardContent.innerHTML = `
+      <div class="pregnancy-container">
+        <div class="pregnancy-badge">
+          <div class="badge-emoji">🤰</div>
+          <div class="badge-text">
+            <h3>${this._t('pregnant')}</h3>
+            <p>${this._t('week')} ${pregnancyWeek} • ${this._t('trimester')} ${trimester}</p>
+          </div>
+        </div>
+
+        <div class="pregnancy-info-grid">
+          <div class="info-box">
+            <span class="info-label">${this._t('due_date')}</span>
+            <span class="info-value">${dueDate}</span>
+          </div>
+          <div class="info-box">
+            <span class="info-label">${this._t('pregnancy_week')}</span>
+            <span class="info-value">${pregnancyWeek}</span>
+          </div>
+        </div>
+
+        <div class="milestone-section">
+          <h4>${this._t('milestones_trimester')} ${trimester}</h4>
+          <div class="milestone-list" id="milestoneList"></div>
+        </div>
+
+        <div class="checklist-section">
+          <h4>${this._t('trimester_checklist')}</h4>
+          <div class="checklist" id="trimesterChecklist"></div>
+        </div>
+
+        <div class="symptom-tracker">
+          <h4>${this._t('symptoms')}</h4>
+          <div class="symptom-grid" id="symptomGrid"></div>
+        </div>
+
+        <div class="reminder-section">
+          <label class="reminder-label">
+            <input type="checkbox" id="reminderCheckbox" checked />
+            ${this._t('enable_reminder')}
+          </label>
+        </div>
+      </div>
+    `;
+
+    this.renderPregnancyMilestones(trimester);
+    this.renderTrimesterChecklist(trimester);
+    this.renderSymptomTracker('pregnancy');
+    this.attachReminderListener();
+  }
+
+  renderPostpartumMode(cardContent, attributes) {
+    const birthDate = attributes?.birth_date || new Date().toISOString();
+    const daysSinceBirth = this.calculateDaysSince(birthDate);
+    const weeksSinceBirth = Math.floor(daysSinceBirth / 7);
+
+    cardContent.innerHTML = `
+      <div class="postpartum-container">
+        <div class="postpartum-badge">
+          <div class="badge-emoji">👶</div>
+          <div class="badge-text">
+            <h3>${this._t('postpartum')}</h3>
+            <p>${daysSinceBirth} ${this._t('days_since_birth')}</p>
+          </div>
+        </div>
+
+        <div class="postpartum-info-grid">
+          <div class="info-box">
+            <span class="info-label">${this._t('weeks_postpartum')}</span>
+            <span class="info-value">${weeksSinceBirth}</span>
+          </div>
+          <div class="info-box">
+            <span class="info-label">${this._t('days_postpartum')}</span>
+            <span class="info-value">${daysSinceBirth}</span>
+          </div>
+        </div>
+
+        <div class="recovery-section">
+          <h4>${this._t('recovery_tracker')}</h4>
+          <div class="recovery-items" id="recoveryItems"></div>
+        </div>
+
+        <div class="bleeding-monitor">
+          <h4>${this._t('bleeding_monitor')}</h4>
+          <div class="bleeding-grid" id="bleedingGrid"></div>
+        </div>
+
+        <div class="postpartum-checklist">
+          <h4>${this._t('postpartum_checklist')}</h4>
+          <div class="checklist" id="postpartumChecklist"></div>
+        </div>
+
+        <div class="reminder-section">
+          <label class="reminder-label">
+            <input type="checkbox" id="reminderCheckbox" checked />
+            ${this._t('enable_reminder')}
+          </label>
+        </div>
+      </div>
+    `;
+
+    this.renderRecoveryItems(weeksSinceBirth);
+    this.renderBleedingMonitor();
+    this.renderPostpartumChecklist(weeksSinceBirth);
+    this.attachReminderListener();
+  }
+
+  renderMenopauseMode(cardContent) {
+    cardContent.innerHTML = `
+      <div class="menopause-container">
+        <div class="menopause-badge">
+          <div class="badge-emoji">🌙</div>
+          <div class="badge-text">
+            <h3>${this._t('menopause')}</h3>
+            <p>${this._t('menopause_desc')}</p>
+          </div>
+        </div>
+
+        <div class="symptom-tracker">
+          <h4>${this._t('menopause_symptoms')}</h4>
+          <div class="symptom-grid" id="menopauseSymptoms"></div>
+        </div>
+
+        <div class="mood-tracker">
+          <h4>${this._t('mood_tracker')}</h4>
+          <div class="mood-grid" id="moodGrid"></div>
+        </div>
+
+        <div class="wellness-tips">
+          <h4>${this._t('wellness_tips')}</h4>
+          <div class="tips-list" id="wellnessTips"></div>
+        </div>
+
+        <div class="reminder-section">
+          <label class="reminder-label">
+            <input type="checkbox" id="reminderCheckbox" checked />
+            ${this._t('enable_reminder')}
+          </label>
+        </div>
+      </div>
+    `;
+
+    this.renderMenopauseSymptoms();
+    this.renderMoodTracker();
+    this.renderWellnessTips();
+    this.attachReminderListener();
+  }
+
+  renderPeriodMode(cardContent) {
+    cardContent.innerHTML = `
+      <div class="product-selector">
+        <label class="selector-label">Wähle Produkt</label>
+        <div class="product-dropdown-wrapper">
+          <select id="productSelect" class="product-select">
+            <option value="">-- Produkt wählen --</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="timer-container">
+        <div class="timer-display" id="timerDisplay">
+          <div class="timer-icon" id="timerIcon">🩸</div>
+          <div class="timer-content">
+            <div class="timer-time" id="timerTime">00:00</div>
+            <div class="timer-label" id="timerLabel">Bereit</div>
+          </div>
+        </div>
+
+        <div class="timer-controls">
+          <button id="startBtn" class="btn btn-start">Start</button>
+          <button id="pauseBtn" class="btn btn-pause" disabled>Pause</button>
+          <button id="resetBtn" class="btn btn-reset">Zurück</button>
+        </div>
+
+        <div class="reminder-section">
+          <label class="reminder-label">
+            <input type="checkbox" id="reminderCheckbox" checked />
+            ${this._t('enable_reminder')}
+          </label>
+        </div>
+      </div>
+    `;
+
+    this.attachTimerEventListeners();
+    this.updateProductDropdown(this.timerState.currentStatus);
+  }
+
+  renderPregnancyMilestones(trimester) {
+    const milestoneList = this.querySelector("#milestoneList");
+    if (!milestoneList) return;
+
+    const milestones = {
+      1: ['Herzschlag erkennbar', 'Erstes Ultraschall', 'Geschlechtsbestimmung möglich'],
+      2: ['Bewegungen spürbar', 'Detailliertes Ultraschall', 'Gewichtszunahme'],
+      3: ['Babys Position fest', 'Geburt nahbar', 'Letzter Check-up']
+    };
+
+    const items = milestones[trimester] || [];
+    milestoneList.innerHTML = items.map(m => `
+      <div class="milestone-item">
+        <span class="milestone-check">✓</span>
+        <span>${m}</span>
+      </div>
+    `).join('');
+  }
+
+  renderTrimesterChecklist(trimester) {
+    const checklist = this.querySelector("#trimesterChecklist");
+    if (!checklist) return;
+
+    const checklists = {
+      1: ['Arzttermin vereinbaren', 'Vorsorgeuntersuchung', 'Vitamins starten'],
+      2: ['Zahnarzt-Check', 'Gewichtszunahme kontrollieren', 'Bewegungsübungen'],
+      3: ['Geburtsplan besprechen', 'Krankenhaus anmelden', 'Tasche packen']
+    };
+
+    const items = checklists[trimester] || [];
+    checklist.innerHTML = items.map((item, i) => `
+      <label class="checkbox-item">
+        <input type="checkbox" data-item="${i}" />
+        <span>${item}</span>
+      </label>
+    `).join('');
+  }
+
+  renderSymptomTracker(mode) {
+    const symptomGrid = this.querySelector("#symptomGrid");
+    if (!symptomGrid) return;
+
+    const symptoms = mode === 'pregnancy' 
+      ? ['Übelkeit', 'Müdigkeit', 'Kopfschmerz', 'Rückenschmerz', 'Sodbrennen', 'Schwellungen']
+      : ['Hitzewallungen', 'Schweißausbrüche', 'Schlafstörungen', 'Stimmungsschwankungen'];
+
+    symptomGrid.innerHTML = symptoms.map(s => `
+      <label class="symptom-btn">
+        <input type="checkbox" />
+        <span>${s}</span>
+      </label>
+    `).join('');
+  }
+
+  renderRecoveryItems(weeksSinceBirth) {
+    const recoveryItems = this.querySelector("#recoveryItems");
+    if (!recoveryItems) return;
+
+    const items = [
+      { label: 'Wundheilung', weeks: 2 },
+      { label: 'Blutung normalisiert', weeks: 4 },
+      { label: 'Rückbildung aktiv', weeks: 6 },
+      { label: 'Sex möglich', weeks: 6 }
+    ];
+
+    recoveryItems.innerHTML = items.map(item => {
+      const completed = weeksSinceBirth >= item.weeks;
+      return `
+        <div class="recovery-item ${completed ? 'completed' : ''}">
+          <span class="recovery-check">${completed ? '✓' : '○'}</span>
+          <span>${item.label}</span>
+          <span class="week-label">Woche ${item.weeks}</span>
+        </div>
+      `;
+    }).join('');
+  }
+
+  renderBleedingMonitor() {
+    const bleedingGrid = this.querySelector("#bleedingGrid");
+    if (!bleedingGrid) return;
+
+    const levels = ['Gering', 'Moderat', 'Stark'];
+    bleedingGrid.innerHTML = levels.map(level => `
+      <label class="bleeding-option">
+        <input type="radio" name="bleeding" value="${level}" />
+        <span>${level}</span>
+      </label>
+    `).join('');
+  }
+
+  renderPostpartumChecklist(weeksSinceBirth) {
+    const checklist = this.querySelector("#postpartumChecklist");
+    if (!checklist) return;
+
+    const items = [
+      'Arzttermin Wochenbett',
+      'Rückbildungskurs starten',
+      'Beckenbodentraining',
+      'Blutung überprüfen',
+      'Emotional Check-in'
+    ];
+
+    checklist.innerHTML = items.map((item, i) => `
+      <label class="checkbox-item">
+        <input type="checkbox" data-item="${i}" />
+        <span>${item}</span>
+      </label>
+    `).join('');
+  }
+
+  renderMenopauseSymptoms() {
+    const symptomsGrid = this.querySelector("#menopauseSymptoms");
+    if (!symptomsGrid) return;
+
+    const symptoms = ['Hitzewallungen', 'Nachtschweiß', 'Schlafstörungen', 'Reizbarkeit', 'Trockenheit', 'Gewichtszunahme'];
+    symptomsGrid.innerHTML = symptoms.map(s => `
+      <label class="symptom-btn">
+        <input type="checkbox" />
+        <span>${s}</span>
+      </label>
+    `).join('');
+  }
+
+  renderMoodTracker() {
+    const moodGrid = this.querySelector("#moodGrid");
+    if (!moodGrid) return;
+
+    const moods = ['😊 Glücklich', '😐 Neutral', '😔 Traurig', '😤 Reizbar', '😰 Ängstlich'];
+    moodGrid.innerHTML = moods.map(mood => `
+      <label class="mood-option">
+        <input type="radio" name="mood" />
+        <span>${mood}</span>
+      </label>
+    `).join('');
+  }
+
+  renderWellnessTips() {
+    const wellnessTips = this.querySelector("#wellnessTips");
+    if (!wellnessTips) return;
+
+    const tips = [
+      '🧘 Entspannungstechniken & Yoga',
+      '🏃 Regelmäßige Bewegung',
+      '🥗 Gesunde Ernährung',
+      '💧 Ausreichend Wasser trinken',
+      '😴 Guter Schlaf wichtig',
+      '🤝 Unterstützung suchen'
+    ];
+
+    wellnessTips.innerHTML = tips.map(tip => `
+      <div class="wellness-tip">${tip}</div>
+    `).join('');
+  }
+
+  calculateDaysSince(date) {
+    const startDate = new Date(date);
+    const today = new Date();
+    const diffTime = today - startDate;
+    return Math.floor(diffTime / (1000 * 60 * 60 * 24));
   }
 
   attachTimerEventListeners() {
@@ -176,6 +545,15 @@ class PeriodCountdownTimer extends HTMLElement {
         if (e.target.value) {
           this.selectProductFromDropdown(e.target.value);
         }
+      });
+    }
+  }
+
+  attachReminderListener() {
+    const reminderCheckbox = this.querySelector("#reminderCheckbox");
+    if (reminderCheckbox) {
+      reminderCheckbox.addEventListener("change", (e) => {
+        this.timerState.reminderEnabled = e.target.checked;
       });
     }
   }
@@ -205,16 +583,13 @@ class PeriodCountdownTimer extends HTMLElement {
 
       this.productConfig = productConfig;
 
-      // Clear all options except the first
       while (productSelect.options.length > 1) {
         productSelect.remove(1);
       }
 
       const products = productConfig[status];
-      console.log("Products for status", status, ":", products);
       
       if (!products) {
-        console.warn("No products for status:", status);
         productSelect.disabled = true;
         return;
       }
@@ -229,8 +604,6 @@ class PeriodCountdownTimer extends HTMLElement {
         option.dataset.seconds = product.seconds;
         productSelect.appendChild(option);
       });
-      
-      console.log("Dropdown updated successfully");
     } catch (error) {
       console.error("Error updating product dropdown:", error);
     }
@@ -423,6 +796,74 @@ class PeriodCountdownTimer extends HTMLElement {
     }
   }
 
+  _t(key) {
+    const translations = {
+      de: {
+        pre_menarche: "Pre-Menarche",
+        pre_menarche_desc: "Pubertät - Zyklus noch nicht begonnen",
+        pregnant: "Schwanger",
+        postpartum: "Wochenbett",
+        menopause: "Menopause",
+        preparation_tips: "Vorbereitungstipps",
+        learn_about_cycle: "Lerne über den Zyklus",
+        hygiene_products: "Hygiene-Produkte",
+        talk_to_parent: "Sprich mit Eltern",
+        use_app_tracking: "Nutze App zum Tracking",
+        enable_reminder: "Benachrichtigungen aktivieren",
+        week: "Woche",
+        trimester: "Trimester",
+        due_date: "Geburtstermin",
+        pregnancy_week: "Schwangerschaftswoche",
+        milestones_trimester: "Meilensteine",
+        trimester_checklist: "Checkliste",
+        symptoms: "Symptome",
+        days_since_birth: "Tage seit Geburt",
+        weeks_postpartum: "Wochen Wochenbett",
+        days_postpartum: "Tage Wochenbett",
+        recovery_tracker: "Genesungs-Tracker",
+        bleeding_monitor: "Blutungs-Monitor",
+        postpartum_checklist: "Wochenbett-Checkliste",
+        menopause_symptoms: "Menopause-Symptome",
+        mood_tracker: "Stimmungs-Tracker",
+        wellness_tips: "Wellness-Tipps",
+        menopause_desc: "Menopause-Phase"
+      },
+      en: {
+        pre_menarche: "Pre-Menarche",
+        pre_menarche_desc: "Puberty - cycle not yet started",
+        pregnant: "Pregnant",
+        postpartum: "Postpartum",
+        menopause: "Menopause",
+        preparation_tips: "Preparation Tips",
+        learn_about_cycle: "Learn about your cycle",
+        hygiene_products: "Hygiene products",
+        talk_to_parent: "Talk to parents",
+        use_app_tracking: "Use app to track",
+        enable_reminder: "Enable notifications",
+        week: "Week",
+        trimester: "Trimester",
+        due_date: "Due date",
+        pregnancy_week: "Pregnancy week",
+        milestones_trimester: "Milestones",
+        trimester_checklist: "Checklist",
+        symptoms: "Symptoms",
+        days_since_birth: "Days since birth",
+        weeks_postpartum: "Weeks postpartum",
+        days_postpartum: "Days postpartum",
+        recovery_tracker: "Recovery tracker",
+        bleeding_monitor: "Bleeding monitor",
+        postpartum_checklist: "Postpartum checklist",
+        menopause_symptoms: "Menopause symptoms",
+        mood_tracker: "Mood tracker",
+        wellness_tips: "Wellness tips",
+        menopause_desc: "Menopause phase"
+      },
+    };
+
+    const lang = this._hass?.language || 'de';
+    return translations[lang]?.[key] || translations['en'][key];
+  }
+
   getStyles() {
     return `
       :host {
@@ -484,7 +925,7 @@ class PeriodCountdownTimer extends HTMLElement {
         min-height: 200px;
       }
 
-      /* Neutral Status Message */
+      /* Neutral Message */
       .neutral-message {
         display: flex;
         flex-direction: column;
@@ -516,7 +957,247 @@ class PeriodCountdownTimer extends HTMLElement {
         color: var(--secondary-text-color);
       }
 
-      /* Product Selector */
+      /* Pre-Menarche */
+      .premenarche-container,
+      .pregnancy-container,
+      .postpartum-container,
+      .menopause-container {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .premenarche-badge,
+      .pregnancy-badge,
+      .postpartum-badge,
+      .menopause-badge {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px;
+        background: linear-gradient(135deg, #9b59b630 0%, #9b59b615 100%);
+        border: 2px solid #9b59b6;
+        border-radius: 12px;
+      }
+
+      .pregnancy-badge {
+        border-color: #3498db;
+        background: linear-gradient(135deg, #3498db30 0%, #3498db15 100%);
+      }
+
+      .postpartum-badge {
+        border-color: #1abc9c;
+        background: linear-gradient(135deg, #1abc9c30 0%, #1abc9c15 100%);
+      }
+
+      .menopause-badge {
+        border-color: #34495e;
+        background: linear-gradient(135deg, #34495e30 0%, #34495e15 100%);
+      }
+
+      .badge-emoji {
+        font-size: 2.5rem;
+      }
+
+      .badge-text h3 {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--primary-text-color);
+      }
+
+      .badge-text p {
+        margin: 4px 0 0 0;
+        font-size: 0.85rem;
+        color: var(--secondary-text-color);
+      }
+
+      /* Info Sections */
+      .info-section,
+      .milestone-section,
+      .checklist-section,
+      .symptom-tracker,
+      .recovery-section,
+      .bleeding-monitor,
+      .postpartum-checklist,
+      .mood-tracker,
+      .wellness-tips {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .info-section h4,
+      .milestone-section h4,
+      .checklist-section h4,
+      .symptom-tracker h4,
+      .recovery-section h4,
+      .bleeding-monitor h4,
+      .postpartum-checklist h4,
+      .mood-tracker h4,
+      .wellness-tips h4 {
+        margin: 0;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--primary-text-color);
+      }
+
+      /* Grids */
+      .tips-grid,
+      .pregnancy-info-grid,
+      .postpartum-info-grid,
+      .symptom-grid,
+      .mood-grid,
+      .bleeding-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        gap: 8px;
+      }
+
+      .tip-card,
+      .info-box,
+      .symptom-btn,
+      .mood-option,
+      .bleeding-option {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        padding: 12px;
+        background: var(--ha-card-background);
+        border: 1px solid var(--divider-color);
+        border-radius: 8px;
+        text-align: center;
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .tip-card:hover,
+      .symptom-btn:hover,
+      .mood-option:hover,
+      .bleeding-option:hover {
+        border-color: #9b59b6;
+        background: #9b59b610;
+      }
+
+      .tip-emoji {
+        font-size: 1.5rem;
+      }
+
+      .info-box {
+        border: 2px solid var(--divider-color);
+        padding: 16px;
+      }
+
+      .info-label {
+        font-size: 0.75rem;
+        color: var(--secondary-text-color);
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+
+      .info-value {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--primary-text-color);
+      }
+
+      /* Lists */
+      .milestone-list,
+      .recovery-items,
+      .tips-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .milestone-item,
+      .recovery-item,
+      .wellness-tip {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        background: var(--ha-card-background);
+        border: 1px solid var(--divider-color);
+        border-radius: 8px;
+        font-size: 0.9rem;
+      }
+
+      .milestone-check,
+      .recovery-check {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #27ae60;
+        min-width: 24px;
+      }
+
+      .recovery-item.completed {
+        opacity: 0.6;
+        text-decoration: line-through;
+      }
+
+      .week-label {
+        margin-left: auto;
+        font-size: 0.75rem;
+        color: var(--secondary-text-color);
+      }
+
+      /* Checkboxes */
+      .checklist,
+      .checkbox-item {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .checkbox-item {
+        flex-direction: row;
+        align-items: center;
+        padding: 8px;
+        cursor: pointer;
+      }
+
+      .checkbox-item input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+      }
+
+      .checkbox-item span {
+        font-size: 0.9rem;
+        flex: 1;
+      }
+
+      /* Reminders */
+      .reminder-section {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 12px;
+        background: var(--ha-card-background);
+        border: 1px solid var(--divider-color);
+        border-radius: 8px;
+      }
+
+      .reminder-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        color: var(--primary-text-color);
+        user-select: none;
+      }
+
+      .reminder-label input[type="checkbox"] {
+        cursor: pointer;
+        width: 18px;
+        height: 18px;
+      }
+
+      /* Product Selector & Timer */
       .product-selector {
         display: flex;
         flex-direction: column;
@@ -554,7 +1235,6 @@ class PeriodCountdownTimer extends HTMLElement {
 
       .product-select:hover {
         border-color: #e74c3c;
-        box-shadow: 0 2px 8px rgba(231, 76, 60, 0.2);
       }
 
       .product-select:focus {
@@ -563,18 +1243,6 @@ class PeriodCountdownTimer extends HTMLElement {
         box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.1);
       }
 
-      .product-select:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
-
-      .product-select option {
-        background: var(--ha-card-background);
-        color: var(--primary-text-color);
-        padding: 8px;
-      }
-
-      /* Timer */
       .timer-container {
         display: flex;
         flex-direction: column;
@@ -696,44 +1364,10 @@ class PeriodCountdownTimer extends HTMLElement {
         cursor: not-allowed;
       }
 
-      .reminder-section {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 12px;
-        background: var(--ha-card-background);
-        border: 1px solid var(--divider-color);
-        border-radius: 8px;
-      }
-
-      .reminder-label {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        cursor: pointer;
-        font-size: 0.9rem;
-        color: var(--primary-text-color);
-        user-select: none;
-      }
-
-      .reminder-label input[type="checkbox"] {
-        cursor: pointer;
-        width: 18px;
-        height: 18px;
-      }
-
       @media (prefers-color-scheme: dark) {
-        .neutral-message {
-          background: linear-gradient(135deg, #27ae6030 0%, #27ae6015 100%);
-        }
-
         .timer-display { background: linear-gradient(135deg, #e74c3c30 0%, #e74c3c15 100%); }
         .timer-display.warning { background: linear-gradient(135deg, #f39c1230 0%, #f39c1215 100%); }
         .timer-display.critical { background: linear-gradient(135deg, #e74c3c40 0%, #e74c3c25 100%); }
-        
-        .product-select {
-          background-color: var(--ha-card-background);
-        }
       }
 
       @media (max-width: 600px) {
@@ -741,22 +1375,22 @@ class PeriodCountdownTimer extends HTMLElement {
         .timer-time { font-size: 2rem; }
         .timer-icon { font-size: 2.5rem; }
         .btn { padding: 8px 12px; font-size: 0.8rem; }
-        .product-select { font-size: 0.9rem; }
         
-        .neutral-message {
-          padding: 30px 16px;
+        .tips-grid,
+        .pregnancy-info-grid,
+        .postpartum-info-grid,
+        .symptom-grid,
+        .mood-grid,
+        .bleeding-grid {
+          grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
         }
         
-        .message-icon {
-          font-size: 2.5rem;
+        .badge-emoji {
+          font-size: 2rem;
         }
         
-        .message-text h3 {
-          font-size: 1.1rem;
-        }
-        
-        .message-text p {
-          font-size: 0.9rem;
+        .badge-text h3 {
+          font-size: 1rem;
         }
       }
     `;
