@@ -5,7 +5,7 @@ from __future__ import annotations
 import inspect
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -45,6 +45,8 @@ from .const import (
     SERVICE_FIELD_ERASE_ALL,
     SERVICE_FIELD_FILENAME,
     SERVICE_FIELD_FORMAT,
+    SERVICE_FIELD_IS_PREGNANT,
+    SERVICE_FIELD_PREGNANCY_START_DATE,
     SERVICE_FIELD_PROFILE,
     SERVICE_FIELD_SYMPTOM_DATA,
     SERVICE_GET_SYMPTOM,
@@ -53,6 +55,8 @@ from .const import (
     SERVICE_REMOVE_SYMPTOM,
     SERVICE_SET_CYCLE_HISTORY,
     SERVICE_SET_PERIOD_DURATION,
+    SERVICE_SET_PREGNANCY_MODE,
+    SERVICE_UPDATE_PREGNANCY_DATE,
     SIGNAL_HISTORY_UPDATED,
     STORAGE_KEY,
 )
@@ -79,6 +83,7 @@ class MenstruationRuntime:
     history: list[str]
     period_duration_days: int
     symptom_history: list[dict[str, Any]]
+    pregnancy_data: dict[str, Any] = field(default_factory=lambda: {"is_pregnant": False, "start_date": None})
     unregister_midnight_listener: Callable[[], None] | None = None
 
 
@@ -158,7 +163,12 @@ def _runtime_for_call(hass: HomeAssistant, call: ServiceCall) -> MenstruationRun
 async def _async_save_and_notify(hass: HomeAssistant, runtime: MenstruationRuntime) -> None:
     runtime.history = normalize_history(runtime.history)
     runtime.period_duration_days = max(1, min(14, int(runtime.period_duration_days)))
-    await runtime.storage.async_save(runtime.history, runtime.period_duration_days, runtime.symptom_history)
+    await runtime.storage.async_save(
+        runtime.history,
+        runtime.period_duration_days,
+        runtime.symptom_history,
+        runtime.pregnancy_data,
+    )
     await _async_refresh_cycle_model(hass, {_entry_id_for_runtime(hass, runtime)})
 
 
@@ -247,6 +257,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         history=stored[ATTR_HISTORY],
         period_duration_days=stored.get(ATTR_PERIOD_DURATION_DAYS, DEFAULT_PERIOD_DURATION_DAYS),
         symptom_history=stored.get(ATTR_SYMPTOM_HISTORY, []),
+        pregnancy_data=stored.get("pregnancy_data", {"is_pregnant": False, "start_date": None}),
     )
 
     runtime.unregister_midnight_listener = async_track_time_change(
@@ -288,6 +299,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     async def async_get_symptom(call: ServiceCall) -> None:
         await _async_handle_get_symptom(hass, call)
+
+    async def async_set_pregnancy_mode(call: ServiceCall) -> None:
+        await _async_handle_set_pregnancy_mode(hass, call)
+
+    async def async_update_pregnancy_date(call: ServiceCall) -> None:
+        await _async_handle_update_pregnancy_date(hass, call)
 
     common_profile_field = {
         vol.Optional(SERVICE_FIELD_ENTITY_ID): cv.entity_id,
@@ -373,11 +390,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             DOMAIN,
             SERVICE_ADD_SYMPTOM,
             async_add_symptom,
-            schema=vol.Schema({
-                **common_profile_field,
-                vol.Required(SERVICE_FIELD_DATE): cv.string,
-                vol.Required(SERVICE_FIELD_SYMPTOM_DATA): dict,
-            }),
+            schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_DATE): cv.string, vol.Required(SERVICE_FIELD_SYMPTOM_DATA): dict}),
         )
 
     if not hass.services.has_service(DOMAIN, SERVICE_REMOVE_SYMPTOM):
@@ -394,6 +407,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_GET_SYMPTOM,
             async_get_symptom,
             schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_DATE): cv.string}),
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_SET_PREGNANCY_MODE):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SET_PREGNANCY_MODE,
+            async_set_pregnancy_mode,
+            schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_IS_PREGNANT): cv.boolean, vol.Optional(SERVICE_FIELD_PREGNANCY_START_DATE): cv.string}),
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_UPDATE_PREGNANCY_DATE):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_UPDATE_PREGNANCY_DATE,
+            async_update_pregnancy_date,
+            schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_PREGNANCY_START_DATE): cv.string}),
         )
 
     await _async_register_card_static_path(hass)
@@ -422,6 +451,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_ADD_SYMPTOM,
             SERVICE_REMOVE_SYMPTOM,
             SERVICE_GET_SYMPTOM,
+            SERVICE_SET_PREGNANCY_MODE,
+            SERVICE_UPDATE_PREGNANCY_DATE,
         ):
             if hass.services.has_service(DOMAIN, service):
                 hass.services.async_remove(DOMAIN, service)
@@ -460,15 +491,11 @@ async def _async_handle_set_period_duration(hass: HomeAssistant, call: ServiceCa
 async def _async_handle_erase_all_history(hass: HomeAssistant, call: ServiceCall) -> None:
     entity_id = str(call.data.get(SERVICE_FIELD_ENTITY_ID, "")).strip()
     if not entity_id:
-        raise HomeAssistantError(
-            "Refusing to erase history. Provide entity_id explicitly for safety."
-        )
+        raise HomeAssistantError("Refusing to erase history. Provide entity_id explicitly for safety.")
     runtime = _runtime_for_call(hass, call)
     erase_all = call.data.get(SERVICE_FIELD_ERASE_ALL)
     if erase_all is not True:
-        raise HomeAssistantError(
-            "Refusing to erase history. Set erase_all: true to confirm destructive action."
-        )
+        raise HomeAssistantError("Refusing to erase history. Set erase_all: true to confirm destructive action.")
     runtime.history = []
     await _async_save_and_notify(hass, runtime)
 
@@ -522,7 +549,6 @@ async def _async_handle_add_symptom(hass: HomeAssistant, call: ServiceCall) -> N
     if not isinstance(symptom_data, dict):
         raise HomeAssistantError("Symptom data must be a dictionary.")
 
-    # Find existing entry or create new one
     existing = None
     for entry in runtime.symptom_history:
         if entry.get("date") == date_iso:
@@ -530,16 +556,13 @@ async def _async_handle_add_symptom(hass: HomeAssistant, call: ServiceCall) -> N
             break
 
     if existing:
-        # Merge with existing data
         existing.update(symptom_data)
         existing["date"] = date_iso
     else:
-        # Create new entry
         new_entry = dict(symptom_data)
         new_entry["date"] = date_iso
         runtime.symptom_history.append(new_entry)
 
-    # Sort by date
     runtime.symptom_history.sort(key=lambda x: x.get("date", ""))
     await _async_save_and_notify(hass, runtime)
 
@@ -566,6 +589,29 @@ async def _async_handle_get_symptom(hass: HomeAssistant, call: ServiceCall) -> N
     _LOGGER.info("No symptom data found for %s", date_iso)
 
 
+async def _async_handle_set_pregnancy_mode(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Set pregnancy mode on or off."""
+    runtime = _runtime_for_call(hass, call)
+    is_pregnant = bool(call.data.get(SERVICE_FIELD_IS_PREGNANT, False))
+    pregnancy_start_date = call.data.get(SERVICE_FIELD_PREGNANCY_START_DATE)
+    if pregnancy_start_date:
+        pregnancy_start_date = _normalize_date_or_raise(pregnancy_start_date)
+    elif is_pregnant and runtime.history:
+        pregnancy_start_date = runtime.history[-1]
+    else:
+        pregnancy_start_date = None
+    runtime.pregnancy_data = {"is_pregnant": is_pregnant, "start_date": pregnancy_start_date}
+    await _async_save_and_notify(hass, runtime)
+
+
+async def _async_handle_update_pregnancy_date(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Update pregnancy start date."""
+    runtime = _runtime_for_call(hass, call)
+    date_iso = _normalize_date_or_raise(call.data[SERVICE_FIELD_PREGNANCY_START_DATE])
+    runtime.pregnancy_data["start_date"] = date_iso
+    await _async_save_and_notify(hass, runtime)
+
+
 async def _maybe_await(result: Any) -> Any:
     """Await coroutine-like values, return plain values unchanged."""
     if inspect.isawaitable(result):
@@ -577,18 +623,16 @@ async def _async_ensure_lovelace_resource(hass: HomeAssistant) -> None:
     """Auto-register Lovelace JS resource for storage dashboards."""
     try:
         from homeassistant.components.lovelace.resources import async_get_resource_collection
-    except Exception as err:  # pragma: no cover - depends on HA internals
+    except Exception as err:
         _LOGGER.debug("Lovelace resource API unavailable, skip auto registration: %s", err)
         return
 
     try:
         collection = await _maybe_await(async_get_resource_collection(hass))
         items = await _maybe_await(collection.async_items())
-
         for item in items or []:
             if isinstance(item, dict) and item.get("url") == CARD_RESOURCE_URL:
                 return
-
         created = False
         for payload in (
             {"url": CARD_RESOURCE_URL, "res_type": CARD_RESOURCE_TYPE},
@@ -600,20 +644,12 @@ async def _async_ensure_lovelace_resource(hass: HomeAssistant) -> None:
                 break
             except Exception:
                 continue
-
         if created:
             _LOGGER.info("Registered Lovelace resource automatically: %s", CARD_RESOURCE_URL)
         else:
-            _LOGGER.warning(
-                "Could not auto-register Lovelace resource. Add manually: %s",
-                CARD_RESOURCE_URL,
-            )
-    except Exception as err:  # pragma: no cover - depends on HA internals
-        _LOGGER.warning(
-            "Auto-registration of Lovelace resource failed, add manually: %s (%s)",
-            CARD_RESOURCE_URL,
-            err,
-        )
+            _LOGGER.warning("Could not auto-register Lovelace resource. Add manually: %s", CARD_RESOURCE_URL)
+    except Exception as err:
+        _LOGGER.warning("Auto-registration of Lovelace resource failed, add manually: %s (%s)", CARD_RESOURCE_URL, err)
 
 
 async def _async_register_card_static_path(hass: HomeAssistant) -> None:
@@ -622,28 +658,19 @@ async def _async_register_card_static_path(hass: HomeAssistant) -> None:
         (CARD_RESOURCE_URL, str(Path(__file__).parent / "www" / "menstruation-gauge-card.js")),
         (HEATMAP_RESOURCE_URL, str(Path(__file__).parent / "www" / "menstruation-cycle-heatmap-card.js")),
     ]
-
     if hasattr(hass.http, "async_register_static_paths"):
         try:
-            from homeassistant.components.http import StaticPathConfig  # type: ignore
-
-            await _maybe_await(
-                hass.http.async_register_static_paths(
-                    [StaticPathConfig(url_path=url, path=path, cache_headers=False) for url, path in static_files]
-                )
-            )
+            from homeassistant.components.http import StaticPathConfig
+            await _maybe_await(hass.http.async_register_static_paths([StaticPathConfig(url_path=url, path=path, cache_headers=False) for url, path in static_files]))
             return
         except Exception:
             pass
-
     if hasattr(hass.http, "async_register_static_path"):
         for url, path in static_files:
             await _maybe_await(hass.http.async_register_static_path(url, path, False))
         return
-
     if hasattr(hass.http, "register_static_path"):
         for url, path in static_files:
             await hass.async_add_executor_job(hass.http.register_static_path, url, path, False)
         return
-
     _LOGGER.warning("No compatible HA HTTP static-path API found for %s", CARD_RESOURCE_URL)
