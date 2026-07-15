@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, timedelta
+from typing import Any
 
 from .const import STATE_FERTILE, STATE_NEUTRAL, STATE_PERIOD, STATE_PMS
 
@@ -23,6 +24,7 @@ class CycleModel:
     period_duration_days: int
     learned_period_duration_days: int | None
     state: str
+    symptom_history: list[dict[str, Any]]
 
 
 def normalize_history(history: list[str]) -> list[str]:
@@ -116,10 +118,35 @@ def predict_next_start(grouped_starts: list[str]) -> tuple[str | None, int | Non
     return next_start.isoformat(), avg
 
 
-def build_cycle_model(history: list[str], period_duration_days: int, today: date | None = None) -> CycleModel:
+def normalize_symptoms(symptom_history: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Normalize symptom history and ensure all dates are valid ISO format."""
+    normalized: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    
+    for item in symptom_history:
+        if not isinstance(item, dict):
+            continue
+        date_str = item.get("date")
+        if not date_str:
+            continue
+        try:
+            iso_date = date.fromisoformat(str(date_str)).isoformat()
+            if iso_date not in seen:
+                normalized_item = dict(item)
+                normalized_item["date"] = iso_date
+                normalized.append(normalized_item)
+                seen.add(iso_date)
+        except ValueError:
+            continue
+    
+    return sorted(normalized, key=lambda x: x.get("date", ""))
+
+
+def build_cycle_model(history: list[str], period_duration_days: int, symptom_history: list[dict[str, Any]] | None = None, today: date | None = None) -> CycleModel:
     """Build complete cycle model for sensor state + attributes."""
     now = today or date.today()
     normalized = normalize_history(history)
+    symptoms = normalize_symptoms(symptom_history or [])
 
     # Keep model based on confirmed values up to today, but keep full history as attribute.
     base_history = [item for item in normalized if item <= now.isoformat()] or normalized
@@ -169,4 +196,5 @@ def build_cycle_model(history: list[str], period_duration_days: int, today: date
         period_duration_days=effective_duration,
         learned_period_duration_days=learned_avg_duration,
         state=state,
+        symptom_history=symptoms,
     )
