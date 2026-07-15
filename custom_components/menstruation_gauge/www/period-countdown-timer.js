@@ -6,6 +6,7 @@ class PeriodCountdownTimer extends HTMLElement {
       totalSeconds: 0,
       remainingSeconds: 0,
       intervalId: null,
+      feedbackTimeoutId: null,
       selectedProduct: null,
       currentStatus: null,
       reminderEnabled: true,
@@ -119,8 +120,8 @@ class PeriodCountdownTimer extends HTMLElement {
       <div class="neutral-message">
         <div class="message-icon">✨</div>
         <div class="message-text">
-          <h3>Keine Periode</h3>
-          <p>Aktuell werden keine Periodenprodukte benötigt.</p>
+          <h3>${this._t('neutral_title')}</h3>
+          <p>${this._t('neutral_products_message')}</p>
         </div>
       </div>
     `;
@@ -349,6 +350,13 @@ class PeriodCountdownTimer extends HTMLElement {
           <button id="resetBtn" class="btn btn-reset">Zurück</button>
         </div>
 
+        <div class="usage-controls">
+          <button id="logUsageBtn" class="btn btn-usage" disabled>${this._t('log_used')}</button>
+          <button id="logCupBtn" class="btn btn-cup" hidden disabled>${this._t('log_cup_emptied')}</button>
+        </div>
+
+        <div class="usage-feedback" id="usageFeedback" hidden></div>
+
         <div class="reminder-section">
           <label class="reminder-label">
             <input type="checkbox" id="reminderCheckbox" checked />
@@ -527,12 +535,16 @@ class PeriodCountdownTimer extends HTMLElement {
     const startBtn = this.querySelector("#startBtn");
     const pauseBtn = this.querySelector("#pauseBtn");
     const resetBtn = this.querySelector("#resetBtn");
+    const logUsageBtn = this.querySelector("#logUsageBtn");
+    const logCupBtn = this.querySelector("#logCupBtn");
     const reminderCheckbox = this.querySelector("#reminderCheckbox");
     const productSelect = this.querySelector("#productSelect");
 
     if (startBtn) startBtn.addEventListener("click", () => this.startTimer());
     if (pauseBtn) pauseBtn.addEventListener("click", () => this.pauseTimer());
     if (resetBtn) resetBtn.addEventListener("click", () => this.resetTimer());
+    if (logUsageBtn) logUsageBtn.addEventListener("click", () => this.logProductUsage("used"));
+    if (logCupBtn) logCupBtn.addEventListener("click", () => this.logProductUsage("emptied"));
 
     if (reminderCheckbox) {
       reminderCheckbox.addEventListener("change", (e) => {
@@ -582,6 +594,11 @@ class PeriodCountdownTimer extends HTMLElement {
       };
 
       this.productConfig = productConfig;
+      this.timerState.selectedProduct = null;
+      this.timerState.totalSeconds = 0;
+      this.timerState.remainingSeconds = 0;
+      this.pauseTimer();
+      productSelect.value = "";
 
       while (productSelect.options.length > 1) {
         productSelect.remove(1);
@@ -591,6 +608,7 @@ class PeriodCountdownTimer extends HTMLElement {
       
       if (!products) {
         productSelect.disabled = true;
+        this.updateUsageButtons();
         return;
       }
 
@@ -604,6 +622,9 @@ class PeriodCountdownTimer extends HTMLElement {
         option.dataset.seconds = product.seconds;
         productSelect.appendChild(option);
       });
+      this.updateDisplay();
+      this.updateButtonStates();
+      this.updateUsageButtons();
     } catch (error) {
       console.error("Error updating product dropdown:", error);
     }
@@ -634,6 +655,7 @@ class PeriodCountdownTimer extends HTMLElement {
 
       this.updateDisplay();
       this.updateButtonStates();
+      this.updateUsageButtons();
     } catch (error) {
       console.error("Error selecting product:", error);
     }
@@ -685,11 +707,82 @@ class PeriodCountdownTimer extends HTMLElement {
       this.timerState.isRunning = false;
       this.timerState.remainingSeconds = 0;
       clearInterval(this.timerState.intervalId);
+      this.timerState.intervalId = null;
       this.updateButtonStates();
       this.updateDisplay();
     } catch (error) {
       console.error("Error resetting timer:", error);
     }
+  }
+
+  callService(domain, service, serviceData) {
+    if (!this._hass) {
+      throw new Error("Home Assistant instance not available");
+    }
+    return this._hass.callService(domain, service, serviceData);
+  }
+
+  async logProductUsage(action = "used") {
+    try {
+      if (!this.timerState.selectedProduct) {
+        this.showUsageFeedback(this._t('select_product_first'), "error");
+        return;
+      }
+
+      if (action === "emptied" && this.timerState.selectedProduct !== "cup") {
+        this.showUsageFeedback(this._t('cup_empty_only'), "error");
+        return;
+      }
+
+      await this.callService("menstruation_gauge", "log_product_usage", {
+        entity_id: this.config?.entity,
+        profile: this.config?.profile,
+        entry_id: this.config?.entry_id,
+        product: this.timerState.selectedProduct,
+        action,
+        quantity: 1,
+      });
+
+      clearInterval(this.timerState.intervalId);
+      this.timerState.intervalId = null;
+      this.timerState.isRunning = false;
+      this.timerState.remainingSeconds = this.timerState.totalSeconds;
+      this.updateDisplay();
+      this.updateButtonStates();
+      this.updateUsageButtons();
+
+      const successKey = action === "emptied" ? "usage_logged_emptied" : "usage_logged_used";
+      this.showUsageFeedback(this._t(successKey), "success");
+    } catch (error) {
+      console.error("Error logging product usage:", error);
+      this.showUsageFeedback(this._t('usage_logged_error'), "error");
+    }
+  }
+
+  showUsageFeedback(message, type = "success") {
+    const feedback = this.querySelector("#usageFeedback");
+    const timerDisplay = this.querySelector("#timerDisplay");
+
+    if (feedback) {
+      feedback.hidden = false;
+      feedback.textContent = message;
+      feedback.className = `usage-feedback ${type}`;
+    }
+
+    if (timerDisplay) {
+      timerDisplay.classList.remove("logged-success", "logged-error");
+      timerDisplay.classList.add(type === "success" ? "logged-success" : "logged-error");
+    }
+
+    clearTimeout(this.timerState.feedbackTimeoutId);
+    this.timerState.feedbackTimeoutId = window.setTimeout(() => {
+      if (feedback) {
+        feedback.hidden = true;
+        feedback.textContent = "";
+        feedback.className = "usage-feedback";
+      }
+      timerDisplay?.classList.remove("logged-success", "logged-error");
+    }, 2200);
   }
 
   updateDisplay() {
@@ -786,13 +879,33 @@ class PeriodCountdownTimer extends HTMLElement {
     try {
       const startBtn = this.querySelector("#startBtn");
       const pauseBtn = this.querySelector("#pauseBtn");
+      const logUsageBtn = this.querySelector("#logUsageBtn");
 
       if (startBtn && pauseBtn) {
         startBtn.disabled = this.timerState.isRunning;
         pauseBtn.disabled = !this.timerState.isRunning;
       }
+
+      if (logUsageBtn) {
+        logUsageBtn.disabled = !this.timerState.selectedProduct;
+      }
     } catch (error) {
       console.error("Error updating button states:", error);
+    }
+  }
+
+  updateUsageButtons() {
+    const logUsageBtn = this.querySelector("#logUsageBtn");
+    const logCupBtn = this.querySelector("#logCupBtn");
+    const isCupSelected = this.timerState.selectedProduct === "cup";
+
+    if (logUsageBtn) {
+      logUsageBtn.disabled = !this.timerState.selectedProduct;
+    }
+
+    if (logCupBtn) {
+      logCupBtn.hidden = !isCupSelected;
+      logCupBtn.disabled = !isCupSelected;
     }
   }
 
@@ -801,6 +914,8 @@ class PeriodCountdownTimer extends HTMLElement {
       de: {
         pre_menarche: "Pre-Menarche",
         pre_menarche_desc: "Pubertät - Zyklus noch nicht begonnen",
+        neutral_title: "Keine Periode",
+        neutral_products_message: "Keine Periode - keine Produkte nötig",
         pregnant: "Schwanger",
         postpartum: "Wochenbett",
         menopause: "Menopause",
@@ -826,11 +941,20 @@ class PeriodCountdownTimer extends HTMLElement {
         menopause_symptoms: "Menopause-Symptome",
         mood_tracker: "Stimmungs-Tracker",
         wellness_tips: "Wellness-Tipps",
-        menopause_desc: "Menopause-Phase"
+        menopause_desc: "Menopause-Phase",
+        log_used: "✓ Verbraucht",
+        log_cup_emptied: "🔄 Geleert",
+        select_product_first: "Bitte zuerst ein Produkt auswählen.",
+        cup_empty_only: "Cup-Leerung ist nur für die Menstruationstasse verfügbar.",
+        usage_logged_used: "Produktverbrauch gespeichert.",
+        usage_logged_emptied: "Cup-Leerung gespeichert.",
+        usage_logged_error: "Produktverbrauch konnte nicht gespeichert werden."
       },
       en: {
         pre_menarche: "Pre-Menarche",
         pre_menarche_desc: "Puberty - cycle not yet started",
+        neutral_title: "No period",
+        neutral_products_message: "No period - no products needed",
         pregnant: "Pregnant",
         postpartum: "Postpartum",
         menopause: "Menopause",
@@ -856,7 +980,14 @@ class PeriodCountdownTimer extends HTMLElement {
         menopause_symptoms: "Menopause symptoms",
         mood_tracker: "Mood tracker",
         wellness_tips: "Wellness tips",
-        menopause_desc: "Menopause phase"
+        menopause_desc: "Menopause phase",
+        log_used: "✓ Used",
+        log_cup_emptied: "🔄 Emptied",
+        select_product_first: "Please select a product first.",
+        cup_empty_only: "Cup emptying is only available for the menstrual cup.",
+        usage_logged_used: "Product usage saved.",
+        usage_logged_emptied: "Cup emptying saved.",
+        usage_logged_error: "Could not save product usage."
       },
     };
 
@@ -1282,6 +1413,16 @@ class PeriodCountdownTimer extends HTMLElement {
         background: #e74c3c;
       }
 
+      .timer-display.logged-success {
+        border-color: #27ae60;
+        background: linear-gradient(135deg, #27ae6020 0%, #27ae6010 100%);
+      }
+
+      .timer-display.logged-error {
+        border-color: #c0392b;
+        background: linear-gradient(135deg, #c0392b20 0%, #c0392b10 100%);
+      }
+
       @keyframes complete-pulse {
         0%, 100% { transform: scale(1); }
         50% { transform: scale(1.05); }
@@ -1315,6 +1456,33 @@ class PeriodCountdownTimer extends HTMLElement {
         display: flex;
         gap: 8px;
         justify-content: center;
+      }
+
+      .usage-controls {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+      }
+
+      .usage-feedback {
+        padding: 10px 12px;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-align: center;
+        border: 1px solid transparent;
+      }
+
+      .usage-feedback.success {
+        color: #1f7a45;
+        background: rgba(39, 174, 96, 0.12);
+        border-color: rgba(39, 174, 96, 0.3);
+      }
+
+      .usage-feedback.error {
+        color: #a83232;
+        background: rgba(192, 57, 43, 0.12);
+        border-color: rgba(192, 57, 43, 0.3);
       }
 
       .btn {
@@ -1351,6 +1519,26 @@ class PeriodCountdownTimer extends HTMLElement {
 
       .btn-reset {
         background: #95a5a6;
+      }
+
+      .btn-usage {
+        background: #2980b9;
+      }
+
+      .btn-usage:hover:not(:disabled) {
+        background: #2471a3;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(41, 128, 185, 0.3);
+      }
+
+      .btn-cup {
+        background: #8e44ad;
+      }
+
+      .btn-cup:hover:not(:disabled) {
+        background: #7d3c98;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(142, 68, 173, 0.3);
       }
 
       .btn-reset:hover:not(:disabled) {
@@ -1414,3 +1602,10 @@ class PeriodCountdownTimer extends HTMLElement {
 }
 
 customElements.define("period-countdown-timer", PeriodCountdownTimer);
+
+window.customCards = window.customCards || [];
+window.customCards.push({
+  type: "period-countdown-timer",
+  name: "Period Countdown Timer",
+  description: "Countdown timer with direct product-usage logging for period products.",
+});

@@ -14,5 +14,41 @@
     "error": {
       "invalid_profile": "Profil muss Buchstaben oder Zahlen enthalten."
     }
+  },
+  "services": {
+    "log_product_usage": {
+      "name": "Produktverbrauch protokollieren",
+      "description": "Protokolliert Periodenprodukt-Verbrauch für Timer-Integrationen und Langzeitstatistiken.",
+      "fields": {
+        "entity_id": {
+          "name": "Entität",
+          "description": "Ziel-Menstruationssensor."
+        },
+        "profile": {
+          "name": "Profil",
+          "description": "Konfigurierter Profil-Slug."
+        },
+        "entry_id": {
+          "name": "Entry-ID",
+          "description": "Kennung des Config-Entries."
+        },
+        "product": {
+          "name": "Produkt",
+          "description": "Zu protokollierender Produkttyp."
+        },
+        "action": {
+          "name": "Aktion",
+          "description": "Verbrauchsaktion, zum Beispiel benutzt oder geleert."
+        },
+        "quantity": {
+          "name": "Menge",
+          "description": "Wie viele Produkte oder Leerungen hinzugefügt werden."
+        },
+        "date": {
+          "name": "Datum",
+          "description": "Optionales ISO-Datum für Nachträge. Standard ist heute."
+        }
+      }
+    }
   }
 }
