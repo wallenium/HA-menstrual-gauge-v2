@@ -195,3 +195,143 @@ refresh_cycle_model:
       example: "a1b2c3d4e5f6..."
       selector:
         text:
+
+log_product_usage:
+  name: Log product usage
+  description: Log tampon, pad, cup, or liner usage for statistics and timer integrations.
+  fields:
+    entity_id:
+      required: false
+      example: "sensor.anna"
+      selector:
+        entity:
+          domain: sensor
+    profile:
+      required: false
+      example: "anna"
+      selector:
+        text:
+    entry_id:
+      required: false
+      example: "a1b2c3d4e5f6..."
+      selector:
+        text:
+    product:
+      required: true
+      example: "tampon"
+      selector:
+        select:
+          options:
+            - "tampon"
+            - "pad"
+            - "cup"
+            - "underwear"
+            - "liner"
+    action:
+      required: false
+      example: "used"
+      selector:
+        select:
+          options:
+            - "used"
+            - "emptied"
+    quantity:
+      required: false
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 50
+          mode: box
+    date:
+      required: false
+      example: "2026-07-15"
+      description: Optional backfill date in YYYY-MM-DD format. Defaults to today.
+      selector:
+        text:
+
+add_symptom:
+  name: Add or update symptom data for a date
+  description: Add or update symptom data for a specific date. Data is merged with existing entries.
+  fields:
+    entity_id:
+      required: false
+      example: "sensor.anna"
+      selector:
+        entity:
+          domain: sensor
+    profile:
+      required: false
+      example: "anna"
+      selector:
+        text:
+    entry_id:
+      required: false
+      example: "a1b2c3d4e5f6..."
+      selector:
+        text:
+    date:
+      required: true
+      example: "2026-03-15"
+      description: Date in YYYY-MM-DD format
+      selector:
+        text:
+    symptom_data:
+      required: true
+      description: Dictionary with symptom fields. Optional fields - bleeding_strength, spotting, intercourse, pain (list), basal_temp (number), hygiene (list), test
+      selector:
+        object:
+
+remove_symptom:
+  name: Remove symptom data for a date
+  description: Remove all symptom data for a specific date.
+  fields:
+    entity_id:
+      required: false
+      example: "sensor.anna"
+      selector:
+        entity:
+          domain: sensor
+    profile:
+      required: false
+      example: "anna"
+      selector:
+        text:
+    entry_id:
+      required: false
+      example: "a1b2c3d4e5f6..."
+      selector:
+        text:
+    date:
+      required: true
+      example: "2026-03-15"
+      description: Date in YYYY-MM-DD format
+      selector:
+        text:
+
+get_symptom:
+  name: Get symptom data for a date
+  description: Retrieve symptom data for a specific date.
+  fields:
+    entity_id:
+      required: false
+      example: "sensor.anna"
+      selector:
+        entity:
+          domain: sensor
+    profile:
+      required: false
+      example: "anna"
+      selector:
+        text:
+    entry_id:
+      required: false
+      example: "a1b2c3d4e5f6..."
+      selector:
+        text:
+    date:
+      required: true
+      example: "2026-03-15"
+      description: Date in YYYY-MM-DD format
+      selector:
+        text:

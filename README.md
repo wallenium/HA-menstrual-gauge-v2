@@ -22,6 +22,8 @@ This repository contains:
 - Add the customcards under `Settings -> Devices & Services` (...)-Menu "Add ressouces":
     - `/menstruation_gauge/menstruation-gauge-card.js`
     - `/menstruation_gauge/menstruation-cycle-heatmap-card.js`
+    - `/menstruation_gauge/period-countdown-timer.js`
+    - `/menstruation_gauge/menstrual-product-stats-card.js`
     - each of Type: `JavaScript module`
     - //mental note: it is correct: ignore of www subfolder within actual folder structure
 
@@ -67,7 +69,9 @@ HA-menstruation-gauge-v2/
         │   └── en.json
         └── www/
             ├── menstruation-gauge-card.js
-            └── menstruation-cycle-heatmap-card.js
+            ├── menstruation-cycle-heatmap-card.js
+            ├── period-countdown-timer.js
+            └── menstrual-product-stats-card.js
 ```
 
 ## Why This Structure Is Required - Notes to myself to understand HACS requirements better.
@@ -126,6 +130,7 @@ HA-menstruation-gauge-v2/
 - `menstruation_gauge.erase_all_history` (destructive, requires `erase_all: true` and explicit `entity_id`)
 - `menstruation_gauge.export_history` (export as `csv` or `txt`)
 - `menstruation_gauge.refresh_cycle_model`
+- `menstruation_gauge.log_product_usage`
 
 For multi-profile setups, target by `entity_id` (recommended).
 
@@ -150,6 +155,8 @@ Guardrails:
 - Add the customcards under `Settings -> Devices & Services` (...)-Menu "Add ressouces
     - `/menstruation_gauge/menstruation-gauge-card.js`
     - `/menstruation_gauge/menstruation-cycle-heatmap-card.js`
+    - `/menstruation_gauge/period-countdown-timer.js`
+    - `/menstruation_gauge/menstrual-product-stats-card.js`
 - Type: `JavaScript module`
   
 - restart HA
@@ -217,6 +224,42 @@ Sidenote: `symptom_entities` reflects the intended future direction of the
 heatmap card. The card is prepared for it, but the related symptom data
 sources are not yet implemented as part of this project.
 
+### Product Countdown Timer
+
+The timer card now supports direct product-consumption logging through the
+`menstruation_gauge.log_product_usage` service. When the cycle state is
+`neutral`, the timer is hidden and replaced with a "no products needed"
+message. During `period`, `fertile`, and `pms`, users can log product usage
+with one tap and restart the timer from the selected product duration.
+
+```yaml
+type: custom:period-countdown-timer
+entity: sensor.anna
+tampon_duration: 4
+pad_duration: 4
+cup_duration: 7
+underwear_duration: 6
+liner_duration: 8
+```
+
+### Product Usage Statistics Card
+
+The statistics card uses the main menstruation sensor attributes to visualize:
+- tampons per recent cycle
+- pads per recent cycle
+- menstrual cup empties per day for the last period
+- planning days until the next predicted period
+- a 30-day timeline with color-coded product usage
+
+```yaml
+type: custom:menstrual-product-stats-card
+entity: sensor.anna
+title: Product Usage
+```
+
+The repository also includes a combined dashboard example:
+`examples/product_usage_dashboard.yaml`
+
 ## History Import Example
 
 ```yaml
@@ -254,6 +297,24 @@ data:
 
 Target directory: `<config>/menstruation_gauge_exports/` 
 - status: tested in browser (works), not tested yet within HA Companion app (needed to be checked).
+
+## Product Usage Logging Example
+
+```yaml
+service: menstruation_gauge.log_product_usage
+data:
+  entity_id: sensor.anna
+  product: tampon
+  action: used
+  quantity: 1
+```
+
+Additional sensors are created automatically per profile for use in dashboards
+and automations:
+- `*_tampon_usage_today`
+- `*_pad_usage_today`
+- `*_cup_empties_today`
+- `*_product_usage_average_cycle`
 
 ## Medical and Safety Notice
 
