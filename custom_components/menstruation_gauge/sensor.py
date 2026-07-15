@@ -23,6 +23,7 @@ from .const import (
     ATTR_HISTORY,
     ATTR_NEXT_PREDICTED_START,
     ATTR_PERIOD_DURATION_DAYS,
+    ATTR_SYMPTOM_HISTORY,
     DOMAIN,
     SIGNAL_HISTORY_UPDATED,
 )
@@ -39,7 +40,7 @@ async def async_setup_entry(
 
 
 class MenstruationGaugeSensor(SensorEntity):
-    """Expose cycle state and computed attributes."""
+    """Expose cycle state and computed attributes including symptoms."""
 
     _attr_has_entity_name = True
 
@@ -78,6 +79,7 @@ class MenstruationGaugeSensor(SensorEntity):
         model = build_cycle_model(
             history=runtime.history,
             period_duration_days=runtime.period_duration_days,
+            symptom_history=runtime.symptom_history,
             today=dt_util.now().date(),
         )
 
@@ -85,6 +87,7 @@ class MenstruationGaugeSensor(SensorEntity):
         has_history = bool(model.history)
         self._attrs = {
             ATTR_HISTORY: model.history,
+            ATTR_SYMPTOM_HISTORY: model.symptom_history,
             ATTR_GROUPED_STARTS: model.grouped_starts,
             ATTR_BLEEDING_BLOCKS: model.bleeding_blocks,
             ATTR_NEXT_PREDICTED_START: model.next_predicted_start,
