@@ -16,7 +16,12 @@ class MenstruationStorage:
     """Persist and load cycle history + symptom data."""
 
     def __init__(self, hass: HomeAssistant, key: str, legacy_key: str | None = None) -> None:
-        self._store = Store(hass, STORAGE_VERSION, key)
+        self._store = Store(
+            hass,
+            STORAGE_VERSION,
+            key,
+            migrate_func=self._async_migrate_data,
+        )
         self._legacy_store = Store(hass, STORAGE_VERSION, legacy_key) if legacy_key else None
 
     async def async_load(self) -> dict:
@@ -58,6 +63,19 @@ class MenstruationStorage:
             "period_duration_days": days,
             "symptom_history": symptoms
         })
+
+    @staticmethod
+    async def _async_migrate_data(version: int, minor_version: int, data: dict[str, Any]) -> dict[str, Any]:
+        """Migrate data from v1 to v2."""
+        # v1 -> v2: Add symptom_history field
+        if version == 1:
+            # Ensure symptom_history exists for v1 -> v2 migration
+            if "symptom_history" not in data:
+                data["symptom_history"] = []
+            return data
+        
+        # If already v2, return as-is
+        return data
 
     @staticmethod
     def _normalize_iso(value: str) -> str | None:
