@@ -5,7 +5,7 @@ from __future__ import annotations
 DOMAIN = "menstruation_gauge"
 PLATFORMS = ["sensor"]
 
-STORAGE_VERSION = 3
+STORAGE_VERSION = 1
 STORAGE_KEY = "menstruation_gauge.history"
 
 CONF_NAME = "name"
