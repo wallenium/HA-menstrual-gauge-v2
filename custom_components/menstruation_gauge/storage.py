@@ -13,7 +13,7 @@ from .const import STORAGE_KEY, STORAGE_VERSION
 
 
 class MenstruationStorage:
-    """Persist and load cycle history + symptom data."""
+    """Persist and load cycle history + symptom data + pregnancy data."""
 
     def __init__(self, hass: HomeAssistant, key: str, legacy_key: str | None = None) -> None:
         self._store = Store(
@@ -33,7 +33,12 @@ class MenstruationStorage:
                 data = legacy_data
 
         if not isinstance(data, dict):
-            return {"history": [], "period_duration_days": 5, "symptom_history": []}
+            return {
+                "history": [],
+                "period_duration_days": 5,
+                "symptom_history": [],
+                "pregnancy_data": {"is_pregnant": False, "start_date": None},
+            }
 
         history = data.get("history", [])
         if not isinstance(history, list):
@@ -51,29 +56,52 @@ class MenstruationStorage:
         if not isinstance(symptom_history, list):
             symptom_history = []
 
-        return {"history": normalized, "period_duration_days": days, "symptom_history": self._normalize_symptoms(symptom_history)}
+        pregnancy_data = data.get("pregnancy_data", {})
+        if not isinstance(pregnancy_data, dict):
+            pregnancy_data = {}
+        pregnancy_data.setdefault("is_pregnant", False)
+        pregnancy_data.setdefault("start_date", None)
 
-    async def async_save(self, history: Iterable[str], period_duration_days: int, symptom_history: list[dict[str, Any]] | None = None) -> None:
+        return {
+            "history": normalized,
+            "period_duration_days": days,
+            "symptom_history": self._normalize_symptoms(symptom_history),
+            "pregnancy_data": pregnancy_data,
+        }
+
+    async def async_save(
+        self,
+        history: Iterable[str],
+        period_duration_days: int,
+        symptom_history: list[dict[str, Any]] | None = None,
+        pregnancy_data: dict[str, Any] | None = None,
+    ) -> None:
         """Save data to storage."""
         normalized = sorted({self._normalize_iso(raw) for raw in history if self._normalize_iso(raw)})
         days = max(1, min(14, int(period_duration_days)))
         symptoms = self._normalize_symptoms(symptom_history or [])
-        await self._store.async_save({
-            "history": normalized,
-            "period_duration_days": days,
-            "symptom_history": symptoms
-        })
+        preg_data = pregnancy_data or {"is_pregnant": False, "start_date": None}
+
+        await self._store.async_save(
+            {
+                "history": normalized,
+                "period_duration_days": days,
+                "symptom_history": symptoms,
+                "pregnancy_data": preg_data,
+            }
+        )
 
     @staticmethod
     async def _async_migrate_data(version: int, minor_version: int, data: dict[str, Any]) -> dict[str, Any]:
         """Migrate data from v1 to v2."""
-        # v1 -> v2: Add symptom_history field
+        # v1 -> v2: Add symptom_history and pregnancy_data fields
         if version == 1:
-            # Ensure symptom_history exists for v1 -> v2 migration
             if "symptom_history" not in data:
                 data["symptom_history"] = []
+            if "pregnancy_data" not in data:
+                data["pregnancy_data"] = {"is_pregnant": False, "start_date": None}
             return data
-        
+
         # If already v2, return as-is
         return data
 
