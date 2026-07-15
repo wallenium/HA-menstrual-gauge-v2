@@ -17,13 +17,17 @@ from .const import (
     ATTR_AVG_CYCLE_LENGTH,
     ATTR_BLEEDING_BLOCKS,
     ATTR_DAYS_UNTIL_NEXT_START,
+    ATTR_DUE_DATE,
     ATTR_FERTILE_WINDOW_END,
     ATTR_FERTILE_WINDOW_START,
     ATTR_GROUPED_STARTS,
     ATTR_HISTORY,
+    ATTR_IS_PREGNANT,
     ATTR_NEXT_PREDICTED_START,
     ATTR_PERIOD_DURATION_DAYS,
+    ATTR_PREGNANCY_START_DATE,
     ATTR_SYMPTOM_HISTORY,
+    ATTR_WEEKS_PREGNANT,
     DOMAIN,
     SIGNAL_HISTORY_UPDATED,
 )
@@ -40,7 +44,7 @@ async def async_setup_entry(
 
 
 class MenstruationGaugeSensor(SensorEntity):
-    """Expose cycle state and computed attributes including symptoms."""
+    """Expose cycle state and computed attributes including symptoms and pregnancy."""
 
     _attr_has_entity_name = True
 
@@ -80,6 +84,7 @@ class MenstruationGaugeSensor(SensorEntity):
             history=runtime.history,
             period_duration_days=runtime.period_duration_days,
             symptom_history=runtime.symptom_history,
+            pregnancy_data=runtime.pregnancy_data,
             today=dt_util.now().date(),
         )
 
@@ -98,6 +103,10 @@ class MenstruationGaugeSensor(SensorEntity):
             ATTR_PERIOD_DURATION_DAYS: model.period_duration_days if has_history else None,
             "period_duration_default_days": runtime.period_duration_days if has_history else None,
             "period_duration_learned_avg_days": model.learned_period_duration_days if has_history else None,
+            ATTR_IS_PREGNANT: model.is_pregnant,
+            ATTR_PREGNANCY_START_DATE: model.pregnancy_start_date,
+            ATTR_WEEKS_PREGNANT: model.weeks_pregnant,
+            ATTR_DUE_DATE: model.due_date,
             "profile": runtime.profile,
             "entry_id": self._entry.entry_id,
             "friendly_name": runtime.friendly_name,
