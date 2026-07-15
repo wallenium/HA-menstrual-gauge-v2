@@ -16,7 +16,12 @@ class MenstruationStorage:
     """Persist and load cycle history + symptom data + product usage + pregnancy data."""
 
     def __init__(self, hass: HomeAssistant, key: str, legacy_key: str | None = None) -> None:
-        self._store = Store(hass, STORAGE_VERSION, key)
+        self._store = Store(
+            hass,
+            STORAGE_VERSION,
+            key,
+            async_migrate_func=self._async_migrate_data,
+        )
         self._legacy_store = Store(hass, STORAGE_VERSION, legacy_key) if legacy_key else None
 
     async def async_load(self) -> dict:
