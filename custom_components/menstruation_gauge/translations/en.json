@@ -14,5 +14,41 @@
     "error": {
       "invalid_profile": "Profile must contain letters or numbers."
     }
+  },
+  "services": {
+    "log_product_usage": {
+      "name": "Log product usage",
+      "description": "Log period-product usage for timer integrations and long-term statistics.",
+      "fields": {
+        "entity_id": {
+          "name": "Entity",
+          "description": "Target menstruation gauge sensor."
+        },
+        "profile": {
+          "name": "Profile",
+          "description": "Configured profile slug."
+        },
+        "entry_id": {
+          "name": "Entry ID",
+          "description": "Config entry identifier."
+        },
+        "product": {
+          "name": "Product",
+          "description": "Product type to log."
+        },
+        "action": {
+          "name": "Action",
+          "description": "Usage action, for example used or emptied."
+        },
+        "quantity": {
+          "name": "Quantity",
+          "description": "How many products or emptying events to add."
+        },
+        "date": {
+          "name": "Date",
+          "description": "Optional ISO date to backfill. Defaults to today."
+        }
+      }
+    }
   }
 }

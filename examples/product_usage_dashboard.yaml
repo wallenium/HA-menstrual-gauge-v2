@@ -1,0 +1,20 @@
+type: vertical-stack
+cards:
+  - type: custom:menstruation-gauge-card
+    entity: sensor.anna
+    title: Cycle Overview
+    show_editor: true
+    show_fertile_period: true
+    calendar_edit_enabled: true
+
+  - type: custom:period-countdown-timer
+    entity: sensor.anna
+    tampon_duration: 4
+    pad_duration: 4
+    cup_duration: 7
+    underwear_duration: 6
+    liner_duration: 8
+
+  - type: custom:menstrual-product-stats-card
+    entity: sensor.anna
+    title: Product Usage

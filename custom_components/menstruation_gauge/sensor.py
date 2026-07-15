@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from datetime import date, datetime
+from statistics import mean
+from typing import Any
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
@@ -25,13 +28,14 @@ from .const import (
     ATTR_IS_PREGNANT,
     ATTR_NEXT_PREDICTED_START,
     ATTR_PERIOD_DURATION_DAYS,
+    ATTR_PRODUCT_USAGE,
     ATTR_PREGNANCY_START_DATE,
     ATTR_SYMPTOM_HISTORY,
     ATTR_WEEKS_PREGNANT,
     DOMAIN,
     SIGNAL_HISTORY_UPDATED,
 )
-from .model import build_cycle_model
+from .model import bleeding_blocks, build_cycle_model, normalize_history
 
 
 async def async_setup_entry(
@@ -40,7 +44,111 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up sensor from config entry."""
-    async_add_entities([MenstruationGaugeSensor(hass, entry)], True)
+    async_add_entities(
+        [
+            MenstruationGaugeSensor(hass, entry),
+            ProductUsageTodaySensor(hass, entry, "tampon"),
+            ProductUsageTodaySensor(hass, entry, "pad"),
+            CupEmptiesTodaySensor(hass, entry),
+            ProductUsageAverageCycleSensor(hass, entry),
+        ],
+        True,
+    )
+
+
+def _group_product_usage_by_date(product_usage: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for entry in product_usage:
+        date_str = entry.get("date")
+        if isinstance(date_str, str):
+            grouped[date_str].append(entry)
+    return grouped
+
+
+def _product_usage_for_range(
+    grouped_usage: dict[str, list[dict[str, Any]]],
+    start: str,
+    end: str,
+    *,
+    product: str | None = None,
+    action: str | None = None,
+) -> int:
+    start_date = date.fromisoformat(start)
+    end_date = date.fromisoformat(end)
+    count = 0
+    for day_entries_date, day_entries in grouped_usage.items():
+        try:
+            entry_date = date.fromisoformat(day_entries_date)
+        except ValueError:
+            continue
+        if entry_date < start_date or entry_date > end_date:
+            continue
+        for entry in day_entries:
+            if product and entry.get("product") != product:
+                continue
+            if action and entry.get("action") != action:
+                continue
+            count += int(entry.get("quantity", 1) or 1)
+    return count
+
+
+def _build_product_usage_stats(
+    history: list[str],
+    product_usage: list[dict[str, Any]],
+    today: date,
+) -> dict[str, Any]:
+    normalized_history = normalize_history(history)
+    usable_history = [item for item in normalized_history if item <= today.isoformat()] or normalized_history
+    blocks = bleeding_blocks(usable_history)
+    grouped_usage = _group_product_usage_by_date(product_usage)
+
+    today_iso = today.isoformat()
+    today_entries = grouped_usage.get(today_iso, [])
+    today_tampons = sum(int(entry.get("quantity", 1) or 1) for entry in today_entries if entry.get("product") == "tampon")
+    today_pads = sum(int(entry.get("quantity", 1) or 1) for entry in today_entries if entry.get("product") == "pad")
+    today_cup_empties = sum(
+        int(entry.get("quantity", 1) or 1)
+        for entry in today_entries
+        if entry.get("product") == "cup" and entry.get("action") == "emptied"
+    )
+
+    recent_blocks = blocks[-3:]
+    tampon_cycle_counts = [
+        _product_usage_for_range(grouped_usage, block[0], block[-1], product="tampon")
+        for block in recent_blocks
+        if block
+    ]
+    pad_cycle_counts = [
+        _product_usage_for_range(grouped_usage, block[0], block[-1], product="pad")
+        for block in recent_blocks
+        if block
+    ]
+    cup_cycle_counts = [
+        _product_usage_for_range(grouped_usage, block[0], block[-1], product="cup", action="emptied")
+        for block in recent_blocks
+        if block
+    ]
+
+    overall_cycle_counts = [
+        _product_usage_for_range(grouped_usage, block[0], block[-1])
+        for block in recent_blocks
+        if block
+    ]
+
+    return {
+        "today": {
+            "tampon": today_tampons,
+            "pad": today_pads,
+            "cup_empties": today_cup_empties,
+        },
+        "averages_per_cycle": {
+            "overall": round(mean(overall_cycle_counts), 1) if overall_cycle_counts else 0.0,
+            "tampon": round(mean(tampon_cycle_counts), 1) if tampon_cycle_counts else 0.0,
+            "pad": round(mean(pad_cycle_counts), 1) if pad_cycle_counts else 0.0,
+            "cup_empties": round(mean(cup_cycle_counts), 1) if cup_cycle_counts else 0.0,
+            "cycles_considered": len(recent_blocks),
+        },
+    }
 
 
 class MenstruationGaugeSensor(SensorEntity):
@@ -87,12 +195,14 @@ class MenstruationGaugeSensor(SensorEntity):
             pregnancy_data=runtime.pregnancy_data,
             today=dt_util.now().date(),
         )
+        usage_stats = _build_product_usage_stats(runtime.history, runtime.product_usage, dt_util.now().date())
 
         self._state = model.state
         has_history = bool(model.history)
         self._attrs = {
             ATTR_HISTORY: model.history,
             ATTR_SYMPTOM_HISTORY: model.symptom_history,
+            ATTR_PRODUCT_USAGE: runtime.product_usage,
             ATTR_GROUPED_STARTS: model.grouped_starts,
             ATTR_BLEEDING_BLOCKS: model.bleeding_blocks,
             ATTR_NEXT_PREDICTED_START: model.next_predicted_start,
@@ -110,6 +220,7 @@ class MenstruationGaugeSensor(SensorEntity):
             "profile": runtime.profile,
             "entry_id": self._entry.entry_id,
             "friendly_name": runtime.friendly_name,
+            "product_usage_stats": usage_stats,
         }
 
     @property
@@ -171,6 +282,165 @@ class MenstruationGaugeSensor(SensorEntity):
     def entity_registry_enabled_default(self) -> bool:
         """Enable by default."""
         return True
+
+    def _handle_runtime_update(self) -> None:
+        self.async_schedule_update_ha_state(True)
+
+    def _handle_daily_refresh(self, _now: datetime) -> None:
+        self.async_schedule_update_ha_state(True)
+
+
+class ProductUsageTodaySensor(SensorEntity):
+    """Count logged tampon or pad usage for today."""
+
+    _attr_has_entity_name = True
+    _product_labels = {
+        "tampon": ("Tampon usage today", "mdi:water-opacity"),
+        "pad": ("Pad usage today", "mdi:medical-bag"),
+        "cup": ("Cup empties today", "mdi:cup-water"),
+    }
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, product: str) -> None:
+        self.hass = hass
+        self._entry = entry
+        self._product = product
+        self._attr_unique_id = f"{entry.entry_id}_{product}_usage_today"
+        self._attr_name, self._icon = self._product_labels[product]
+        self._attr_native_unit_of_measurement = "items"
+        self._attr_native_value = 0
+        self._attrs: dict[str, StateType] = {}
+
+    async def async_added_to_hass(self) -> None:
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_HISTORY_UPDATED, self._handle_runtime_update)
+        )
+        self.async_on_remove(
+            async_track_time_change(
+                self.hass,
+                self._handle_daily_refresh,
+                hour=0,
+                minute=0,
+                second=5,
+            )
+        )
+
+    async def async_update(self) -> None:
+        runtime = self.hass.data[DOMAIN][self._entry.entry_id]
+        self._attr_native_value = _build_product_usage_stats(
+            runtime.history,
+            runtime.product_usage,
+            dt_util.now().date(),
+        )["today"][self._product]
+        self._attrs = {"profile": runtime.profile}
+
+    @property
+    def native_value(self) -> StateType:
+        return self._attr_native_value
+
+    @property
+    def extra_state_attributes(self) -> dict[str, StateType]:
+        return self._attrs
+
+    @property
+    def icon(self) -> str | None:
+        return self._icon
+
+    @property
+    def should_poll(self) -> bool:
+        return False
+
+    @property
+    def available(self) -> bool:
+        return self._entry.entry_id in self.hass.data.get(DOMAIN, {})
+
+    def _handle_runtime_update(self) -> None:
+        self.async_schedule_update_ha_state(True)
+
+    def _handle_daily_refresh(self, _now: datetime) -> None:
+        self.async_schedule_update_ha_state(True)
+
+
+class CupEmptiesTodaySensor(ProductUsageTodaySensor):
+    """Count logged menstrual cup emptying events for today."""
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+        super().__init__(hass, entry, "cup")
+        self._attr_unique_id = f"{entry.entry_id}_cup_empties_today"
+        self._attr_name = "Cup empties today"
+        self._icon = "mdi:cup-water"
+        self._attr_native_unit_of_measurement = "empties"
+
+    async def async_update(self) -> None:
+        runtime = self.hass.data[DOMAIN][self._entry.entry_id]
+        self._attr_native_value = _build_product_usage_stats(
+            runtime.history,
+            runtime.product_usage,
+            dt_util.now().date(),
+        )["today"]["cup_empties"]
+        self._attrs = {"profile": runtime.profile}
+
+
+class ProductUsageAverageCycleSensor(SensorEntity):
+    """Average logged product usage per recent cycle."""
+
+    _attr_has_entity_name = True
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+        self.hass = hass
+        self._entry = entry
+        self._attr_unique_id = f"{entry.entry_id}_product_usage_average_cycle"
+        self._attr_name = "Product usage average cycle"
+        self._icon = "mdi:chart-line"
+        self._attr_native_unit_of_measurement = "items/cycle"
+        self._attr_native_value = 0.0
+        self._attrs: dict[str, StateType] = {}
+
+    async def async_added_to_hass(self) -> None:
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_HISTORY_UPDATED, self._handle_runtime_update)
+        )
+        self.async_on_remove(
+            async_track_time_change(
+                self.hass,
+                self._handle_daily_refresh,
+                hour=0,
+                minute=0,
+                second=5,
+            )
+        )
+
+    async def async_update(self) -> None:
+        runtime = self.hass.data[DOMAIN][self._entry.entry_id]
+        stats = _build_product_usage_stats(runtime.history, runtime.product_usage, dt_util.now().date())
+        averages = stats["averages_per_cycle"]
+        self._attr_native_value = averages["overall"]
+        self._attrs = {
+            "profile": runtime.profile,
+            "tampon_average_per_cycle": averages["tampon"],
+            "pad_average_per_cycle": averages["pad"],
+            "cup_empties_average_per_cycle": averages["cup_empties"],
+            "cycles_considered": averages["cycles_considered"],
+        }
+
+    @property
+    def native_value(self) -> StateType:
+        return self._attr_native_value
+
+    @property
+    def extra_state_attributes(self) -> dict[str, StateType]:
+        return self._attrs
+
+    @property
+    def icon(self) -> str | None:
+        return self._icon
+
+    @property
+    def should_poll(self) -> bool:
+        return False
+
+    @property
+    def available(self) -> bool:
+        return self._entry.entry_id in self.hass.data.get(DOMAIN, {})
 
     def _handle_runtime_update(self) -> None:
         self.async_schedule_update_ha_state(True)

@@ -13,7 +13,7 @@ from .const import STORAGE_KEY, STORAGE_VERSION
 
 
 class MenstruationStorage:
-    """Persist and load cycle history + symptom data + pregnancy data."""
+    """Persist and load cycle history + symptom data + product usage + pregnancy data."""
 
     def __init__(self, hass: HomeAssistant, key: str, legacy_key: str | None = None) -> None:
         self._store = Store(
@@ -37,6 +37,7 @@ class MenstruationStorage:
                 "history": [],
                 "period_duration_days": 5,
                 "symptom_history": [],
+                "product_usage": [],
                 "pregnancy_data": {"is_pregnant": False, "start_date": None},
             }
 
@@ -56,6 +57,10 @@ class MenstruationStorage:
         if not isinstance(symptom_history, list):
             symptom_history = []
 
+        product_usage = data.get("product_usage", [])
+        if not isinstance(product_usage, list):
+            product_usage = []
+
         pregnancy_data = data.get("pregnancy_data", {})
         if not isinstance(pregnancy_data, dict):
             pregnancy_data = {}
@@ -66,6 +71,7 @@ class MenstruationStorage:
             "history": normalized,
             "period_duration_days": days,
             "symptom_history": self._normalize_symptoms(symptom_history),
+            "product_usage": self._normalize_product_usage(product_usage),
             "pregnancy_data": pregnancy_data,
         }
 
@@ -74,12 +80,14 @@ class MenstruationStorage:
         history: Iterable[str],
         period_duration_days: int,
         symptom_history: list[dict[str, Any]] | None = None,
+        product_usage: list[dict[str, Any]] | None = None,
         pregnancy_data: dict[str, Any] | None = None,
     ) -> None:
         """Save data to storage."""
         normalized = sorted({self._normalize_iso(raw) for raw in history if self._normalize_iso(raw)})
         days = max(1, min(14, int(period_duration_days)))
         symptoms = self._normalize_symptoms(symptom_history or [])
+        usage = self._normalize_product_usage(product_usage or [])
         preg_data = pregnancy_data or {"is_pregnant": False, "start_date": None}
 
         await self._store.async_save(
@@ -87,22 +95,37 @@ class MenstruationStorage:
                 "history": normalized,
                 "period_duration_days": days,
                 "symptom_history": symptoms,
+                "product_usage": usage,
                 "pregnancy_data": preg_data,
             }
         )
 
+    async def async_load_product_usage(self) -> list[dict[str, Any]]:
+        """Load only normalized product usage history."""
+        data = await self.async_load()
+        return data["product_usage"]
+
+    async def async_save_product_usage(self, product_usage: list[dict[str, Any]]) -> None:
+        """Persist product usage while preserving the remaining stored fields."""
+        data = await self.async_load()
+        await self.async_save(
+            data["history"],
+            data["period_duration_days"],
+            data.get("symptom_history", []),
+            product_usage,
+            data.get("pregnancy_data"),
+        )
+
     @staticmethod
     async def _async_migrate_data(version: int, minor_version: int, data: dict[str, Any]) -> dict[str, Any]:
-        """Migrate data from v1 to v2."""
-        # v1 -> v2: Add symptom_history and pregnancy_data fields
-        if version == 1:
+        """Migrate stored payloads to the current schema."""
+        if version <= 2:
             if "symptom_history" not in data:
                 data["symptom_history"] = []
+            if "product_usage" not in data:
+                data["product_usage"] = []
             if "pregnancy_data" not in data:
                 data["pregnancy_data"] = {"is_pregnant": False, "start_date": None}
-            return data
-
-        # If already v2, return as-is
         return data
 
     @staticmethod
@@ -129,3 +152,38 @@ class MenstruationStorage:
             except ValueError:
                 continue
         return sorted(seen.values(), key=lambda x: x.get("date", ""))
+
+    @staticmethod
+    def _normalize_product_usage(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Normalize product usage entries and drop invalid items."""
+        normalized: list[dict[str, Any]] = []
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+
+            date_str = MenstruationStorage._normalize_iso(entry.get("date"))
+            product = str(entry.get("product", "")).strip().lower()
+            action = str(entry.get("action", "used")).strip().lower() or "used"
+
+            if not date_str or not product:
+                continue
+
+            try:
+                quantity = max(1, int(entry.get("quantity", 1)))
+            except (TypeError, ValueError):
+                quantity = 1
+
+            normalized_entry: dict[str, Any] = {
+                "date": date_str,
+                "product": product,
+                "quantity": quantity,
+                "action": action,
+            }
+
+            notes = entry.get("notes")
+            if isinstance(notes, str) and notes.strip():
+                normalized_entry["notes"] = notes.strip()
+
+            normalized.append(normalized_entry)
+
+        return sorted(normalized, key=lambda item: (item.get("date", ""), item.get("product", ""), item.get("action", "")))

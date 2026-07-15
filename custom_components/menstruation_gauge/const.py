@@ -5,7 +5,7 @@ from __future__ import annotations
 DOMAIN = "menstruation_gauge"
 PLATFORMS = ["sensor"]
 
-STORAGE_VERSION = 2
+STORAGE_VERSION = 3
 STORAGE_KEY = "menstruation_gauge.history"
 
 CONF_NAME = "name"
@@ -19,6 +19,7 @@ DEFAULT_PERIOD_DURATION_DAYS = 5
 
 ATTR_HISTORY = "history"
 ATTR_SYMPTOM_HISTORY = "symptom_history"
+ATTR_PRODUCT_USAGE = "product_usage"
 ATTR_GROUPED_STARTS = "grouped_starts"
 ATTR_BLEEDING_BLOCKS = "bleeding_blocks"
 ATTR_NEXT_PREDICTED_START = "next_predicted_start"
@@ -46,6 +47,7 @@ SERVICE_SET_PERIOD_DURATION = "set_period_duration"
 SERVICE_ERASE_ALL_HISTORY = "erase_all_history"
 SERVICE_EXPORT_HISTORY = "export_history"
 SERVICE_REFRESH_CYCLE_MODEL = "refresh_cycle_model"
+SERVICE_LOG_PRODUCT_USAGE = "log_product_usage"
 SERVICE_ADD_SYMPTOM = "add_symptom"
 SERVICE_REMOVE_SYMPTOM = "remove_symptom"
 SERVICE_GET_SYMPTOM = "get_symptom"
@@ -67,6 +69,9 @@ SERVICE_FIELD_PROFILE = "profile"
 SERVICE_FIELD_ENTRY_ID = "entry_id"
 SERVICE_FIELD_ENTITY_ID = "entity_id"
 SERVICE_FIELD_SYMPTOM_DATA = "symptom_data"
+SERVICE_FIELD_PRODUCT = "product"
+SERVICE_FIELD_QUANTITY = "quantity"
+SERVICE_FIELD_ACTION = "action"
 SERVICE_FIELD_IS_PREGNANT = "is_pregnant"
 SERVICE_FIELD_PREGNANCY_START_DATE = "pregnancy_start_date"
 SERVICE_FIELD_ESTIMATED_MENARCHE_DATE = "estimated_menarche_date"

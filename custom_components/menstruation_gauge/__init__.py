@@ -20,11 +20,13 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_time_change
+from homeassistant.util import dt as dt_util
 from homeassistant.util import slugify
 
 from .const import (
     ATTR_HISTORY,
     ATTR_PERIOD_DURATION_DAYS,
+    ATTR_PRODUCT_USAGE,
     ATTR_SYMPTOM_HISTORY,
     CONF_FRIENDLY_NAME,
     CONF_ICON,
@@ -34,6 +36,7 @@ from .const import (
     DEFAULT_PERIOD_DURATION_DAYS,
     DOMAIN,
     SERVICE_ADD_CYCLE_START,
+    SERVICE_FIELD_ACTION,
     SERVICE_ADD_SYMPTOM,
     SERVICE_ERASE_ALL_HISTORY,
     SERVICE_EXPORT_HISTORY,
@@ -46,10 +49,13 @@ from .const import (
     SERVICE_FIELD_FILENAME,
     SERVICE_FIELD_FORMAT,
     SERVICE_FIELD_IS_PREGNANT,
+    SERVICE_FIELD_PRODUCT,
     SERVICE_FIELD_PREGNANCY_START_DATE,
     SERVICE_FIELD_PROFILE,
+    SERVICE_FIELD_QUANTITY,
     SERVICE_FIELD_SYMPTOM_DATA,
     SERVICE_GET_SYMPTOM,
+    SERVICE_LOG_PRODUCT_USAGE,
     SERVICE_REFRESH_CYCLE_MODEL,
     SERVICE_REMOVE_CYCLE_START,
     SERVICE_REMOVE_SYMPTOM,
@@ -66,8 +72,18 @@ from .storage import MenstruationStorage
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 CARD_RESOURCE_URL = "/menstruation_gauge/menstruation-gauge-card.js"
 HEATMAP_RESOURCE_URL = "/menstruation_gauge/menstruation-cycle-heatmap-card.js"
+TIMER_RESOURCE_URL = "/menstruation_gauge/period-countdown-timer.js"
+PRODUCT_STATS_RESOURCE_URL = "/menstruation_gauge/menstrual-product-stats-card.js"
 CARD_RESOURCE_TYPE = "module"
 EXPORT_DIR_NAME = "menstruation_gauge_exports"
+LOVELACE_RESOURCES = (
+    (CARD_RESOURCE_URL, "menstruation-gauge-card.js"),
+    (HEATMAP_RESOURCE_URL, "menstruation-cycle-heatmap-card.js"),
+    (TIMER_RESOURCE_URL, "period-countdown-timer.js"),
+    (PRODUCT_STATS_RESOURCE_URL, "menstrual-product-stats-card.js"),
+)
+VALID_PRODUCT_USAGE_PRODUCTS = {"tampon", "pad", "cup", "underwear", "liner"}
+VALID_PRODUCT_USAGE_ACTIONS = {"used", "emptied"}
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -83,6 +99,7 @@ class MenstruationRuntime:
     history: list[str]
     period_duration_days: int
     symptom_history: list[dict[str, Any]]
+    product_usage: list[dict[str, Any]]
     pregnancy_data: dict[str, Any] = field(default_factory=lambda: {"is_pregnant": False, "start_date": None})
     unregister_midnight_listener: Callable[[], None] | None = None
 
@@ -167,6 +184,7 @@ async def _async_save_and_notify(hass: HomeAssistant, runtime: MenstruationRunti
         runtime.history,
         runtime.period_duration_days,
         runtime.symptom_history,
+        runtime.product_usage,
         runtime.pregnancy_data,
     )
     await _async_refresh_cycle_model(hass, {_entry_id_for_runtime(hass, runtime)})
@@ -257,6 +275,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         history=stored[ATTR_HISTORY],
         period_duration_days=stored.get(ATTR_PERIOD_DURATION_DAYS, DEFAULT_PERIOD_DURATION_DAYS),
         symptom_history=stored.get(ATTR_SYMPTOM_HISTORY, []),
+        product_usage=stored.get(ATTR_PRODUCT_USAGE, []),
         pregnancy_data=stored.get("pregnancy_data", {"is_pregnant": False, "start_date": None}),
     )
 
@@ -290,6 +309,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     async def async_refresh_cycle_model(call: ServiceCall) -> None:
         await _async_handle_refresh_cycle_model(hass, call)
+
+    async def async_log_product_usage(call: ServiceCall) -> None:
+        await _async_handle_log_product_usage(hass, call)
 
     async def async_add_symptom(call: ServiceCall) -> None:
         await _async_handle_add_symptom(hass, call)
@@ -385,6 +407,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             schema=vol.Schema(common_profile_field),
         )
 
+    if not hass.services.has_service(DOMAIN, SERVICE_LOG_PRODUCT_USAGE):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_LOG_PRODUCT_USAGE,
+            async_log_product_usage,
+            schema=vol.Schema(
+                {
+                    **common_profile_field,
+                    vol.Required(SERVICE_FIELD_PRODUCT): cv.string,
+                    vol.Optional(SERVICE_FIELD_ACTION, default="used"): vol.In(VALID_PRODUCT_USAGE_ACTIONS),
+                    vol.Optional(SERVICE_FIELD_QUANTITY, default=1): vol.All(vol.Coerce(int), vol.Range(min=1, max=50)),
+                    vol.Optional(SERVICE_FIELD_DATE): cv.string,
+                }
+            ),
+        )
+
     if not hass.services.has_service(DOMAIN, SERVICE_ADD_SYMPTOM):
         hass.services.async_register(
             DOMAIN,
@@ -448,6 +486,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_ERASE_ALL_HISTORY,
             SERVICE_EXPORT_HISTORY,
             SERVICE_REFRESH_CYCLE_MODEL,
+            SERVICE_LOG_PRODUCT_USAGE,
             SERVICE_ADD_SYMPTOM,
             SERVICE_REMOVE_SYMPTOM,
             SERVICE_GET_SYMPTOM,
@@ -540,6 +579,34 @@ async def _async_handle_refresh_cycle_model(hass: HomeAssistant, call: ServiceCa
     await _async_refresh_cycle_model(hass, _target_entry_ids_for_call(hass, call))
 
 
+async def _async_handle_log_product_usage(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Log product usage for the selected profile/entity."""
+    runtime = _runtime_for_call(hass, call)
+    product = str(call.data.get(SERVICE_FIELD_PRODUCT, "")).strip().lower()
+    action = str(call.data.get(SERVICE_FIELD_ACTION, "used")).strip().lower() or "used"
+    quantity = int(call.data.get(SERVICE_FIELD_QUANTITY, 1))
+    raw_date = call.data.get(SERVICE_FIELD_DATE)
+    date_iso = _normalize_date_or_raise(raw_date) if raw_date else dt_util.now().date().isoformat()
+
+    if product not in VALID_PRODUCT_USAGE_PRODUCTS:
+        valid_products = ", ".join(sorted(VALID_PRODUCT_USAGE_PRODUCTS))
+        raise HomeAssistantError(f"Unsupported product '{product}'. Use one of: {valid_products}")
+
+    if action not in VALID_PRODUCT_USAGE_ACTIONS:
+        valid_actions = ", ".join(sorted(VALID_PRODUCT_USAGE_ACTIONS))
+        raise HomeAssistantError(f"Unsupported action '{action}'. Use one of: {valid_actions}")
+
+    runtime.product_usage.append(
+        {
+            "date": date_iso,
+            "product": product,
+            "quantity": max(1, quantity),
+            "action": action,
+        }
+    )
+    await _async_save_and_notify(hass, runtime)
+
+
 async def _async_handle_add_symptom(hass: HomeAssistant, call: ServiceCall) -> None:
     """Add or update symptom data for a date."""
     runtime = _runtime_for_call(hass, call)
@@ -620,7 +687,7 @@ async def _maybe_await(result: Any) -> Any:
 
 
 async def _async_ensure_lovelace_resource(hass: HomeAssistant) -> None:
-    """Auto-register Lovelace JS resource for storage dashboards."""
+    """Auto-register Lovelace JS resources for storage dashboards."""
     try:
         from homeassistant.components.lovelace.resources import async_get_resource_collection
     except Exception as err:
@@ -630,33 +697,41 @@ async def _async_ensure_lovelace_resource(hass: HomeAssistant) -> None:
     try:
         collection = await _maybe_await(async_get_resource_collection(hass))
         items = await _maybe_await(collection.async_items())
-        for item in items or []:
-            if isinstance(item, dict) and item.get("url") == CARD_RESOURCE_URL:
-                return
-        created = False
-        for payload in (
-            {"url": CARD_RESOURCE_URL, "res_type": CARD_RESOURCE_TYPE},
-            {"url": CARD_RESOURCE_URL, "type": CARD_RESOURCE_TYPE},
-        ):
-            try:
-                await _maybe_await(collection.async_create_item(payload))
-                created = True
-                break
-            except Exception:
+        existing_urls = {
+            item.get("url")
+            for item in items or []
+            if isinstance(item, dict) and item.get("url")
+        }
+
+        for resource_url, _filename in LOVELACE_RESOURCES:
+            if resource_url in existing_urls:
                 continue
-        if created:
-            _LOGGER.info("Registered Lovelace resource automatically: %s", CARD_RESOURCE_URL)
-        else:
-            _LOGGER.warning("Could not auto-register Lovelace resource. Add manually: %s", CARD_RESOURCE_URL)
+
+            created = False
+            for payload in (
+                {"url": resource_url, "res_type": CARD_RESOURCE_TYPE},
+                {"url": resource_url, "type": CARD_RESOURCE_TYPE},
+            ):
+                try:
+                    await _maybe_await(collection.async_create_item(payload))
+                    created = True
+                    break
+                except Exception:
+                    continue
+
+            if created:
+                _LOGGER.info("Registered Lovelace resource automatically: %s", resource_url)
+            else:
+                _LOGGER.warning("Could not auto-register Lovelace resource. Add manually: %s", resource_url)
     except Exception as err:
-        _LOGGER.warning("Auto-registration of Lovelace resource failed, add manually: %s (%s)", CARD_RESOURCE_URL, err)
+        _LOGGER.warning("Auto-registration of Lovelace resources failed, add them manually (%s)", err)
 
 
 async def _async_register_card_static_path(hass: HomeAssistant) -> None:
     """Register card JS files as static paths across HA core API variants."""
     static_files = [
-        (CARD_RESOURCE_URL, str(Path(__file__).parent / "www" / "menstruation-gauge-card.js")),
-        (HEATMAP_RESOURCE_URL, str(Path(__file__).parent / "www" / "menstruation-cycle-heatmap-card.js")),
+        (url, str(Path(__file__).parent / "www" / filename))
+        for url, filename in LOVELACE_RESOURCES
     ]
     if hasattr(hass.http, "async_register_static_paths"):
         try:
