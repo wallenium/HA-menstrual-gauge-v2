@@ -25,6 +25,7 @@ from homeassistant.util import slugify
 from .const import (
     ATTR_HISTORY,
     ATTR_PERIOD_DURATION_DAYS,
+    ATTR_SYMPTOM_HISTORY,
     CONF_FRIENDLY_NAME,
     CONF_ICON,
     CONF_NAME,
@@ -33,9 +34,9 @@ from .const import (
     DEFAULT_PERIOD_DURATION_DAYS,
     DOMAIN,
     SERVICE_ADD_CYCLE_START,
+    SERVICE_ADD_SYMPTOM,
     SERVICE_ERASE_ALL_HISTORY,
     SERVICE_EXPORT_HISTORY,
-    SERVICE_REFRESH_CYCLE_MODEL,
     SERVICE_FIELD_DATE,
     SERVICE_FIELD_DATES,
     SERVICE_FIELD_DAYS,
@@ -45,7 +46,11 @@ from .const import (
     SERVICE_FIELD_FILENAME,
     SERVICE_FIELD_FORMAT,
     SERVICE_FIELD_PROFILE,
+    SERVICE_FIELD_SYMPTOM_DATA,
+    SERVICE_GET_SYMPTOM,
+    SERVICE_REFRESH_CYCLE_MODEL,
     SERVICE_REMOVE_CYCLE_START,
+    SERVICE_REMOVE_SYMPTOM,
     SERVICE_SET_CYCLE_HISTORY,
     SERVICE_SET_PERIOD_DURATION,
     SIGNAL_HISTORY_UPDATED,
@@ -73,6 +78,7 @@ class MenstruationRuntime:
     icon: str
     history: list[str]
     period_duration_days: int
+    symptom_history: list[dict[str, Any]]
     unregister_midnight_listener: Callable[[], None] | None = None
 
 
@@ -152,7 +158,7 @@ def _runtime_for_call(hass: HomeAssistant, call: ServiceCall) -> MenstruationRun
 async def _async_save_and_notify(hass: HomeAssistant, runtime: MenstruationRuntime) -> None:
     runtime.history = normalize_history(runtime.history)
     runtime.period_duration_days = max(1, min(14, int(runtime.period_duration_days)))
-    await runtime.storage.async_save(runtime.history, runtime.period_duration_days)
+    await runtime.storage.async_save(runtime.history, runtime.period_duration_days, runtime.symptom_history)
     await _async_refresh_cycle_model(hass, {_entry_id_for_runtime(hass, runtime)})
 
 
@@ -240,6 +246,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         icon=icon,
         history=stored[ATTR_HISTORY],
         period_duration_days=stored.get(ATTR_PERIOD_DURATION_DAYS, DEFAULT_PERIOD_DURATION_DAYS),
+        symptom_history=stored.get(ATTR_SYMPTOM_HISTORY, []),
     )
 
     runtime.unregister_midnight_listener = async_track_time_change(
@@ -272,6 +279,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     async def async_refresh_cycle_model(call: ServiceCall) -> None:
         await _async_handle_refresh_cycle_model(hass, call)
+
+    async def async_add_symptom(call: ServiceCall) -> None:
+        await _async_handle_add_symptom(hass, call)
+
+    async def async_remove_symptom(call: ServiceCall) -> None:
+        await _async_handle_remove_symptom(hass, call)
+
+    async def async_get_symptom(call: ServiceCall) -> None:
+        await _async_handle_get_symptom(hass, call)
 
     common_profile_field = {
         vol.Optional(SERVICE_FIELD_ENTITY_ID): cv.entity_id,
@@ -352,6 +368,34 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             schema=vol.Schema(common_profile_field),
         )
 
+    if not hass.services.has_service(DOMAIN, SERVICE_ADD_SYMPTOM):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_ADD_SYMPTOM,
+            async_add_symptom,
+            schema=vol.Schema({
+                **common_profile_field,
+                vol.Required(SERVICE_FIELD_DATE): cv.string,
+                vol.Required(SERVICE_FIELD_SYMPTOM_DATA): dict,
+            }),
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_REMOVE_SYMPTOM):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_REMOVE_SYMPTOM,
+            async_remove_symptom,
+            schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_DATE): cv.string}),
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_GET_SYMPTOM):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_GET_SYMPTOM,
+            async_get_symptom,
+            schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_DATE): cv.string}),
+        )
+
     await _async_register_card_static_path(hass)
     await _async_ensure_lovelace_resource(hass)
 
@@ -375,6 +419,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_ERASE_ALL_HISTORY,
             SERVICE_EXPORT_HISTORY,
             SERVICE_REFRESH_CYCLE_MODEL,
+            SERVICE_ADD_SYMPTOM,
+            SERVICE_REMOVE_SYMPTOM,
+            SERVICE_GET_SYMPTOM,
         ):
             if hass.services.has_service(DOMAIN, service):
                 hass.services.async_remove(DOMAIN, service)
@@ -464,6 +511,59 @@ async def _async_handle_export_history(hass: HomeAssistant, call: ServiceCall) -
 
 async def _async_handle_refresh_cycle_model(hass: HomeAssistant, call: ServiceCall) -> None:
     await _async_refresh_cycle_model(hass, _target_entry_ids_for_call(hass, call))
+
+
+async def _async_handle_add_symptom(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Add or update symptom data for a date."""
+    runtime = _runtime_for_call(hass, call)
+    date_iso = _normalize_date_or_raise(call.data[SERVICE_FIELD_DATE])
+    symptom_data = call.data.get(SERVICE_FIELD_SYMPTOM_DATA, {})
+
+    if not isinstance(symptom_data, dict):
+        raise HomeAssistantError("Symptom data must be a dictionary.")
+
+    # Find existing entry or create new one
+    existing = None
+    for entry in runtime.symptom_history:
+        if entry.get("date") == date_iso:
+            existing = entry
+            break
+
+    if existing:
+        # Merge with existing data
+        existing.update(symptom_data)
+        existing["date"] = date_iso
+    else:
+        # Create new entry
+        new_entry = dict(symptom_data)
+        new_entry["date"] = date_iso
+        runtime.symptom_history.append(new_entry)
+
+    # Sort by date
+    runtime.symptom_history.sort(key=lambda x: x.get("date", ""))
+    await _async_save_and_notify(hass, runtime)
+
+
+async def _async_handle_remove_symptom(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Remove symptom data for a date."""
+    runtime = _runtime_for_call(hass, call)
+    date_iso = _normalize_date_or_raise(call.data[SERVICE_FIELD_DATE])
+
+    runtime.symptom_history = [entry for entry in runtime.symptom_history if entry.get("date") != date_iso]
+    await _async_save_and_notify(hass, runtime)
+
+
+async def _async_handle_get_symptom(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Get symptom data for a date."""
+    runtime = _runtime_for_call(hass, call)
+    date_iso = _normalize_date_or_raise(call.data[SERVICE_FIELD_DATE])
+
+    for entry in runtime.symptom_history:
+        if entry.get("date") == date_iso:
+            _LOGGER.info("Symptom data for %s: %s", date_iso, entry)
+            return
+
+    _LOGGER.info("No symptom data found for %s", date_iso)
 
 
 async def _maybe_await(result: Any) -> Any:
