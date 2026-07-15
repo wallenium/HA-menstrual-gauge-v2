@@ -20,7 +20,7 @@ class MenstruationStorage:
             hass,
             STORAGE_VERSION,
             key,
-            migrate_func=self._async_migrate_data,
+            minor_version_changed_func=self._async_migrate_data,
         )
         self._legacy_store = Store(hass, STORAGE_VERSION, legacy_key) if legacy_key else None
 
