@@ -66,9 +66,12 @@ SYMPTOM_BASAL_TEMP = "basal_temp"
 SYMPTOM_HYGIENE = "hygiene"
 SYMPTOM_TEST = "test"
 
-BLEEDING_STRENGTH_OPTIONS = ["leicht", "mittel", "stark", "sehr stark"]
-SPOTTING_OPTIONS = ["rot", "braun"]
-INTERCOURSE_OPTIONS = ["geschützt", "ungeschützt"]
-PAIN_OPTIONS = ["Mittelschmerz", "Krämpfe", "sensible Brüste", "Kopfschmerzen", "Migräne", "unterer Rücken", "Vulva"]
-HYGIENE_OPTIONS = ["Binde", "Slipeinlage", "Tampon", "Menstruationstasse", "Periodenunterwäsche"]
-TEST_OPTIONS = ["Positiver Ovulationstest", "Negativer Ovulationstest", "positiver Schwangerschaftstest", "negativer Schwangerschaftstest"]
+# Symptom options for reference (used in UI)
+SYMPTOM_OPTIONS = {
+    SYMPTOM_BLEEDING_STRENGTH: ["light", "medium", "heavy", "very_heavy"],
+    SYMPTOM_SPOTTING: ["red", "brown"],
+    SYMPTOM_INTERCOURSE: ["protected", "unprotected"],
+    SYMPTOM_PAIN: ["mittelschmerz", "cramps", "tender_breasts", "headache", "migraine", "lower_back", "vulva"],
+    SYMPTOM_HYGIENE: ["pad", "liner", "tampon", "cup", "period_underwear"],
+    SYMPTOM_TEST: ["positive_ovulation", "negative_ovulation", "positive_pregnancy", "negative_pregnancy"],
+}
