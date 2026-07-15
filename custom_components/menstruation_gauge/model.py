@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, timedelta
+from typing import Any
 
-from .const import STATE_FERTILE, STATE_NEUTRAL, STATE_PERIOD, STATE_PMS
+from .const import STATE_FERTILE, STATE_NEUTRAL, STATE_PERIOD, STATE_PMS, STATE_PREGNANT
+
+PREGNANCY_DAYS = 280  # Standard pregnancy duration in days (40 weeks)
 
 
 @dataclass(slots=True)
@@ -23,6 +26,11 @@ class CycleModel:
     period_duration_days: int
     learned_period_duration_days: int | None
     state: str
+    symptom_history: list[dict[str, Any]]
+    is_pregnant: bool
+    pregnancy_start_date: str | None
+    weeks_pregnant: int | None
+    due_date: str | None
 
 
 def normalize_history(history: list[str]) -> list[str]:
@@ -116,10 +124,86 @@ def predict_next_start(grouped_starts: list[str]) -> tuple[str | None, int | Non
     return next_start.isoformat(), avg
 
 
-def build_cycle_model(history: list[str], period_duration_days: int, today: date | None = None) -> CycleModel:
+def normalize_symptoms(symptom_history: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Normalize symptom history and ensure all dates are valid ISO format."""
+    normalized: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    for item in symptom_history:
+        if not isinstance(item, dict):
+            continue
+        date_str = item.get("date")
+        if not date_str:
+            continue
+        try:
+            iso_date = date.fromisoformat(str(date_str)).isoformat()
+            if iso_date not in seen:
+                normalized_item = dict(item)
+                normalized_item["date"] = iso_date
+                normalized.append(normalized_item)
+                seen.add(iso_date)
+        except ValueError:
+            continue
+
+    return sorted(normalized, key=lambda x: x.get("date", ""))
+
+
+def calculate_pregnancy_info(pregnancy_start_date: str | None, today: date | None = None) -> tuple[int | None, str | None]:
+    """Calculate weeks pregnant and due date from pregnancy start date (first day of last period)."""
+    if not pregnancy_start_date:
+        return None, None
+
+    now = today or date.today()
+    try:
+        start = date.fromisoformat(str(pregnancy_start_date))
+    except ValueError:
+        return None, None
+
+    # Calculate weeks from start date
+    weeks = (now - start).days // 7
+    # Due date is 280 days after start
+    due = start + timedelta(days=PREGNANCY_DAYS)
+
+    return weeks, due.isoformat()
+
+
+def build_cycle_model(
+    history: list[str],
+    period_duration_days: int,
+    symptom_history: list[dict[str, Any]] | None = None,
+    pregnancy_data: dict[str, Any] | None = None,
+    today: date | None = None,
+) -> CycleModel:
     """Build complete cycle model for sensor state + attributes."""
     now = today or date.today()
     normalized = normalize_history(history)
+    symptoms = normalize_symptoms(symptom_history or [])
+
+    preg_data = pregnancy_data or {"is_pregnant": False, "start_date": None}
+    is_pregnant = bool(preg_data.get("is_pregnant", False))
+    pregnancy_start_date = preg_data.get("start_date")
+
+    # If pregnant, return pregnancy state
+    if is_pregnant:
+        weeks, due_date = calculate_pregnancy_info(pregnancy_start_date, now)
+        return CycleModel(
+            history=normalized,
+            grouped_starts=[],
+            bleeding_blocks=[],
+            next_predicted_start=None,
+            avg_cycle_length=None,
+            fertile_window_start=None,
+            fertile_window_end=None,
+            days_until_next_start=None,
+            period_duration_days=period_duration_days,
+            learned_period_duration_days=None,
+            state=STATE_PREGNANT,
+            symptom_history=symptoms,
+            is_pregnant=True,
+            pregnancy_start_date=pregnancy_start_date,
+            weeks_pregnant=weeks,
+            due_date=due_date,
+        )
 
     # Keep model based on confirmed values up to today, but keep full history as attribute.
     base_history = [item for item in normalized if item <= now.isoformat()] or normalized
@@ -169,4 +253,9 @@ def build_cycle_model(history: list[str], period_duration_days: int, today: date
         period_duration_days=effective_duration,
         learned_period_duration_days=learned_avg_duration,
         state=state,
+        symptom_history=symptoms,
+        is_pregnant=False,
+        pregnancy_start_date=None,
+        weeks_pregnant=None,
+        due_date=None,
     )
