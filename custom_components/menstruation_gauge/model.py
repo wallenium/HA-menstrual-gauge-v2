@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
 
-from .const import STATE_FERTILE, STATE_MENARCHE, STATE_NEUTRAL, STATE_PERIOD, STATE_PMS, STATE_PREGNANT, STATE_PRE_MENARCHE
+from .const import STATE_FERTILE, STATE_MENARCHE, STATE_NEUTRAL, STATE_PERIOD, STATE_PMS, STATE_PREGNANT, STATE_PRE_MENARCHE, UNDERWEAR_STATUS_CLEAN, UNDERWEAR_STATUS_DIRTY
 
 PREGNANCY_DAYS = 280  # Standard pregnancy duration in days (40 weeks)
 
@@ -329,3 +329,162 @@ def build_cycle_model(
         menarche_data=men_data,
         pre_menarche_data=pre_men_data,
     )
+
+
+# ---------------------------------------------------------------------------
+# Inventory calculation helpers
+# ---------------------------------------------------------------------------
+
+def calculate_inventory_summary(inventory: dict[str, Any]) -> dict[str, Any]:
+    """Return a summary of the current product inventory with low-stock flags."""
+    summary: dict[str, Any] = {}
+
+    for product in ("tampons", "pads"):
+        product_data = inventory.get(product, {})
+        locations = product_data.get("locations", {})
+        threshold = int(product_data.get("low_stock_threshold", 0))
+        total_stock = 0
+        location_summary: dict[str, Any] = {}
+        for loc, loc_data in locations.items():
+            stock = int(loc_data.get("stock", 0))
+            total_stock += stock
+            min_stock = int(loc_data.get("min_stock", threshold))
+            location_summary[loc] = {
+                "stock": stock,
+                "min_stock": min_stock,
+                "last_restocked": loc_data.get("last_restocked"),
+                "status": _stock_status(stock, min_stock),
+            }
+        summary[product] = {
+            "total_stock": total_stock,
+            "locations": location_summary,
+            "low_stock_threshold": threshold,
+            "status": _stock_status(total_stock, threshold),
+        }
+
+    underwear = inventory.get("underwear", {})
+    items = underwear.get("items", [])
+    low_clean_threshold = int(underwear.get("low_clean_threshold", 1))
+    wash_reminder_days = int(underwear.get("wash_reminder_days", 2))
+
+    clean_items = [i for i in items if i.get("status") == UNDERWEAR_STATUS_CLEAN]
+    dirty_items = [i for i in items if i.get("status") == UNDERWEAR_STATUS_DIRTY]
+
+    today = date.today().isoformat()
+    max_dirty_days = 0
+    for item in dirty_items:
+        since = item.get("since")
+        if since:
+            try:
+                delta = (date.fromisoformat(today) - date.fromisoformat(since)).days
+                if delta > max_dirty_days:
+                    max_dirty_days = delta
+            except ValueError:
+                pass
+
+    wash_needed = max_dirty_days >= wash_reminder_days or len(clean_items) <= low_clean_threshold
+
+    summary["underwear"] = {
+        "total": len(items),
+        "clean": len(clean_items),
+        "dirty": len(dirty_items),
+        "items": list(items),
+        "low_clean_threshold": low_clean_threshold,
+        "wash_reminder_days": wash_reminder_days,
+        "wash_needed": wash_needed,
+        "max_dirty_days": max_dirty_days,
+        "status": "warning" if len(clean_items) <= low_clean_threshold else "ok",
+    }
+
+    return summary
+
+
+def get_low_stock_alerts(inventory: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return a list of products/locations with low stock."""
+    alerts: list[dict[str, Any]] = []
+    summary = calculate_inventory_summary(inventory)
+
+    for product in ("tampons", "pads"):
+        product_summary = summary.get(product, {})
+        for loc, loc_data in product_summary.get("locations", {}).items():
+            if loc_data.get("status") in ("low", "critical"):
+                alerts.append({
+                    "product": product,
+                    "location": loc,
+                    "stock": loc_data["stock"],
+                    "min_stock": loc_data["min_stock"],
+                    "status": loc_data["status"],
+                })
+
+    underwear_summary = summary.get("underwear", {})
+    if underwear_summary.get("status") == "warning":
+        alerts.append({
+            "product": "underwear",
+            "location": "wardrobe",
+            "clean": underwear_summary.get("clean", 0),
+            "dirty": underwear_summary.get("dirty", 0),
+            "status": "warning",
+        })
+
+    return alerts
+
+
+def get_wash_recommendation(inventory: dict[str, Any]) -> dict[str, Any]:
+    """Return the current wash recommendation for underwear."""
+    summary = calculate_inventory_summary(inventory)
+    underwear = summary.get("underwear", {})
+    dirty_count = underwear.get("dirty", 0)
+    clean_count = underwear.get("clean", 0)
+    max_dirty_days = underwear.get("max_dirty_days", 0)
+    wash_needed = underwear.get("wash_needed", False)
+    wash_reminder_days = underwear.get("wash_reminder_days", 2)
+
+    if wash_needed and dirty_count > 0:
+        if max_dirty_days >= wash_reminder_days:
+            recommendation = f"Wash now ({dirty_count} dirty, {max_dirty_days} days)"
+        else:
+            recommendation = f"Wash soon ({dirty_count} dirty, {clean_count} clean left)"
+    else:
+        recommendation = None
+
+    return {
+        "wash_needed": wash_needed,
+        "dirty_count": dirty_count,
+        "clean_count": clean_count,
+        "max_dirty_days": max_dirty_days,
+        "recommendation": recommendation,
+    }
+
+
+def generate_shopping_list(inventory: dict[str, Any]) -> list[dict[str, Any]]:
+    """Generate a shopping list based on current inventory."""
+    shopping_list: list[dict[str, Any]] = []
+    summary = calculate_inventory_summary(inventory)
+
+    for product in ("tampons", "pads"):
+        product_summary = summary.get(product, {})
+        threshold = product_summary.get("low_stock_threshold", 0)
+        for loc, loc_data in product_summary.get("locations", {}).items():
+            stock = loc_data["stock"]
+            min_stock = loc_data["min_stock"]
+            if stock < min_stock:
+                needed = min_stock - stock
+                shopping_list.append({
+                    "product": product,
+                    "location": loc,
+                    "current_stock": stock,
+                    "recommended": min_stock,
+                    "to_buy": needed,
+                    "status": loc_data["status"],
+                })
+
+    return shopping_list
+
+
+def _stock_status(current: int, minimum: int) -> str:
+    """Return stock status string based on current vs minimum."""
+    if current <= 0:
+        return "critical"
+    if current < minimum:
+        return "low"
+    return "ok"

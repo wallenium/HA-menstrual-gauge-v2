@@ -31,17 +31,21 @@ from .const import (
     ATTR_GROUPED_STARTS,
     ATTR_HISTORY,
     ATTR_IS_PREGNANT,
+    ATTR_LOW_STOCK_ALERTS,
     ATTR_NEXT_PREDICTED_START,
     ATTR_PERIOD_DURATION_DAYS,
     ATTR_PRE_MENARCHE_DATA,
     ATTR_PREGNANCY_DATA,
     ATTR_PREGNANCY_START_DATE,
+    ATTR_PRODUCT_INVENTORY,
+    ATTR_SHOPPING_LIST,
     ATTR_SYMPTOM_HISTORY,
+    ATTR_WASH_RECOMMENDATION,
     ATTR_WEEKS_PREGNANT,
     DOMAIN,
     SIGNAL_HISTORY_UPDATED,
 )
-from .model import bleeding_blocks, build_cycle_model, normalize_history
+from .model import bleeding_blocks, build_cycle_model, calculate_inventory_summary, generate_shopping_list, get_low_stock_alerts, get_wash_recommendation, normalize_history
 
 
 async def async_setup_entry(
@@ -203,6 +207,13 @@ class MenstruationGaugeSensor(SensorEntity):
         )
         usage_stats = _build_product_usage_stats(runtime.history, runtime.product_usage, dt_util.now().date())
 
+        # Inventory summary
+        inventory = getattr(runtime, "product_inventory", {})
+        inventory_summary = calculate_inventory_summary(inventory)
+        low_stock_alerts = get_low_stock_alerts(inventory)
+        wash_recommendation = get_wash_recommendation(inventory)
+        shopping_list = generate_shopping_list(inventory)
+
         self._state = model.state
         has_history = bool(model.history)
 
@@ -233,6 +244,10 @@ class MenstruationGaugeSensor(SensorEntity):
             "entry_id": self._entry.entry_id,
             "friendly_name": runtime.friendly_name,
             "product_usage_stats": usage_stats,
+            ATTR_PRODUCT_INVENTORY: inventory_summary,
+            ATTR_LOW_STOCK_ALERTS: low_stock_alerts,
+            ATTR_WASH_RECOMMENDATION: wash_recommendation,
+            ATTR_SHOPPING_LIST: shopping_list,
         }
 
     @property

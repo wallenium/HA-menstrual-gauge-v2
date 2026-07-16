@@ -31,6 +31,7 @@ from homeassistant.util import slugify
 from .const import (
     ATTR_HISTORY,
     ATTR_PERIOD_DURATION_DAYS,
+    ATTR_PRODUCT_INVENTORY,
     ATTR_PRODUCT_USAGE,
     ATTR_SYMPTOM_HISTORY,
     CONF_FRIENDLY_NAME,
@@ -45,6 +46,7 @@ from .const import (
     PRE_MENARCHE_SIGN_OPTIONS,
     SERVICE_ADD_CYCLE_START,
     SERVICE_ADD_PRE_MENARCHE_SIGN,
+    SERVICE_EXPORT_SHOPPING_LIST,
     SERVICE_FIELD_ACTION,
     SERVICE_ADD_SYMPTOM,
     SERVICE_ERASE_ALL_HISTORY,
@@ -60,15 +62,23 @@ from .const import (
     SERVICE_FIELD_FILENAME,
     SERVICE_FIELD_FORMAT,
     SERVICE_FIELD_IS_PREGNANT,
+    SERVICE_FIELD_LABEL,
+    SERVICE_FIELD_LOCATION,
+    SERVICE_FIELD_NOTES,
     SERVICE_FIELD_PRODUCT,
     SERVICE_FIELD_PREGNANCY_START_DATE,
     SERVICE_FIELD_PRE_MENARCHE_SIGN,
     SERVICE_FIELD_PROFILE,
     SERVICE_FIELD_QUANTITY,
+    SERVICE_FIELD_STATUS,
     SERVICE_FIELD_SYMPTOM_DATA,
     SERVICE_FIELD_TANNER_STAGE,
+    SERVICE_FIELD_TARGET_LOCATION,
+    SERVICE_FIELD_UNDERWEAR_ID,
     SERVICE_GET_MENARCHE_INFO,
+    SERVICE_GET_PRODUCT_INVENTORY,
     SERVICE_GET_SYMPTOM,
+    SERVICE_LOG_PRODUCT_RESTOCK,
     SERVICE_LOG_PRODUCT_USAGE,
     SERVICE_REFRESH_CYCLE_MODEL,
     SERVICE_REMOVE_CYCLE_START,
@@ -80,6 +90,8 @@ from .const import (
     SERVICE_SET_PREGNANCY_MODE,
     SERVICE_UPDATE_MENARCHE_DATE,
     SERVICE_UPDATE_PREGNANCY_DATE,
+    SERVICE_UPDATE_PRODUCT_LOCATION,
+    SERVICE_UPDATE_UNDERWEAR_STATUS,
     SIGNAL_HISTORY_UPDATED,
     STORAGE_KEY,
     SYMPTOM_BASAL_TEMP,
@@ -89,6 +101,8 @@ from .const import (
     TANNER_STAGE_3,
     TANNER_STAGE_4,
     TANNER_STAGE_5,
+    UNDERWEAR_STATUS_CLEAN,
+    UNDERWEAR_STATUS_DIRTY,
 )
 from .model import normalize_history
 from .storage import MenstruationStorage
@@ -101,6 +115,9 @@ PRODUCT_STATS_RESOURCE_URL = "/menstruation_gauge/menstrual-product-stats-card.j
 COMPACT_CARD_RESOURCE_URL = "/menstruation_gauge/menstrual-cycle-card-compact.js"
 HISTORY_ROW_RESOURCE_URL = "/menstruation_gauge/menstrual-cycle-history-card-row.js"
 HISTORY_ANALOG_RESOURCE_URL = "/menstruation_gauge/menstrual-cycle-history-card-analog.js"
+UNDERWEAR_CARD_RESOURCE_URL = "/menstruation_gauge/menstrual-underwear-inventory-card.js"
+PRODUCT_INVENTORY_CARD_RESOURCE_URL = "/menstruation_gauge/menstrual-product-inventory-card.js"
+QUICK_STATUS_CARD_RESOURCE_URL = "/menstruation_gauge/menstrual-quick-status-card.js"
 CARD_RESOURCE_TYPE = "module"
 EXPORT_DIR_NAME = "menstruation_gauge_exports"
 LOVELACE_RESOURCES = (
@@ -111,6 +128,9 @@ LOVELACE_RESOURCES = (
     (COMPACT_CARD_RESOURCE_URL, "menstrual-cycle-card-compact.js"),
     (HISTORY_ROW_RESOURCE_URL, "menstrual-cycle-history-card-row.js"),
     (HISTORY_ANALOG_RESOURCE_URL, "menstrual-cycle-history-card-analog.js"),
+    (UNDERWEAR_CARD_RESOURCE_URL, "menstrual-underwear-inventory-card.js"),
+    (PRODUCT_INVENTORY_CARD_RESOURCE_URL, "menstrual-product-inventory-card.js"),
+    (QUICK_STATUS_CARD_RESOURCE_URL, "menstrual-quick-status-card.js"),
 )
 VALID_PRODUCT_USAGE_PRODUCTS = {"tampon", "pad", "cup", "underwear", "liner"}
 VALID_PRODUCT_USAGE_ACTIONS = {"used", "emptied"}
@@ -133,6 +153,7 @@ class MenstruationRuntime:
     pregnancy_data: dict[str, Any] = field(default_factory=lambda: {"is_pregnant": False, "start_date": None})
     menarche_data: dict[str, Any] = field(default_factory=lambda: {"tracking_active": False, "is_menarche": False, "menarche_date": None, "estimated_date": None, "family_menarche_age": None})
     pre_menarche_data: dict[str, Any] = field(default_factory=lambda: {"signs": {}, "tanner_stage": None})
+    product_inventory: dict[str, Any] = field(default_factory=dict)
     unregister_midnight_listener: Callable[[], None] | None = None
 
 
@@ -300,6 +321,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         legacy_key=STORAGE_KEY if profile == "default" else None,
     )
     stored = await storage.async_load()
+    product_inventory = await storage.async_load_inventory()
 
     runtime = MenstruationRuntime(
         storage=storage,
@@ -313,6 +335,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         pregnancy_data=stored.get("pregnancy_data", {"is_pregnant": False, "start_date": None}),
         menarche_data=stored.get("menarche_data", {"tracking_active": False, "is_menarche": False, "menarche_date": None, "estimated_date": None, "family_menarche_age": None}),
         pre_menarche_data=stored.get("pre_menarche_data", {"signs": {}, "tanner_stage": None}),
+        product_inventory=product_inventory,
     )
 
     runtime.unregister_midnight_listener = async_track_time_change(
@@ -378,6 +401,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     async def async_remove_pre_menarche_sign(call: ServiceCall) -> None:
         await _async_handle_remove_pre_menarche_sign(hass, call)
+
+    async def async_log_product_restock(call: ServiceCall) -> None:
+        await _async_handle_log_product_restock(hass, call)
+
+    async def async_update_underwear_status(call: ServiceCall) -> None:
+        await _async_handle_update_underwear_status(hass, call)
+
+    async def async_get_product_inventory(call: ServiceCall) -> dict[str, Any]:
+        return await _async_handle_get_product_inventory(hass, call)
+
+    async def async_update_product_location(call: ServiceCall) -> None:
+        await _async_handle_update_product_location(hass, call)
+
+    async def async_export_shopping_list(call: ServiceCall) -> dict[str, Any]:
+        return await _async_handle_export_shopping_list(hass, call)
 
     common_profile_field = {
         vol.Optional(SERVICE_FIELD_ENTITY_ID): cv.entity_id,
@@ -566,7 +604,65 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             }),
         )
 
-    await _async_register_card_static_path(hass)
+    if not hass.services.has_service(DOMAIN, SERVICE_LOG_PRODUCT_RESTOCK):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_LOG_PRODUCT_RESTOCK,
+            async_log_product_restock,
+            schema=vol.Schema({
+                **common_profile_field,
+                vol.Required(SERVICE_FIELD_PRODUCT): vol.In(["tampons", "pads"]),
+                vol.Required(SERVICE_FIELD_QUANTITY): vol.All(vol.Coerce(int), vol.Range(min=1, max=500)),
+                vol.Optional(SERVICE_FIELD_LOCATION): cv.string,
+                vol.Optional(SERVICE_FIELD_NOTES): cv.string,
+            }),
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_UPDATE_UNDERWEAR_STATUS):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_UPDATE_UNDERWEAR_STATUS,
+            async_update_underwear_status,
+            schema=vol.Schema({
+                **common_profile_field,
+                vol.Required(SERVICE_FIELD_UNDERWEAR_ID): vol.Coerce(int),
+                vol.Required(SERVICE_FIELD_STATUS): vol.In([UNDERWEAR_STATUS_CLEAN, UNDERWEAR_STATUS_DIRTY]),
+            }),
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_GET_PRODUCT_INVENTORY):
+        _inventory_kwargs: dict[str, Any] = {
+            "schema": vol.Schema(common_profile_field),
+        }
+        if SupportsResponse is not None:
+            _inventory_kwargs["supports_response"] = SupportsResponse.OPTIONAL
+        hass.services.async_register(DOMAIN, SERVICE_GET_PRODUCT_INVENTORY, async_get_product_inventory, **_inventory_kwargs)
+
+    if not hass.services.has_service(DOMAIN, SERVICE_UPDATE_PRODUCT_LOCATION):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_UPDATE_PRODUCT_LOCATION,
+            async_update_product_location,
+            schema=vol.Schema({
+                **common_profile_field,
+                vol.Required(SERVICE_FIELD_PRODUCT): vol.In(["tampons", "pads"]),
+                vol.Required(SERVICE_FIELD_QUANTITY): vol.All(vol.Coerce(int), vol.Range(min=1, max=500)),
+                vol.Required(SERVICE_FIELD_LOCATION): cv.string,
+                vol.Required(SERVICE_FIELD_TARGET_LOCATION): cv.string,
+            }),
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_EXPORT_SHOPPING_LIST):
+        _shopping_list_kwargs: dict[str, Any] = {
+            "schema": vol.Schema({
+                **common_profile_field,
+                vol.Optional(SERVICE_FIELD_FORMAT, default="csv"): vol.In(["csv", "txt"]),
+                vol.Optional(SERVICE_FIELD_FILENAME): cv.string,
+            }),
+        }
+        if SupportsResponse is not None:
+            _shopping_list_kwargs["supports_response"] = SupportsResponse.OPTIONAL
+        hass.services.async_register(DOMAIN, SERVICE_EXPORT_SHOPPING_LIST, async_export_shopping_list, **_shopping_list_kwargs)
     await _async_ensure_lovelace_resource(hass)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -600,6 +696,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_GET_MENARCHE_INFO,
             SERVICE_ADD_PRE_MENARCHE_SIGN,
             SERVICE_REMOVE_PRE_MENARCHE_SIGN,
+            SERVICE_LOG_PRODUCT_RESTOCK,
+            SERVICE_UPDATE_UNDERWEAR_STATUS,
+            SERVICE_GET_PRODUCT_INVENTORY,
+            SERVICE_UPDATE_PRODUCT_LOCATION,
+            SERVICE_EXPORT_SHOPPING_LIST,
         ):
             if hass.services.has_service(DOMAIN, service):
                 hass.services.async_remove(DOMAIN, service)
@@ -948,3 +1049,206 @@ async def _async_register_card_static_path(hass: HomeAssistant) -> None:
             await hass.async_add_executor_job(hass.http.register_static_path, url, path, False)
         return
     _LOGGER.warning("No compatible HA HTTP static-path API found for %s", CARD_RESOURCE_URL)
+
+
+async def _async_handle_log_product_restock(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Add stock to a product location."""
+    from .model import generate_shopping_list, get_low_stock_alerts
+    runtime = _runtime_for_call(hass, call)
+    product = str(call.data[SERVICE_FIELD_PRODUCT]).strip().lower()
+    quantity = int(call.data[SERVICE_FIELD_QUANTITY])
+    location = str(call.data.get(SERVICE_FIELD_LOCATION, "bathroom")).strip().lower()
+    today = dt_util.now().date().isoformat()
+
+    inventory = runtime.product_inventory
+    product_data = inventory.get(product, {})
+    locations = product_data.get("locations", {})
+
+    if location not in locations:
+        locations[location] = {"stock": 0, "min_stock": 10, "last_restocked": None}
+
+    locations[location]["stock"] = int(locations[location].get("stock", 0)) + quantity
+    locations[location]["last_restocked"] = today
+    product_data["locations"] = locations
+    inventory[product] = product_data
+    runtime.product_inventory = inventory
+
+    await runtime.storage.async_save_inventory(runtime.product_inventory)
+    await _async_refresh_cycle_model(hass, {_entry_id_for_runtime(hass, runtime)})
+    _LOGGER.info("Restocked %d %s at %s for profile '%s'", quantity, product, location, runtime.profile)
+
+
+async def _async_handle_update_underwear_status(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Update clean/dirty status of a period underwear item."""
+    runtime = _runtime_for_call(hass, call)
+    underwear_id = int(call.data[SERVICE_FIELD_UNDERWEAR_ID])
+    new_status = str(call.data[SERVICE_FIELD_STATUS]).strip().lower()
+    today = dt_util.now().date().isoformat()
+
+    if new_status not in (UNDERWEAR_STATUS_CLEAN, UNDERWEAR_STATUS_DIRTY):
+        raise HomeAssistantError(f"Invalid status '{new_status}'. Use 'clean' or 'dirty'.")
+
+    inventory = runtime.product_inventory
+    underwear = inventory.get("underwear", {})
+    items = underwear.get("items", [])
+
+    found = False
+    for item in items:
+        if item.get("id") == underwear_id:
+            old_status = item.get("status")
+            item["status"] = new_status
+            item["since"] = today
+            if new_status == UNDERWEAR_STATUS_DIRTY and old_status == UNDERWEAR_STATUS_CLEAN:
+                item["wear_count"] = int(item.get("wear_count", 0)) + 1
+            found = True
+            break
+
+    if not found:
+        raise HomeAssistantError(f"Underwear item with id {underwear_id} not found.")
+
+    underwear["items"] = items
+    inventory["underwear"] = underwear
+    runtime.product_inventory = inventory
+
+    await runtime.storage.async_save_inventory(runtime.product_inventory)
+    await _async_refresh_cycle_model(hass, {_entry_id_for_runtime(hass, runtime)})
+    _LOGGER.info("Updated underwear item %d to '%s' for profile '%s'", underwear_id, new_status, runtime.profile)
+
+
+async def _async_handle_get_product_inventory(hass: HomeAssistant, call: ServiceCall) -> dict[str, Any]:
+    """Return full product inventory with stats."""
+    from .model import calculate_inventory_summary, get_low_stock_alerts, get_wash_recommendation, generate_shopping_list
+    runtime = _runtime_for_call(hass, call)
+    summary = calculate_inventory_summary(runtime.product_inventory)
+    alerts = get_low_stock_alerts(runtime.product_inventory)
+    wash_rec = get_wash_recommendation(runtime.product_inventory)
+    shopping = generate_shopping_list(runtime.product_inventory)
+
+    return {
+        "profile": runtime.profile,
+        "inventory": summary,
+        "low_stock_alerts": alerts,
+        "wash_recommendation": wash_rec,
+        "shopping_list": shopping,
+    }
+
+
+async def _async_handle_update_product_location(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Move products between locations."""
+    runtime = _runtime_for_call(hass, call)
+    product = str(call.data[SERVICE_FIELD_PRODUCT]).strip().lower()
+    quantity = int(call.data[SERVICE_FIELD_QUANTITY])
+    source_loc = str(call.data[SERVICE_FIELD_LOCATION]).strip().lower()
+    target_loc = str(call.data[SERVICE_FIELD_TARGET_LOCATION]).strip().lower()
+
+    inventory = runtime.product_inventory
+    product_data = inventory.get(product, {})
+    locations = product_data.get("locations", {})
+
+    source_stock = int(locations.get(source_loc, {}).get("stock", 0))
+    if source_stock < quantity:
+        raise HomeAssistantError(
+            f"Not enough {product} at '{source_loc}': {source_stock} available, {quantity} requested."
+        )
+
+    if source_loc not in locations:
+        locations[source_loc] = {"stock": 0, "min_stock": 10, "last_restocked": None}
+    if target_loc not in locations:
+        locations[target_loc] = {"stock": 0, "min_stock": 10, "last_restocked": None}
+
+    locations[source_loc]["stock"] = source_stock - quantity
+    locations[target_loc]["stock"] = int(locations[target_loc].get("stock", 0)) + quantity
+    product_data["locations"] = locations
+    inventory[product] = product_data
+    runtime.product_inventory = inventory
+
+    await runtime.storage.async_save_inventory(runtime.product_inventory)
+    await _async_refresh_cycle_model(hass, {_entry_id_for_runtime(hass, runtime)})
+    _LOGGER.info("Moved %d %s from '%s' to '%s' for profile '%s'", quantity, product, source_loc, target_loc, runtime.profile)
+
+
+async def _async_handle_export_shopping_list(hass: HomeAssistant, call: ServiceCall) -> dict[str, Any]:
+    """Export shopping list as CSV/TXT file and return as response."""
+    from .model import generate_shopping_list, calculate_inventory_summary
+    runtime = _runtime_for_call(hass, call)
+    export_format = str(call.data.get(SERVICE_FIELD_FORMAT, "csv")).lower()
+    summary = calculate_inventory_summary(runtime.product_inventory)
+    shopping = generate_shopping_list(runtime.product_inventory)
+
+    underwear = summary.get("underwear", {})
+    today = dt_util.now().date().isoformat()
+    timestamp = dt_util.now().strftime("%Y-%m-%d %H:%M")
+
+    if export_format == "csv":
+        lines = [
+            f"# Shopping List Export - {timestamp}",
+            "Produkt,Lagerort,Aktueller Bestand,Empfohlen,Zu Kaufen,Status",
+        ]
+        for item in shopping:
+            product_name = {"tampons": "Tampons", "pads": "Binden"}.get(item["product"], item["product"])
+            loc_name = {
+                "bathroom": "Badezimmer",
+                "toilet": "Toilette",
+                "on_the_go": "Unterwegs",
+            }.get(item["location"], item["location"])
+            lines.append(
+                f"{product_name},{loc_name},{item['current_stock']},{item['recommended']},{item['to_buy']},{item['status'].upper()}"
+            )
+        # Add underwear row
+        lines.append(
+            f"Periodische Unterwäsche,Wäscheschrank,{underwear.get('total', 0)},{underwear.get('total', 0)},0,"
+            f"{underwear.get('clean', 0)} sauber/{underwear.get('dirty', 0)} schmutzig"
+        )
+        content = "\n".join(lines) + "\n"
+    else:
+        lines = [
+            f"=== Einkaufsliste - {timestamp} ===",
+            "",
+        ]
+        if shopping:
+            lines.append("Produkte:")
+            for item in shopping:
+                product_name = {"tampons": "Tampons", "pads": "Binden"}.get(item["product"], item["product"])
+                loc_name = {
+                    "bathroom": "Badezimmer",
+                    "toilet": "Toilette",
+                    "on_the_go": "Unterwegs",
+                }.get(item["location"], item["location"])
+                lines.append(f"  - {product_name} ({loc_name}): {item['to_buy']} kaufen (Bestand: {item['current_stock']}, Minimum: {item['recommended']})")
+        else:
+            lines.append("Alle Produkte ausreichend bevorratet.")
+
+        lines.extend([
+            "",
+            f"Periodische Unterwäsche: {underwear.get('clean', 0)} sauber, {underwear.get('dirty', 0)} schmutzig",
+        ])
+        if underwear.get("wash_needed"):
+            lines.append("  ⚠️ Waschen empfohlen!")
+        content = "\n".join(lines) + "\n"
+
+    stem = call.data.get(SERVICE_FIELD_FILENAME)
+    if stem:
+        stem = _sanitize_export_filename(str(stem))
+    else:
+        stamp = dt_util.now().strftime("%Y%m%d_%H%M%S")
+        stem = f"shopping_list_{runtime.profile}_{stamp}"
+
+    extension = ".csv" if export_format == "csv" else ".txt"
+    target_dir = Path(hass.config.path(EXPORT_DIR_NAME))
+    target_path = target_dir / f"{stem}{extension}"
+
+    def _write_file() -> None:
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target_path.write_text(content, encoding="utf-8")
+
+    await hass.async_add_executor_job(_write_file)
+    _LOGGER.info("Exported shopping list for profile '%s' to %s", runtime.profile, target_path)
+
+    return {
+        "profile": runtime.profile,
+        "file": str(target_path),
+        "format": export_format,
+        "items_count": len(shopping),
+        "timestamp": timestamp,
+        "shopping_list": shopping,
+    }

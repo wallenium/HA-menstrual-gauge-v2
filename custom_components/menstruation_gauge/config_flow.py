@@ -25,9 +25,12 @@ from .const import (
     DEFAULT_MENARCHE_AGE_MIN,
     DEFAULT_NAME,
     DEFAULT_PERIOD_DURATION_DAYS,
+    DEFAULT_UNDERWEAR_LOW_CLEAN,
+    DEFAULT_UNDERWEAR_WASH_DAYS,
     DOMAIN,
     SIGNAL_HISTORY_UPDATED,
     STORAGE_KEY,
+    UNDERWEAR_STATUS_CLEAN,
 )
 
 
@@ -95,6 +98,7 @@ class MenstruationGaugeOptionsFlow(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         self._entry = config_entry
+        self._init_data: dict = {}
 
     async def async_step_init(self, user_input: dict | None = None) -> FlowResult:
         """Manage the options."""
@@ -162,79 +166,20 @@ class MenstruationGaugeOptionsFlow(config_entries.OptionsFlow):
                     errors[CONF_FAMILY_MENARCHE_AGE] = "invalid_menarche_age"
 
             if not errors:
-                new_friendly_name = str(user_input.get(CONF_FRIENDLY_NAME, DEFAULT_NAME)).strip() or DEFAULT_NAME
-                new_icon = str(user_input.get(CONF_ICON, "")).strip()
-                new_period_duration = max(1, min(14, int(user_input.get(CONF_PERIOD_DURATION_DAYS, DEFAULT_PERIOD_DURATION_DAYS))))
-                pregnancy_enabled = bool(user_input.get(CONF_PREGNANCY_ENABLED, False))
-                pre_menarche_enabled = bool(user_input.get(CONF_PRE_MENARCHE_ENABLED, False))
-
-                # Auto-populate pregnancy start date from last cycle if not provided
-                new_preg_start: str | None = preg_date_parsed if preg_date_parsed is not _INVALID_DATE_SENTINEL else None
-                if pregnancy_enabled and not new_preg_start and runtime and runtime.history:
-                    new_preg_start = sorted(runtime.history)[-1]
-
-                new_pregnancy_data = {
-                    "is_pregnant": pregnancy_enabled,
-                    "start_date": new_preg_start,
-                }
-                new_menarche_data = {
-                    "tracking_active": pre_menarche_enabled,
-                    "is_menarche": menarche_data.get("is_menarche", False),
-                    "menarche_date": menarche_data.get("menarche_date"),
-                    "estimated_date": men_date_parsed if men_date_parsed is not _INVALID_DATE_SENTINEL else None,
+                # Store init step data and proceed to underwear setup
+                self._init_data = {
+                    "friendly_name": str(user_input.get(CONF_FRIENDLY_NAME, DEFAULT_NAME)).strip() or DEFAULT_NAME,
+                    "icon": str(user_input.get(CONF_ICON, "")).strip(),
+                    "period_duration": max(1, min(14, int(user_input.get(CONF_PERIOD_DURATION_DAYS, DEFAULT_PERIOD_DURATION_DAYS)))),
+                    "pregnancy_enabled": bool(user_input.get(CONF_PREGNANCY_ENABLED, False)),
+                    "pre_menarche_enabled": bool(user_input.get(CONF_PRE_MENARCHE_ENABLED, False)),
+                    "preg_date": preg_date_parsed if preg_date_parsed is not _INVALID_DATE_SENTINEL else None,
+                    "men_date": men_date_parsed if men_date_parsed is not _INVALID_DATE_SENTINEL else None,
                     "family_menarche_age": new_family_menarche_age,
+                    "runtime": runtime,
+                    "menarche_data": menarche_data,
                 }
-
-                if runtime is not None:
-                    # Update in-memory runtime
-                    runtime.friendly_name = new_friendly_name
-                    runtime.icon = new_icon
-                    runtime.period_duration_days = new_period_duration
-                    runtime.pregnancy_data = new_pregnancy_data
-                    runtime.menarche_data = new_menarche_data
-
-                    # Persist to storage
-                    await runtime.storage.async_save(
-                        runtime.history,
-                        runtime.period_duration_days,
-                        runtime.symptom_history,
-                        runtime.product_usage,
-                        runtime.pregnancy_data,
-                        runtime.menarche_data,
-                        runtime.pre_menarche_data,
-                    )
-                    async_dispatcher_send(self.hass, SIGNAL_HISTORY_UPDATED)
-                else:
-                    # Runtime unavailable – save directly to storage
-                    profile = slugify(str(self._entry.data.get(CONF_PROFILE, ""))).strip("_") or "default"
-                    fallback_storage = MenstruationStorage(
-                        self.hass,
-                        key=f"{STORAGE_KEY}.{profile}",
-                        legacy_key=STORAGE_KEY if profile == "default" else None,
-                    )
-                    stored_full = await fallback_storage.async_load()
-                    await fallback_storage.async_save(
-                        stored_full["history"],
-                        new_period_duration,
-                        stored_full.get("symptom_history", []),
-                        stored_full.get("product_usage", []),
-                        new_pregnancy_data,
-                        new_menarche_data,
-                        stored_full.get("pre_menarche_data"),
-                    )
-
-                # Keep entry.data in sync for basic info fields
-                self.hass.config_entries.async_update_entry(
-                    self._entry,
-                    data={
-                        **self._entry.data,
-                        CONF_FRIENDLY_NAME: new_friendly_name,
-                        CONF_ICON: new_icon,
-                    },
-                    title=new_friendly_name,
-                )
-
-                return self.async_create_entry(title="", data={})
+                return await self.async_step_underwear()
 
         # Build schema pre-filled with current values
         schema = vol.Schema(
@@ -269,3 +214,161 @@ class MenstruationGaugeOptionsFlow(config_entries.OptionsFlow):
         )
 
         return self.async_show_form(step_id="init", data_schema=schema, errors=errors)
+
+    async def async_step_underwear(self, user_input: dict | None = None) -> FlowResult:
+        """Configure period underwear inventory."""
+        from .storage import MenstruationStorage
+
+        errors: dict[str, str] = {}
+
+        domain_data = self.hass.data.get(DOMAIN, {})
+        runtime = self._init_data.get("runtime") or domain_data.get(self._entry.entry_id)
+
+        # Load current underwear inventory
+        current_underwear: dict = {}
+        if runtime is not None:
+            current_underwear = runtime.product_inventory.get("underwear", {})
+        else:
+            profile = slugify(str(self._entry.data.get(CONF_PROFILE, ""))).strip("_") or "default"
+            storage = MenstruationStorage(
+                self.hass,
+                key=f"{STORAGE_KEY}.{profile}",
+                legacy_key=STORAGE_KEY if profile == "default" else None,
+            )
+            inventory = await storage.async_load_inventory()
+            current_underwear = inventory.get("underwear", {})
+
+        current_items = current_underwear.get("items", [])
+        current_count = len(current_items)
+        current_low_clean = int(current_underwear.get("low_clean_threshold", DEFAULT_UNDERWEAR_LOW_CLEAN))
+        current_wash_days = int(current_underwear.get("wash_reminder_days", DEFAULT_UNDERWEAR_WASH_DAYS))
+
+        if user_input is not None:
+            new_count = int(user_input.get("underwear_count", current_count or 3))
+            new_low_clean = int(user_input.get("underwear_low_clean_threshold", DEFAULT_UNDERWEAR_LOW_CLEAN))
+            new_wash_days = int(user_input.get("underwear_wash_reminder_days", DEFAULT_UNDERWEAR_WASH_DAYS))
+
+            # Build new items list – preserve existing items, add/remove as needed
+            new_items: list[dict] = []
+            for i in range(1, new_count + 1):
+                existing = next((item for item in current_items if item.get("id") == i), None)
+                if existing:
+                    new_items.append(dict(existing))
+                else:
+                    new_items.append({
+                        "id": i,
+                        "label": f"Unterwäsche {i}",
+                        "status": UNDERWEAR_STATUS_CLEAN,
+                        "since": date.today().isoformat(),
+                        "wear_count": 0,
+                    })
+
+            new_underwear = {
+                "items": new_items,
+                "low_clean_threshold": new_low_clean,
+                "wash_reminder_days": new_wash_days,
+            }
+
+            # Now apply all stored init settings + underwear
+            await self._apply_all_settings(runtime, new_underwear)
+            return self.async_create_entry(title="", data={})
+
+        schema = vol.Schema(
+            {
+                vol.Optional("underwear_count", default=current_count or 3): vol.All(
+                    vol.Coerce(int), vol.Range(min=0, max=10)
+                ),
+                vol.Optional("underwear_low_clean_threshold", default=current_low_clean): vol.All(
+                    vol.Coerce(int), vol.Range(min=0, max=10)
+                ),
+                vol.Optional("underwear_wash_reminder_days", default=current_wash_days): vol.All(
+                    vol.Coerce(int), vol.Range(min=1, max=14)
+                ),
+            }
+        )
+        return self.async_show_form(step_id="underwear", data_schema=schema, errors=errors)
+
+    async def _apply_all_settings(self, runtime: object | None, new_underwear: dict) -> None:
+        """Apply the collected settings from all steps to runtime and storage."""
+        from .storage import MenstruationStorage
+
+        init = self._init_data
+        new_friendly_name: str = init["friendly_name"]
+        new_icon: str = init["icon"]
+        new_period_duration: int = init["period_duration"]
+        pregnancy_enabled: bool = init["pregnancy_enabled"]
+        pre_menarche_enabled: bool = init["pre_menarche_enabled"]
+        preg_date: str | None = init["preg_date"]
+        men_date: str | None = init["men_date"]
+        family_menarche_age: int | None = init["family_menarche_age"]
+        menarche_data: dict = init["menarche_data"]
+
+        # Auto-populate pregnancy start date from last cycle if not provided
+        if pregnancy_enabled and not preg_date and runtime and getattr(runtime, "history", None):
+            preg_date = sorted(runtime.history)[-1]
+
+        new_pregnancy_data = {
+            "is_pregnant": pregnancy_enabled,
+            "start_date": preg_date,
+        }
+        new_menarche_data = {
+            "tracking_active": pre_menarche_enabled,
+            "is_menarche": menarche_data.get("is_menarche", False),
+            "menarche_date": menarche_data.get("menarche_date"),
+            "estimated_date": men_date,
+            "family_menarche_age": family_menarche_age,
+        }
+
+        if runtime is not None:
+            runtime.friendly_name = new_friendly_name
+            runtime.icon = new_icon
+            runtime.period_duration_days = new_period_duration
+            runtime.pregnancy_data = new_pregnancy_data
+            runtime.menarche_data = new_menarche_data
+            # Update underwear in inventory
+            inventory = dict(runtime.product_inventory)
+            inventory["underwear"] = new_underwear
+            runtime.product_inventory = inventory
+
+            await runtime.storage.async_save(
+                runtime.history,
+                runtime.period_duration_days,
+                runtime.symptom_history,
+                runtime.product_usage,
+                runtime.pregnancy_data,
+                runtime.menarche_data,
+                runtime.pre_menarche_data,
+            )
+            await runtime.storage.async_save_inventory(runtime.product_inventory)
+            async_dispatcher_send(self.hass, SIGNAL_HISTORY_UPDATED)
+        else:
+            profile = slugify(str(self._entry.data.get(CONF_PROFILE, ""))).strip("_") or "default"
+            fallback_storage = MenstruationStorage(
+                self.hass,
+                key=f"{STORAGE_KEY}.{profile}",
+                legacy_key=STORAGE_KEY if profile == "default" else None,
+            )
+            stored_full = await fallback_storage.async_load()
+            await fallback_storage.async_save(
+                stored_full["history"],
+                new_period_duration,
+                stored_full.get("symptom_history", []),
+                stored_full.get("product_usage", []),
+                new_pregnancy_data,
+                new_menarche_data,
+                stored_full.get("pre_menarche_data"),
+            )
+            # Update underwear in inventory
+            existing_inventory = await fallback_storage.async_load_inventory()
+            existing_inventory["underwear"] = new_underwear
+            await fallback_storage.async_save_inventory(existing_inventory)
+
+        self.hass.config_entries.async_update_entry(
+            self._entry,
+            data={
+                **self._entry.data,
+                CONF_FRIENDLY_NAME: new_friendly_name,
+                CONF_ICON: new_icon,
+            },
+            title=new_friendly_name,
+        )

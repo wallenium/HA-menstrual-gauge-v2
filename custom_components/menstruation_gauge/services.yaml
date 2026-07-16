@@ -561,3 +561,195 @@ remove_pre_menarche_sign:
             - "acne"
             - "body_odor"
             - "vaginal_discharge"
+
+log_product_restock:
+  name: Log product restock
+  description: Add stock to a product location (tampons or pads).
+  fields:
+    entity_id:
+      required: false
+      example: "sensor.anna"
+      selector:
+        entity:
+          domain: sensor
+    profile:
+      required: false
+      example: "anna"
+      selector:
+        text:
+    entry_id:
+      required: false
+      example: "a1b2c3d4e5f6..."
+      selector:
+        text:
+    product:
+      required: true
+      example: "tampons"
+      selector:
+        select:
+          options:
+            - "tampons"
+            - "pads"
+    quantity:
+      required: true
+      example: 24
+      selector:
+        number:
+          min: 1
+          max: 500
+          mode: box
+    location:
+      required: false
+      example: "bathroom"
+      selector:
+        select:
+          options:
+            - "bathroom"
+            - "toilet"
+            - "on_the_go"
+    notes:
+      required: false
+      example: "Monthly restock"
+      selector:
+        text:
+
+update_underwear_status:
+  name: Update underwear status
+  description: Mark a period underwear item as clean or dirty.
+  fields:
+    entity_id:
+      required: false
+      example: "sensor.anna"
+      selector:
+        entity:
+          domain: sensor
+    profile:
+      required: false
+      example: "anna"
+      selector:
+        text:
+    entry_id:
+      required: false
+      example: "a1b2c3d4e5f6..."
+      selector:
+        text:
+    underwear_id:
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 10
+          mode: box
+    status:
+      required: true
+      example: "clean"
+      selector:
+        select:
+          options:
+            - "clean"
+            - "dirty"
+
+get_product_inventory:
+  name: Get product inventory
+  description: Retrieve the full product inventory with low-stock alerts and wash recommendations.
+  fields:
+    entity_id:
+      required: false
+      example: "sensor.anna"
+      selector:
+        entity:
+          domain: sensor
+    profile:
+      required: false
+      example: "anna"
+      selector:
+        text:
+    entry_id:
+      required: false
+      example: "a1b2c3d4e5f6..."
+      selector:
+        text:
+
+update_product_location:
+  name: Move products between locations
+  description: Transfer a quantity of tampons or pads from one location to another.
+  fields:
+    entity_id:
+      required: false
+      example: "sensor.anna"
+      selector:
+        entity:
+          domain: sensor
+    profile:
+      required: false
+      example: "anna"
+      selector:
+        text:
+    entry_id:
+      required: false
+      example: "a1b2c3d4e5f6..."
+      selector:
+        text:
+    product:
+      required: true
+      example: "tampons"
+      selector:
+        select:
+          options:
+            - "tampons"
+            - "pads"
+    quantity:
+      required: true
+      example: 5
+      selector:
+        number:
+          min: 1
+          max: 500
+          mode: box
+    location:
+      required: true
+      example: "bathroom"
+      description: Source location.
+      selector:
+        text:
+    target_location:
+      required: true
+      example: "on_the_go"
+      description: Target location.
+      selector:
+        text:
+
+export_shopping_list:
+  name: Export shopping list
+  description: Generate and export a shopping list based on current inventory.
+  fields:
+    entity_id:
+      required: false
+      example: "sensor.anna"
+      selector:
+        entity:
+          domain: sensor
+    profile:
+      required: false
+      example: "anna"
+      selector:
+        text:
+    entry_id:
+      required: false
+      example: "a1b2c3d4e5f6..."
+      selector:
+        text:
+    format:
+      required: false
+      example: "csv"
+      selector:
+        select:
+          options:
+            - "csv"
+            - "txt"
+    filename:
+      required: false
+      example: "my_shopping_list"
+      selector:
+        text:

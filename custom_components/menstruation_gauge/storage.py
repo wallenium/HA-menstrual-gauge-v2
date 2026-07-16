@@ -9,7 +9,20 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
-from .const import STORAGE_KEY, STORAGE_VERSION
+from .const import (
+    DEFAULT_LOCATIONS,
+    DEFAULT_PAD_LOW_STOCK,
+    DEFAULT_TAMPON_LOW_STOCK,
+    DEFAULT_UNDERWEAR_LOW_CLEAN,
+    DEFAULT_UNDERWEAR_WASH_DAYS,
+    LOC_BATHROOM,
+    LOC_ON_THE_GO,
+    LOC_TOILET,
+    LOC_WARDROBE,
+    STORAGE_KEY,
+    STORAGE_VERSION,
+    UNDERWEAR_STATUS_CLEAN,
+)
 
 
 class MenstruationStorage:
@@ -137,6 +150,121 @@ class MenstruationStorage:
             data.get("menarche_data"),
             data.get("pre_menarche_data"),
         )
+
+    async def async_load_inventory(self) -> dict[str, Any]:
+        """Load product inventory data from storage."""
+        raw = await self._store.async_load()
+        if not isinstance(raw, dict):
+            return self._default_inventory()
+        inventory = raw.get("product_inventory")
+        if not isinstance(inventory, dict):
+            return self._default_inventory()
+        return self._normalize_inventory(inventory)
+
+    async def async_save_inventory(self, inventory: dict[str, Any]) -> None:
+        """Save product inventory while preserving all other stored fields."""
+        raw = await self._store.async_load()
+        data: dict[str, Any] = raw if isinstance(raw, dict) else {}
+        data["product_inventory"] = self._normalize_inventory(inventory)
+        await self._store.async_save(data)
+
+    @staticmethod
+    def _default_inventory() -> dict[str, Any]:
+        """Return a default product inventory structure."""
+        return {
+            "tampons": {
+                "locations": {
+                    LOC_BATHROOM: {"stock": 0, "min_stock": DEFAULT_TAMPON_LOW_STOCK, "last_restocked": None},
+                    LOC_TOILET: {"stock": 0, "min_stock": DEFAULT_TAMPON_LOW_STOCK, "last_restocked": None},
+                    LOC_ON_THE_GO: {"stock": 0, "min_stock": DEFAULT_TAMPON_LOW_STOCK, "last_restocked": None},
+                },
+                "low_stock_threshold": DEFAULT_TAMPON_LOW_STOCK,
+            },
+            "pads": {
+                "locations": {
+                    LOC_BATHROOM: {"stock": 0, "min_stock": DEFAULT_PAD_LOW_STOCK, "last_restocked": None},
+                    LOC_TOILET: {"stock": 0, "min_stock": DEFAULT_PAD_LOW_STOCK, "last_restocked": None},
+                    LOC_ON_THE_GO: {"stock": 0, "min_stock": DEFAULT_PAD_LOW_STOCK, "last_restocked": None},
+                },
+                "low_stock_threshold": DEFAULT_PAD_LOW_STOCK,
+            },
+            "underwear": {
+                "items": [],
+                "low_clean_threshold": DEFAULT_UNDERWEAR_LOW_CLEAN,
+                "wash_reminder_days": DEFAULT_UNDERWEAR_WASH_DAYS,
+            },
+        }
+
+    @staticmethod
+    def _normalize_inventory(inventory: dict[str, Any]) -> dict[str, Any]:
+        """Ensure all required keys exist in the inventory dict."""
+        result = dict(inventory)
+
+        # Normalize tampons
+        tampons = result.get("tampons")
+        if not isinstance(tampons, dict):
+            tampons = {}
+        tampons_locs = tampons.get("locations")
+        if not isinstance(tampons_locs, dict):
+            tampons_locs = {}
+        for loc in DEFAULT_LOCATIONS:
+            if loc not in tampons_locs:
+                tampons_locs[loc] = {"stock": 0, "min_stock": DEFAULT_TAMPON_LOW_STOCK, "last_restocked": None}
+            else:
+                entry = dict(tampons_locs[loc])
+                entry.setdefault("stock", 0)
+                entry.setdefault("min_stock", DEFAULT_TAMPON_LOW_STOCK)
+                entry.setdefault("last_restocked", None)
+                tampons_locs[loc] = entry
+        tampons["locations"] = tampons_locs
+        tampons.setdefault("low_stock_threshold", DEFAULT_TAMPON_LOW_STOCK)
+        result["tampons"] = tampons
+
+        # Normalize pads
+        pads = result.get("pads")
+        if not isinstance(pads, dict):
+            pads = {}
+        pads_locs = pads.get("locations")
+        if not isinstance(pads_locs, dict):
+            pads_locs = {}
+        for loc in DEFAULT_LOCATIONS:
+            if loc not in pads_locs:
+                pads_locs[loc] = {"stock": 0, "min_stock": DEFAULT_PAD_LOW_STOCK, "last_restocked": None}
+            else:
+                entry = dict(pads_locs[loc])
+                entry.setdefault("stock", 0)
+                entry.setdefault("min_stock", DEFAULT_PAD_LOW_STOCK)
+                entry.setdefault("last_restocked", None)
+                pads_locs[loc] = entry
+        pads["locations"] = pads_locs
+        pads.setdefault("low_stock_threshold", DEFAULT_PAD_LOW_STOCK)
+        result["pads"] = pads
+
+        # Normalize underwear
+        underwear = result.get("underwear")
+        if not isinstance(underwear, dict):
+            underwear = {}
+        items = underwear.get("items")
+        if not isinstance(items, list):
+            items = []
+        normalized_items: list[dict[str, Any]] = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            norm_item: dict[str, Any] = {
+                "id": item.get("id", 0),
+                "label": str(item.get("label", f"Unterwäsche {item.get('id', 0)}")),
+                "status": item.get("status", UNDERWEAR_STATUS_CLEAN),
+                "since": item.get("since"),
+                "wear_count": int(item.get("wear_count", 0)),
+            }
+            normalized_items.append(norm_item)
+        underwear["items"] = normalized_items
+        underwear.setdefault("low_clean_threshold", DEFAULT_UNDERWEAR_LOW_CLEAN)
+        underwear.setdefault("wash_reminder_days", DEFAULT_UNDERWEAR_WASH_DAYS)
+        result["underwear"] = underwear
+
+        return result
 
     async def async_load_pregnancy_data(self) -> dict[str, Any]:
         """Load only the pregnancy data block."""

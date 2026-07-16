@@ -38,6 +38,20 @@
           "estimated_menarche_date": "Estimated date of the first period. Used for countdown tracking.",
           "family_menarche_age": "Age of menarche in the family (mother/sister) used to estimate the expected age."
         }
+      },
+      "underwear": {
+        "title": "Period underwear setup",
+        "description": "Configure the number of period underwear items and their management settings.",
+        "data": {
+          "underwear_count": "Number of underwear items (0–10)",
+          "underwear_low_clean_threshold": "Warn when fewer than N clean items remain",
+          "underwear_wash_reminder_days": "Wash reminder after N days dirty"
+        },
+        "data_description": {
+          "underwear_count": "How many period underwear items you own (0 = disabled).",
+          "underwear_low_clean_threshold": "You will receive a warning when fewer than this number of clean items are available.",
+          "underwear_wash_reminder_days": "A wash recommendation is shown when an item has been dirty for longer than this many days."
+        }
       }
     },
     "error": {
@@ -78,6 +92,63 @@
           "name": "Date",
           "description": "Optional ISO date to backfill. Defaults to today."
         }
+      }
+    },
+    "log_product_restock": {
+      "name": "Log product restock",
+      "description": "Increase stock of tampons or pads at a location.",
+      "fields": {
+        "entity_id": { "name": "Entity", "description": "Target menstruation gauge sensor." },
+        "profile": { "name": "Profile", "description": "Configured profile slug." },
+        "entry_id": { "name": "Entry ID", "description": "Config entry identifier." },
+        "product": { "name": "Product", "description": "tampons or pads." },
+        "quantity": { "name": "Quantity", "description": "Number of items to add." },
+        "location": { "name": "Location", "description": "bathroom, toilet, or on_the_go." },
+        "notes": { "name": "Notes", "description": "Optional note for this restock." }
+      }
+    },
+    "update_underwear_status": {
+      "name": "Update underwear status",
+      "description": "Mark a period underwear item as clean or dirty.",
+      "fields": {
+        "entity_id": { "name": "Entity", "description": "Target menstruation gauge sensor." },
+        "profile": { "name": "Profile", "description": "Configured profile slug." },
+        "entry_id": { "name": "Entry ID", "description": "Config entry identifier." },
+        "underwear_id": { "name": "Underwear ID", "description": "ID of the underwear item (1–10)." },
+        "status": { "name": "Status", "description": "clean or dirty." }
+      }
+    },
+    "get_product_inventory": {
+      "name": "Get product inventory",
+      "description": "Retrieve the current product inventory with low-stock alerts.",
+      "fields": {
+        "entity_id": { "name": "Entity", "description": "Target menstruation gauge sensor." },
+        "profile": { "name": "Profile", "description": "Configured profile slug." },
+        "entry_id": { "name": "Entry ID", "description": "Config entry identifier." }
+      }
+    },
+    "update_product_location": {
+      "name": "Move products between locations",
+      "description": "Transfer tampons or pads from one location to another.",
+      "fields": {
+        "entity_id": { "name": "Entity", "description": "Target menstruation gauge sensor." },
+        "profile": { "name": "Profile", "description": "Configured profile slug." },
+        "entry_id": { "name": "Entry ID", "description": "Config entry identifier." },
+        "product": { "name": "Product", "description": "tampons or pads." },
+        "quantity": { "name": "Quantity", "description": "Number of items to transfer." },
+        "location": { "name": "Source location", "description": "Location to transfer from." },
+        "target_location": { "name": "Target location", "description": "Location to transfer to." }
+      }
+    },
+    "export_shopping_list": {
+      "name": "Export shopping list",
+      "description": "Generate and export a shopping list based on current inventory.",
+      "fields": {
+        "entity_id": { "name": "Entity", "description": "Target menstruation gauge sensor." },
+        "profile": { "name": "Profile", "description": "Configured profile slug." },
+        "entry_id": { "name": "Entry ID", "description": "Config entry identifier." },
+        "format": { "name": "Format", "description": "csv or txt." },
+        "filename": { "name": "Filename", "description": "Optional filename without extension." }
       }
     }
   }

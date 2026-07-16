@@ -144,3 +144,47 @@ PRE_MENARCHE_SIGN_OPTIONS = {
 DEFAULT_MENARCHE_AGE_MIN = 9
 DEFAULT_MENARCHE_AGE_MAX = 16
 DEFAULT_MENARCHE_AGE_TYPICAL = 12
+
+# Product inventory constants
+PRODUCT_TAMPONS = "tampons"
+PRODUCT_PADS = "pads"
+PRODUCT_UNDERWEAR = "underwear"
+
+# Location constants
+LOC_BATHROOM = "bathroom"
+LOC_TOILET = "toilet"
+LOC_ON_THE_GO = "on_the_go"
+LOC_WARDROBE = "wardrobe"
+
+DEFAULT_LOCATIONS = [LOC_BATHROOM, LOC_TOILET, LOC_ON_THE_GO]
+
+# Inventory default thresholds
+DEFAULT_TAMPON_LOW_STOCK = 10
+DEFAULT_PAD_LOW_STOCK = 8
+DEFAULT_UNDERWEAR_LOW_CLEAN = 1
+DEFAULT_UNDERWEAR_WASH_DAYS = 2
+
+# Underwear status
+UNDERWEAR_STATUS_CLEAN = "clean"
+UNDERWEAR_STATUS_DIRTY = "dirty"
+
+# Inventory service names
+SERVICE_LOG_PRODUCT_RESTOCK = "log_product_restock"
+SERVICE_UPDATE_PRODUCT_LOCATION = "update_product_location"
+SERVICE_GET_PRODUCT_INVENTORY = "get_product_inventory"
+SERVICE_UPDATE_UNDERWEAR_STATUS = "update_underwear_status"
+SERVICE_EXPORT_SHOPPING_LIST = "export_shopping_list"
+
+# Inventory service fields
+SERVICE_FIELD_LOCATION = "location"
+SERVICE_FIELD_TARGET_LOCATION = "target_location"
+SERVICE_FIELD_UNDERWEAR_ID = "underwear_id"
+SERVICE_FIELD_STATUS = "status"
+SERVICE_FIELD_LABEL = "label"
+SERVICE_FIELD_NOTES = "notes"
+
+# Inventory attribute names
+ATTR_PRODUCT_INVENTORY = "product_inventory"
+ATTR_LOW_STOCK_ALERTS = "low_stock_alerts"
+ATTR_WASH_RECOMMENDATION = "wash_recommendation"
+ATTR_SHOPPING_LIST = "shopping_list"

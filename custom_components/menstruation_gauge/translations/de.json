@@ -38,6 +38,20 @@
           "estimated_menarche_date": "Voraussichtliches Datum der ersten Periode. Wird für das Countdown-Tracking verwendet.",
           "family_menarche_age": "Menarche-Alter in der Familie (Mutter/Schwester) zur Schätzung des erwarteten Alters."
         }
+      },
+      "underwear": {
+        "title": "Periodische Unterwäsche einrichten",
+        "description": "Anzahl und Einstellungen für Periodische Unterwäsche konfigurieren.",
+        "data": {
+          "underwear_count": "Anzahl Unterwäsche (0–10)",
+          "underwear_low_clean_threshold": "Warnung bei weniger als N sauberen Stücken",
+          "underwear_wash_reminder_days": "Wash-Erinnerung nach N Tagen (schmutzig)"
+        },
+        "data_description": {
+          "underwear_count": "Wie viele Periodenunterwäsche-Stücke du hast (0 = deaktiviert).",
+          "underwear_low_clean_threshold": "Du erhältst eine Warnung, wenn weniger als diese Anzahl sauberer Unterwäsche vorhanden ist.",
+          "underwear_wash_reminder_days": "Empfehlung zum Waschen, wenn ein Stück länger als diese Anzahl an Tagen schmutzig ist."
+        }
       }
     },
     "error": {
@@ -314,6 +328,63 @@
           "name": "Pubertätszeichen",
           "description": "Das zu entfernende Körperzeichen."
         }
+      }
+    },
+    "log_product_restock": {
+      "name": "Produktbestand auffüllen",
+      "description": "Bestand von Tampons oder Binden an einem Lagerort erhöhen.",
+      "fields": {
+        "entity_id": { "name": "Entität", "description": "Ziel-Menstruationssensor." },
+        "profile": { "name": "Profil", "description": "Konfigurierter Profil-Slug." },
+        "entry_id": { "name": "Entry-ID", "description": "Kennung des Config-Entries." },
+        "product": { "name": "Produkt", "description": "tampons oder pads." },
+        "quantity": { "name": "Menge", "description": "Anzahl hinzufügender Stücke." },
+        "location": { "name": "Lagerort", "description": "bathroom, toilet oder on_the_go." },
+        "notes": { "name": "Notizen", "description": "Optionale Notiz zum Nachkauf." }
+      }
+    },
+    "update_underwear_status": {
+      "name": "Unterwäsche-Status aktualisieren",
+      "description": "Ein Periodenunterwäsche-Stück als sauber oder schmutzig markieren.",
+      "fields": {
+        "entity_id": { "name": "Entität", "description": "Ziel-Menstruationssensor." },
+        "profile": { "name": "Profil", "description": "Konfigurierter Profil-Slug." },
+        "entry_id": { "name": "Entry-ID", "description": "Kennung des Config-Entries." },
+        "underwear_id": { "name": "Unterwäsche-ID", "description": "ID des Unterwäsche-Stücks (1–10)." },
+        "status": { "name": "Status", "description": "clean oder dirty." }
+      }
+    },
+    "get_product_inventory": {
+      "name": "Produktbestand abrufen",
+      "description": "Aktuellen Bestand aller Produkte mit Warnungen abrufen.",
+      "fields": {
+        "entity_id": { "name": "Entität", "description": "Ziel-Menstruationssensor." },
+        "profile": { "name": "Profil", "description": "Konfigurierter Profil-Slug." },
+        "entry_id": { "name": "Entry-ID", "description": "Kennung des Config-Entries." }
+      }
+    },
+    "update_product_location": {
+      "name": "Produkte zwischen Lagerorten verschieben",
+      "description": "Tampons oder Binden von einem Lagerort zu einem anderen transferieren.",
+      "fields": {
+        "entity_id": { "name": "Entität", "description": "Ziel-Menstruationssensor." },
+        "profile": { "name": "Profil", "description": "Konfigurierter Profil-Slug." },
+        "entry_id": { "name": "Entry-ID", "description": "Kennung des Config-Entries." },
+        "product": { "name": "Produkt", "description": "tampons oder pads." },
+        "quantity": { "name": "Menge", "description": "Anzahl zu transferierender Stücke." },
+        "location": { "name": "Quellort", "description": "Lagerort, von dem transferiert wird." },
+        "target_location": { "name": "Zielort", "description": "Lagerort, zu dem transferiert wird." }
+      }
+    },
+    "export_shopping_list": {
+      "name": "Einkaufsliste exportieren",
+      "description": "Einkaufsliste basierend auf aktuellem Bestand generieren und exportieren.",
+      "fields": {
+        "entity_id": { "name": "Entität", "description": "Ziel-Menstruationssensor." },
+        "profile": { "name": "Profil", "description": "Konfigurierter Profil-Slug." },
+        "entry_id": { "name": "Entry-ID", "description": "Kennung des Config-Entries." },
+        "format": { "name": "Format", "description": "csv oder txt." },
+        "filename": { "name": "Dateiname", "description": "Optionaler Dateiname (ohne Erweiterung)." }
       }
     }
   }
