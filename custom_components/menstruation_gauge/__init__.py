@@ -109,6 +109,7 @@ PRODUCT_INVENTORY_RESOURCE_URL = "/menstruation_gauge/menstrual-product-inventor
 COMPACT_CARD_RESOURCE_URL = "/menstruation_gauge/menstrual-cycle-card-compact.js"
 HISTORY_ROW_RESOURCE_URL = "/menstruation_gauge/menstrual-cycle-history-card-row.js"
 HISTORY_ANALOG_RESOURCE_URL = "/menstruation_gauge/menstrual-cycle-history-card-analog.js"
+COMPACT_STATUS_RESOURCE_URL = "/menstruation_gauge/menstrual-cycle-compact-status-card.js"
 CARD_RESOURCE_TYPE = "module"
 EXPORT_DIR_NAME = "menstruation_gauge_exports"
 LOVELACE_RESOURCES = (
@@ -118,6 +119,7 @@ LOVELACE_RESOURCES = (
     (PRODUCT_STATS_RESOURCE_URL, "menstrual-product-stats-card.js"),
     (PRODUCT_INVENTORY_RESOURCE_URL, "menstrual-product-inventory-card.js"),
     (COMPACT_CARD_RESOURCE_URL, "menstrual-cycle-card-compact.js"),
+    (COMPACT_STATUS_RESOURCE_URL, "menstrual-cycle-compact-status-card.js"),
     (HISTORY_ROW_RESOURCE_URL, "menstrual-cycle-history-card-row.js"),
     (HISTORY_ANALOG_RESOURCE_URL, "menstrual-cycle-history-card-analog.js"),
 )
