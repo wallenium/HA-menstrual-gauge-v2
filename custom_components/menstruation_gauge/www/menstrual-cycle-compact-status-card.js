@@ -62,12 +62,18 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
         postpartum: 'Wochenbett',
         menarche: 'Menarche',
         menopause: 'Menopause',
+        in_menopause: 'In Menopause',
         week: 'Woche',
+        day: 'Tag',
         of: 'von',
         due_date: 'Geburtstermin',
         estimated_date: 'Geschätzter Termin',
         days_until: 'Tage bis Menarche',
         progress: 'Fortschritt',
+        postpartum_end: 'Ende Wochenbett',
+        since: 'seit',
+        years: 'Jahren',
+        months: 'Monaten',
         phase_period: 'Blutung',
         phase_fertile: 'Fruchtbar',
         phase_ovulation: 'Eisprung',
@@ -89,12 +95,18 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
         postpartum: 'Postpartum',
         menarche: 'Menarche',
         menopause: 'Menopause',
+        in_menopause: 'In Menopause',
         week: 'Week',
+        day: 'Day',
         of: 'of',
         due_date: 'Due Date',
         estimated_date: 'Estimated Date',
         days_until: 'Days until Menarche',
         progress: 'Progress',
+        postpartum_end: 'Postpartum End',
+        since: 'since',
+        years: 'years',
+        months: 'months',
         phase_period: 'Bleeding',
         phase_fertile: 'Fertile',
         phase_ovulation: 'Ovulation',
@@ -173,6 +185,7 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
     const ovulationIso = this._normalizeISO(attrs.ovulation_day);
 
     if (attrs.is_pregnant || stateObj?.state === 'pregnant') return 'pregnant';
+    if (attrs.is_postpartum || stateObj?.state === 'postpartum') return 'postpartum';
     if (attrs.awaiting_menarche || stateObj?.state === 'pre_menarche') return 'pre_menarche';
     if (stateObj?.state === 'fertile' && ovulationIso && ovulationIso === todayIso) return 'ovulation';
     return stateObj?.state || 'neutral';
@@ -379,6 +392,41 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
       titleText = this._t('pre_menarche');
       progressLabel = `${progressPercent}%`;
       progressColor = '#9b59b6';
+    } else if (statusKey === 'postpartum') {
+      emoji = '👶';
+      const birthDateNorm = this._normalizeISO(attrs.birth_date);
+      const postpartumDuration = Math.max(1, parseInt(String(attrs.postpartum_duration || '42'), 10) || 42);
+
+      let daysSinceBirth = 0;
+      if (birthDateNorm) {
+        const today = new Date();
+        const birthDate = new Date(birthDateNorm);
+        today.setHours(0, 0, 0, 0);
+        birthDate.setHours(0, 0, 0, 0);
+        daysSinceBirth = Math.max(0, Math.round((today - birthDate) / 86400000));
+      }
+      daysSinceBirth = Math.min(daysSinceBirth, postpartumDuration);
+      progressPercent = Math.min(100, Math.round((daysSinceBirth / postpartumDuration) * 100));
+      progressColor = '#1abc9c';
+
+      if (postpartumDuration % 7 === 0) {
+        const weeksTotal = postpartumDuration / 7;
+        const weeksCurrent = Math.floor(daysSinceBirth / 7);
+        titleText = `${this._t('postpartum')} – ${this._t('week')} ${weeksCurrent}/${weeksTotal}`;
+      } else {
+        titleText = `${this._t('postpartum')} – ${this._t('day')} ${daysSinceBirth}/${postpartumDuration}`;
+      }
+      progressLabel = `${progressPercent}%`;
+
+      if (birthDateNorm) {
+        const endDate = new Date(birthDateNorm);
+        endDate.setHours(0, 0, 0, 0);
+        endDate.setDate(endDate.getDate() + postpartumDuration);
+        const endY = endDate.getFullYear();
+        const endM = String(endDate.getMonth() + 1).padStart(2, '0');
+        const endD = String(endDate.getDate()).padStart(2, '0');
+        subtitleText = `${this._t('postpartum_end')}: ${endY}-${endM}-${endD}`;
+      }
     }
 
     return `
@@ -400,26 +448,40 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
     `;
   }
 
-  // Build simple icon + text layout for postpartum, menarche, menopause
+  // Build simple icon + text layout for menarche, menopause
   _buildIconTextLayout(statusKey, status, attrs) {
     const emojiMap = {
-      postpartum: '👶',
       menarche: '🌸',
       menopause: '🌙',
     };
     const emoji = emojiMap[statusKey] || '⭕';
 
     let extraInfo = '';
-    if (statusKey === 'postpartum') {
-      const dueDate = this._normalizeISO(attrs.due_date);
-      if (dueDate) extraInfo = dueDate;
+    if (statusKey === 'menopause') {
+      const menopauseStartNorm = this._normalizeISO(attrs.menopause_start_date);
+      if (menopauseStartNorm) {
+        const today = new Date();
+        const startDate = new Date(menopauseStartNorm);
+        today.setHours(0, 0, 0, 0);
+        startDate.setHours(0, 0, 0, 0);
+        const totalMonths = Math.floor((today - startDate) / (1000 * 60 * 60 * 24 * 30.44));
+        const years = Math.floor(totalMonths / 12);
+        const months = totalMonths % 12;
+        if (years > 0) {
+          extraInfo = `${this._t('since')} ${years} ${this._t('years')}`;
+        } else if (months > 0) {
+          extraInfo = `${this._t('since')} ${months} ${this._t('months')}`;
+        }
+      }
     }
+
+    const titleLabel = statusKey === 'menopause' ? this._t('in_menopause') : status.label;
 
     return `
       <div class="icon-text-layout">
         <span class="big-emoji" role="img" aria-hidden="true">${emoji}</span>
         <div class="icon-text-info">
-          <div class="icon-text-title" style="color:${status.color};">${status.label}</div>
+          <div class="icon-text-title" style="color:${status.color};">${titleLabel}</div>
           ${extraInfo ? `<div class="icon-text-sub">${extraInfo}</div>` : ''}
         </div>
       </div>
@@ -444,8 +506,8 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
 
     // Determine rendering mode
     const CYCLE_MODES = ['period', 'pms', 'fertile', 'ovulation', 'neutral'];
-    const PROGRESS_MODES = ['pregnant', 'pre_menarche'];
-    const ICON_TEXT_MODES = ['postpartum', 'menarche', 'menopause'];
+    const PROGRESS_MODES = ['pregnant', 'pre_menarche', 'postpartum'];
+    const ICON_TEXT_MODES = ['menarche', 'menopause'];
 
     let bodyHtml = '';
 
