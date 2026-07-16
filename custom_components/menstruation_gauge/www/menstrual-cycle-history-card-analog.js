@@ -58,7 +58,7 @@ class MenstrualCycleHistoryCardAnalog extends HTMLElement {
         cycle_day: 'Zyklustag',
         period: 'Periode',
         fertile: 'Fruchtbar',
-        ovulation: 'Eisprung',
+        ovulation: 'Eissprung',
         pms: 'PMS',
         pregnant: 'Schwanger',
         pre_menarche: 'Vor Menarche',
@@ -123,7 +123,7 @@ class MenstrualCycleHistoryCardAnalog extends HTMLElement {
     const centerX = 160;
     const centerY = 160;
 
-    const segments = [];
+    let segments = '';
     for (let day = 1; day <= cycleLength; day++) {
       const startAngle = (day - 1) * (2 * Math.PI / cycleLength) - Math.PI / 2;
       const endAngle = day * (2 * Math.PI / cycleLength) - Math.PI / 2;
@@ -146,63 +146,29 @@ class MenstrualCycleHistoryCardAnalog extends HTMLElement {
       if (day === cycleDay) segmentClass += ' current';
 
       const path = `M ${x1} ${y1} L ${x2} ${y2} A ${radius} ${radius} 0 0 1 ${x3} ${y3} L ${x4} ${y4} A ${radius - 20} ${radius - 20} 0 0 0 ${x1} ${y1} Z`;
-      segments.push(`<path class="${segmentClass}" d="${path}" />`);
+      segments += `<path class="${segmentClass}" d="${path}" />`;
     }
 
     const currentDayLabel = this._config.show_labels !== false ? `<text x="${centerX}" y="${centerY - 60}" class="day-label">${cycleDay}</text>` : '';
 
-    return `
-      <svg width="320" height="320" viewBox="0 0 320 320" class="cycle-analog">
-        <defs>
-          <style>
-            .segment {
-              fill: rgba(100, 100, 100, 0.1);
-              stroke: var(--divider-color);
-              stroke-width: 0.5;
-              transition: fill 200ms ease;
-            }
-            .segment.period {
-              fill: rgba(231, 76, 60, 0.6);
-            }
-            .segment.fertile {
-              fill: rgba(250, 204, 21, 0.5);
-            }
-            .segment.ovulation {
-              fill: rgba(39, 174, 96, 0.7);
-              filter: drop-shadow(0 0 2px rgba(39, 174, 96, 0.8));
-            }
-            .segment.current {
-              stroke: var(--primary-text-color);
-              stroke-width: 2;
-            }
-            .center-circle {
-              fill: var(--ha-card-background);
-              stroke: var(--divider-color);
-              stroke-width: 1;
-            }
-            .day-label {
-              text-anchor: middle;
-              dominant-baseline: central;
-              font-size: 32px;
-              font-weight: 700;
-              color: var(--primary-text-color);
-            }
-            .info-text {
-              text-anchor: middle;
-              dominant-baseline: central;
-              font-size: 12px;
-              fill: var(--secondary-text-color);
-            }
-          </style>
-        </defs>
-        <g id="cycle-segments">
-          ${segments.join('')}
-        </g>
-        <circle cx="${centerX}" cy="${centerY}" r="50" class="center-circle" />
-        ${currentDayLabel}
-        <text x="${centerX}" y="${centerY + 20}" class="info-text">/ ${cycleLength}</text>
-      </svg>
-    `;
+    return `<svg width="320" height="320" viewBox="0 0 320 320" class="cycle-analog">
+      <defs>
+        <style>
+          .segment { fill: rgba(100, 100, 100, 0.1); stroke: var(--divider-color); stroke-width: 0.5; }
+          .segment.period { fill: rgba(231, 76, 60, 0.6); }
+          .segment.fertile { fill: rgba(250, 204, 21, 0.5); }
+          .segment.ovulation { fill: rgba(39, 174, 96, 0.7); filter: drop-shadow(0 0 2px rgba(39, 174, 96, 0.8)); }
+          .segment.current { stroke: var(--primary-text-color); stroke-width: 2; }
+          .center-circle { fill: var(--ha-card-background); stroke: var(--divider-color); stroke-width: 1; }
+          .day-label { text-anchor: middle; dominant-baseline: central; font-size: 32px; font-weight: 700; color: var(--primary-text-color); }
+          .info-text { text-anchor: middle; dominant-baseline: central; font-size: 12px; fill: var(--secondary-text-color); }
+        </style>
+      </defs>
+      <g id="cycle-segments">${segments}</g>
+      <circle cx="${centerX}" cy="${centerY}" r="50" class="center-circle" />
+      ${currentDayLabel}
+      <text x="${centerX}" y="${centerY + 20}" class="info-text">/ ${cycleLength}</text>
+    </svg>`;
   }
 
   _render() {
@@ -211,12 +177,9 @@ class MenstrualCycleHistoryCardAnalog extends HTMLElement {
 
     const entityId = this._resolveEntityId();
     const stateObj = entityId ? this._hass?.states?.[entityId] : undefined;
+    
     if (!stateObj) {
-      this.shadowRoot.innerHTML = `
-        <ha-card>
-          <div class="pad">${this._t('entity_not_found')}: ${this._config.entity || this._config.entry_id || this._t('unknown')}</div>
-        </ha-card>
-      `;
+      this.shadowRoot.innerHTML = '<ha-card><div class="pad">Entity not found</div></ha-card>';
       return;
     }
 
@@ -253,146 +216,52 @@ class MenstrualCycleHistoryCardAnalog extends HTMLElement {
 
     const cycleContent = this._createAnalogCycle(cycleDay, cycleLength, periodDays);
 
-    this.shadowRoot.innerHTML = `
-      <style>
-        :host {
-          display: block;
-        }
+    let legendHtml = '<div class="legend-item"><span class="legend-swatch period"></span><span>' + this._t('period') + '</span></div>';
+    if (this._config.show_fertile_window !== false) {
+      legendHtml += '<div class="legend-item"><span class="legend-swatch fertile"></span><span>' + this._t('fertile') + '</span></div>';
+      legendHtml += '<div class="legend-item"><span class="legend-swatch ovulation"></span><span>' + this._t('ovulation') + '</span></div>';
+    }
 
-        ha-card {
-          padding: 16px;
-        }
-
-        .title {
-          font-weight: 600;
-          margin: 0 0 12px;
-          color: var(--primary-text-color);
-          text-align: center;
-        }
-
-        .content {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 16px;
-        }
-
-        .cycle-analog {
-          max-width: 100%;
-          height: auto;
-        }
-
-        .status-info {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 8px;
-          padding: 12px;
-          background: rgba(0, 0, 0, 0.02);
-          border-radius: 8px;
-          width: 100%;
-        }
-
-        .status-emoji {
-          font-size: 2rem;
-        }
-
-        .status-text {
-          font-weight: 600;
-          color: var(--primary-text-color);
-        }
-
-        .status-subtext {
-          font-size: 0.85rem;
-          color: var(--secondary-text-color);
-        }
-
-        .legend {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-          gap: 8px;
-          width: 100%;
-          font-size: 0.8rem;
-          color: var(--secondary-text-color);
-          margin-top: 8px;
-        }
-
-        .legend-item {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-        }
-
-        .legend-swatch {
-          width: 12px;
-          height: 12px;
-          border-radius: 2px;
-        }
-
-        .legend-swatch.period {
-          background: rgba(231, 76, 60, 0.6);
-        }
-
-        .legend-swatch.fertile {
-          background: rgba(250, 204, 21, 0.5);
-        }
-
-        .legend-swatch.ovulation {
-          background: rgba(39, 174, 96, 0.7);
-        }
-
-        .pad {
-          padding: 16px;
-          color: var(--secondary-text-color);
-          text-align: center;
-        }
-
-        @media (max-width: 400px) {
-          ha-card {
-            padding: 12px;
-          }
-
-          .cycle-analog {
-            max-width: 250px;
-          }
-        }
-      </style>
-      <ha-card>
-        <div class="title">${this._config.title || this._t('title')}</div>
-        <div class="content">
-          ${cycleContent}
-          <div class="status-info">
-            <div class="status-emoji">${statusEmoji}</div>
-            <div class="status-text">${statusText}</div>
-            <div class="status-subtext">${this._t('cycle_day')} ${cycleDay}/${cycleLength}</div>
-          </div>
-          <div class="legend">
-            <div class="legend-item">
-              <span class="legend-swatch period"></span>
-              <span>${this._t('period')}</span>
-            </div>
-            ${this._config.show_fertile_window !== false ? `
-              <div class="legend-item">
-                <span class="legend-swatch fertile"></span>
-                <span>${this._t('fertile')}</span>
-              </div>
-              <div class="legend-item">
-                <span class="legend-swatch ovulation"></span>
-                <span>${this._t('ovulation')}</span>
-              </div>
-            ` : ''}
-          </div>
+    const html = `<style>
+      :host { display: block; }
+      ha-card { padding: 16px; }
+      .title { font-weight: 600; margin: 0 0 12px; color: var(--primary-text-color); text-align: center; }
+      .content { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+      .cycle-analog { max-width: 100%; height: auto; }
+      .status-info { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px; background: rgba(0, 0, 0, 0.02); border-radius: 8px; width: 100%; }
+      .status-emoji { font-size: 2rem; }
+      .status-text { font-weight: 600; color: var(--primary-text-color); }
+      .status-subtext { font-size: 0.85rem; color: var(--secondary-text-color); }
+      .legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; width: 100%; font-size: 0.8rem; color: var(--secondary-text-color); margin-top: 8px; }
+      .legend-item { display: flex; align-items: center; gap: 4px; }
+      .legend-swatch { width: 12px; height: 12px; border-radius: 2px; }
+      .legend-swatch.period { background: rgba(231, 76, 60, 0.6); }
+      .legend-swatch.fertile { background: rgba(250, 204, 21, 0.5); }
+      .legend-swatch.ovulation { background: rgba(39, 174, 96, 0.7); }
+    </style>
+    <ha-card>
+      <div class="title">${this._config.title || this._t('title')}</div>
+      <div class="content">
+        ${cycleContent}
+        <div class="status-info">
+          <div class="status-emoji">${statusEmoji}</div>
+          <div class="status-text">${statusText}</div>
+          <div class="status-subtext">${this._t('cycle_day')} ${cycleDay}/${cycleLength}</div>
         </div>
-      </ha-card>
-    `;
+        <div class="legend">
+          ${legendHtml}
+        </div>
+      </div>
+    </ha-card>`;
+
+    this.shadowRoot.innerHTML = html;
   }
 }
 
 customElements.define('menstrual-cycle-history-card-analog', MenstrualCycleHistoryCardAnalog);
-
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'menstrual-cycle-history-card-analog',
   name: 'Menstrual Cycle History (Analog)',
-  description: 'Analoge kreisförmige Ansicht des Zyklus mit Schwangerschaft und Pre-Menarche Integration',
+  description: 'Menstrual cycle in circular analog format',
 });
