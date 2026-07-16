@@ -366,8 +366,8 @@ class PeriodCountdownTimer extends HTMLElement {
       </div>
     `;
 
-    this.attachTimerEventListeners();
     this.updateProductDropdown(this.timerState.currentStatus);
+    this.attachTimerEventListeners();
   }
 
   renderPregnancyMilestones(trimester) {
@@ -633,6 +633,10 @@ class PeriodCountdownTimer extends HTMLElement {
   selectProductFromDropdown(key) {
     try {
       const productSelect = this.querySelector("#productSelect");
+      if (!productSelect) {
+        console.warn("ProductSelect element not found");
+        return;
+      }
       const selectedOption = productSelect.options[productSelect.selectedIndex];
 
       if (!selectedOption || !selectedOption.dataset.seconds) {
@@ -991,7 +995,7 @@ class PeriodCountdownTimer extends HTMLElement {
       },
     };
 
-    const lang = this._hass?.language || 'de';
+    const lang = this._hass?.locale?.language || this._hass?.language || 'de';
     return translations[lang]?.[key] || translations['en'][key];
   }
 
