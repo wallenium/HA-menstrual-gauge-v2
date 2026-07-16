@@ -58,10 +58,21 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
         pms: 'PMS',
         neutral: 'Neutral',
         pre_menarche: 'Vor Menarche',
-        pregnant: 'Schwanger',
+        pregnant: 'Schwangerschaft',
         postpartum: 'Wochenbett',
         menarche: 'Menarche',
         menopause: 'Menopause',
+        week: 'Woche',
+        of: 'von',
+        due_date: 'Geburtstermin',
+        estimated_date: 'Geschätzter Termin',
+        days_until: 'Tage bis Menarche',
+        progress: 'Fortschritt',
+        phase_period: 'Blutung',
+        phase_fertile: 'Fruchtbar',
+        phase_ovulation: 'Eisprung',
+        phase_pms: 'PMS',
+        phase_neutral: 'Neutral',
       },
       en: {
         entity_not_found: 'Entity not found',
@@ -74,10 +85,21 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
         pms: 'PMS',
         neutral: 'Neutral',
         pre_menarche: 'Pre-Menarche',
-        pregnant: 'Pregnant',
+        pregnant: 'Pregnancy',
         postpartum: 'Postpartum',
         menarche: 'Menarche',
         menopause: 'Menopause',
+        week: 'Week',
+        of: 'of',
+        due_date: 'Due Date',
+        estimated_date: 'Estimated Date',
+        days_until: 'Days until Menarche',
+        progress: 'Progress',
+        phase_period: 'Bleeding',
+        phase_fertile: 'Fertile',
+        phase_ovulation: 'Ovulation',
+        phase_pms: 'PMS',
+        phase_neutral: 'Neutral',
       },
     };
     return (i18n[this._lang()] && i18n[this._lang()][key]) || (i18n.en[key] || key);
@@ -164,10 +186,10 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
       ovulation: { color: '#f39c12', label: this._t('ovulation'), icon: 'ovulation' },
       neutral: { color: '#95a5a6', label: this._t('neutral'), icon: 'dash' },
       pre_menarche: { color: '#9b59b6', label: this._t('pre_menarche'), icon: 'flower' },
-      pregnant: { color: '#9b59b6', label: this._t('pregnant'), icon: 'heart' },
-      postpartum: { color: '#95a5a6', label: this._t('postpartum'), icon: 'dash' },
+      pregnant: { color: '#3498db', label: this._t('pregnant'), icon: 'pregnant' },
+      postpartum: { color: '#1abc9c', label: this._t('postpartum'), icon: 'baby' },
       menarche: { color: '#9b59b6', label: this._t('menarche'), icon: 'flower' },
-      menopause: { color: '#95a5a6', label: this._t('menopause'), icon: 'dash' },
+      menopause: { color: '#34495e', label: this._t('menopause'), icon: 'moon' },
     };
     return map[statusKey] || map.neutral;
   }
@@ -179,11 +201,23 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
     if (icon === 'warning') {
       return '<path d="M12 3 2.5 20h19L12 3z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 9v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/>';
     }
-    if (icon === 'heart' || icon === 'ovulation') {
+    if (icon === 'heart') {
+      return '<path d="M12 20s-7-4.2-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.8-7 10-7 10z" fill="none" stroke="currentColor" stroke-width="1.8"/>';
+    }
+    if (icon === 'ovulation') {
       return '<path d="M12 20s-7-4.2-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.8-7 10-7 10z" fill="none" stroke="currentColor" stroke-width="1.8"/>';
     }
     if (icon === 'flower') {
       return '<circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="7" r="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="17" r="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="7" cy="12" r="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="17" cy="12" r="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/>';
+    }
+    if (icon === 'pregnant') {
+      return '<circle cx="12" cy="7" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 21c0-3 1.5-7 4-7s4 4 4 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M14 14c1.5 0 3 1 3 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>';
+    }
+    if (icon === 'baby') {
+      return '<circle cx="12" cy="6" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6 21v-2a6 6 0 0 1 12 0v2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M9 11h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>';
+    }
+    if (icon === 'moon') {
+      return '<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z" fill="none" stroke="currentColor" stroke-width="1.8"/>';
     }
     return '<path d="M7 12h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>';
   }
@@ -191,6 +225,205 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
   _statusIcon(icon, color) {
     const marker = icon === 'ovulation' ? `<circle cx="18" cy="6" r="3" fill="${color}" stroke="var(--ha-card-background, #fff)" stroke-width="1.2"/>` : '';
     return `<svg viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false">${this._iconPath(icon)}${marker}</svg>`;
+  }
+
+  // Build the SVG cycle phase circle with colored sectors for cycle modes
+  _buildCycleCircle(cycleDay, cycleLength, attrs) {
+    const periodDays = Math.max(1, parseInt(String(attrs.period_duration_days || '5'), 10) || 5);
+    const fertileStart = attrs.fertile_window_start
+      ? this._dayOfCycleFromISO(attrs.fertile_window_start, attrs)
+      : 10;
+    const fertileEnd = attrs.fertile_window_end
+      ? this._dayOfCycleFromISO(attrs.fertile_window_end, attrs)
+      : 16;
+    const ovulationDay = attrs.ovulation_day
+      ? this._dayOfCycleFromISO(attrs.ovulation_day, attrs)
+      : 14;
+    // PMS: last 3-5 days before period
+    const pmsStart = Math.max(1, cycleLength - 4);
+    const pmsEnd = cycleLength;
+
+    const cx = 40;
+    const cy = 40;
+    const outerR = 34;
+    const innerR = 20;
+    const TWO_PI = 2 * Math.PI;
+
+    const arc = (day, r) => {
+      const angle = ((day - 1) / cycleLength) * TWO_PI - Math.PI / 2;
+      return {
+        x: cx + r * Math.cos(angle),
+        y: cy + r * Math.sin(angle),
+      };
+    };
+
+    let sectors = '';
+    for (let day = 1; day <= cycleLength; day++) {
+      const startAngle = ((day - 1) / cycleLength) * TWO_PI - Math.PI / 2;
+      const endAngle = (day / cycleLength) * TWO_PI - Math.PI / 2;
+      const gap = 0.03; // small gap between segments in radians
+
+      const x1 = cx + innerR * Math.cos(startAngle + gap);
+      const y1 = cy + innerR * Math.sin(startAngle + gap);
+      const x2 = cx + outerR * Math.cos(startAngle + gap);
+      const y2 = cy + outerR * Math.sin(startAngle + gap);
+      const x3 = cx + outerR * Math.cos(endAngle - gap);
+      const y3 = cy + outerR * Math.sin(endAngle - gap);
+      const x4 = cx + innerR * Math.cos(endAngle - gap);
+      const y4 = cy + innerR * Math.sin(endAngle - gap);
+
+      let fill = '#95a5a6'; // neutral
+      if (day <= periodDays) {
+        fill = '#e74c3c'; // period
+      } else if (day >= pmsStart && day <= pmsEnd) {
+        fill = '#f39c12'; // pms
+      } else if (day === ovulationDay) {
+        fill = '#e67e22'; // ovulation (distinct orange)
+      } else if (day >= fertileStart && day <= fertileEnd) {
+        fill = '#27ae60'; // fertile
+      }
+
+      const isCurrent = day === cycleDay;
+      const opacity = isCurrent ? '1' : '0.55';
+      const strokeExtra = isCurrent ? ` stroke="var(--primary-text-color)" stroke-width="1.2"` : '';
+
+      sectors += `<path d="M ${x1} ${y1} L ${x2} ${y2} A ${outerR} ${outerR} 0 0 1 ${x3} ${y3} L ${x4} ${y4} A ${innerR} ${innerR} 0 0 0 ${x1} ${y1} Z" fill="${fill}" opacity="${opacity}"${strokeExtra}/>`;
+    }
+
+    // Animated marker dot for current day
+    const markerAngle = ((cycleDay - 0.5) / cycleLength) * TWO_PI - Math.PI / 2;
+    const markerR = (outerR + innerR) / 2;
+    const mx = cx + markerR * Math.cos(markerAngle);
+    const my = cy + markerR * Math.sin(markerAngle);
+
+    return `<svg viewBox="0 0 80 80" role="img" aria-hidden="true" focusable="false" class="phase-circle">
+      <g>${sectors}</g>
+      <circle cx="${cx}" cy="${cy}" r="${innerR - 1}" fill="var(--ha-card-background, var(--card-background-color))"/>
+      <text x="${cx}" y="${cy - 4}" class="day-num">${cycleDay}</text>
+      <text x="${cx}" y="${cy + 9}" class="day-total">/${cycleLength}</text>
+      <circle cx="${mx.toFixed(2)}" cy="${my.toFixed(2)}" r="3" fill="var(--primary-text-color)" class="marker-dot"/>
+    </svg>`;
+  }
+
+  _dayOfCycleFromISO(isoStr, attrs) {
+    const normalized = this._normalizeISO(isoStr);
+    if (!normalized) return null;
+    const nextStartRaw = attrs.next_predicted_start;
+    if (!nextStartRaw) return null;
+    try {
+      const cycleLength = Math.max(1, parseInt(String(attrs.avg_cycle_length || '28'), 10) || 28);
+      const nextDate = new Date(nextStartRaw);
+      const targetDate = new Date(normalized);
+      if (Number.isNaN(nextDate.getTime()) || Number.isNaN(targetDate.getTime())) return null;
+      nextDate.setHours(0, 0, 0, 0);
+      targetDate.setHours(0, 0, 0, 0);
+      const daysUntilNext = Math.round((nextDate - targetDate) / 86400000);
+      return Math.max(1, Math.min(cycleLength, cycleLength - daysUntilNext));
+    } catch (_e) {
+      return null;
+    }
+  }
+
+  // Build the progress bar layout for pregnant / pre_menarche modes
+  _buildProgressLayout(statusKey, attrs, status) {
+    let emoji = '';
+    let titleText = '';
+    let progressPercent = 0;
+    let progressLabel = '';
+    let progressColor = status.color;
+    let subtitleText = '';
+
+    if (statusKey === 'pregnant') {
+      emoji = '🤰';
+      const weeksRaw = attrs.weeks_pregnant !== undefined ? attrs.weeks_pregnant : attrs.pregnancy_week;
+      const weeksPregnant = Math.max(0, parseInt(String(weeksRaw || '0'), 10) || 0);
+      const totalWeeks = 40;
+      progressPercent = Math.min(100, Math.round((weeksPregnant / totalWeeks) * 100));
+      titleText = `${this._t('pregnant')} – ${this._t('week')} ${weeksPregnant}/${totalWeeks}`;
+      progressLabel = `${progressPercent}%`;
+      progressColor = '#3498db';
+
+      const dueDateRaw = attrs.due_date;
+      const dueDateNorm = this._normalizeISO(dueDateRaw);
+      if (dueDateNorm) {
+        subtitleText = `${this._t('due_date')}: ${dueDateNorm}`;
+      }
+    } else if (statusKey === 'pre_menarche') {
+      emoji = '🌸';
+      const menarcheData = attrs.menarche_data || {};
+      const daysUntil = attrs.days_until_menarche !== undefined ? parseInt(String(attrs.days_until_menarche || '0'), 10) : null;
+      const estimatedDate = this._normalizeISO(menarcheData.estimated_date || attrs.estimated_menarche_date);
+
+      // Calculate progress: use days_until_menarche relative to a rough window
+      // If we have estimated date, compute percent of time elapsed
+      if (estimatedDate) {
+        const today = new Date();
+        const estimated = new Date(estimatedDate);
+        today.setHours(0, 0, 0, 0);
+        estimated.setHours(0, 0, 0, 0);
+        const daysLeft = Math.ceil((estimated - today) / 86400000);
+        // Assume tracking started ~2 years before estimated menarche (~730 days)
+        const trackingWindow = 730;
+        const elapsed = Math.max(0, trackingWindow - daysLeft);
+        progressPercent = Math.min(100, Math.round((elapsed / trackingWindow) * 100));
+        subtitleText = `${this._t('estimated_date')}: ${estimatedDate}`;
+      } else if (daysUntil !== null && Number.isFinite(daysUntil)) {
+        const trackingWindow = 730;
+        const elapsed = Math.max(0, trackingWindow - Math.max(0, daysUntil));
+        progressPercent = Math.min(100, Math.round((elapsed / trackingWindow) * 100));
+        subtitleText = `${this._t('days_until')}: ${Math.max(0, daysUntil)}`;
+      } else {
+        progressPercent = 0;
+      }
+
+      titleText = this._t('pre_menarche');
+      progressLabel = `${progressPercent}%`;
+      progressColor = '#9b59b6';
+    }
+
+    return `
+      <div class="progress-layout">
+        <div class="progress-header">
+          <span class="progress-emoji" role="img" aria-hidden="true">${emoji}</span>
+          <div class="progress-title-wrap">
+            <div class="progress-title">${titleText}</div>
+            ${subtitleText ? `<div class="progress-subtitle">${subtitleText}</div>` : ''}
+          </div>
+        </div>
+        <div class="progress-bar-wrap" aria-label="${this._t('progress')} ${progressLabel}">
+          <div class="progress-bar-track">
+            <div class="progress-bar-fill" style="width:${progressPercent}%;background:${progressColor};"></div>
+          </div>
+          <span class="progress-pct">${progressLabel}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  // Build simple icon + text layout for postpartum, menarche, menopause
+  _buildIconTextLayout(statusKey, status, attrs) {
+    const emojiMap = {
+      postpartum: '👶',
+      menarche: '🌸',
+      menopause: '🌙',
+    };
+    const emoji = emojiMap[statusKey] || '⭕';
+
+    let extraInfo = '';
+    if (statusKey === 'postpartum') {
+      const dueDate = this._normalizeISO(attrs.due_date);
+      if (dueDate) extraInfo = dueDate;
+    }
+
+    return `
+      <div class="icon-text-layout">
+        <span class="big-emoji" role="img" aria-hidden="true">${emoji}</span>
+        <div class="icon-text-info">
+          <div class="icon-text-title" style="color:${status.color};">${status.label}</div>
+          ${extraInfo ? `<div class="icon-text-sub">${extraInfo}</div>` : ''}
+        </div>
+      </div>
+    `;
   }
 
   _render() {
@@ -208,39 +441,100 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
     const { cycleDay, cycleLength } = this._calcCycleDay(attrs);
     const statusKey = this._resolveStatus(stateObj);
     const status = this._statusMeta(statusKey);
-    const progressPercent = Math.max(0, Math.min(100, (cycleDay / cycleLength) * 100));
-    const circleLength = 2 * Math.PI * 24;
-    const offset = circleLength - (circleLength * progressPercent / 100);
+
+    // Determine rendering mode
+    const CYCLE_MODES = ['period', 'pms', 'fertile', 'ovulation', 'neutral'];
+    const PROGRESS_MODES = ['pregnant', 'pre_menarche'];
+    const ICON_TEXT_MODES = ['postpartum', 'menarche', 'menopause'];
+
+    let bodyHtml = '';
+
+    if (CYCLE_MODES.includes(statusKey)) {
+      // Mode 1: Cycle circle with colored phase zones
+      const circleHtml = this._buildCycleCircle(cycleDay, cycleLength, attrs);
+      bodyHtml = `
+        <div class="wrap">
+          <div class="circle-wrap">${circleHtml}</div>
+          <div class="info">
+            <div class="status-line">
+              <span class="status-icon" style="border-color:${status.color};color:${status.color};">${this._statusIcon(status.icon, status.color)}</span>
+              <span class="status-text">${status.label}</span>
+            </div>
+            <div class="cycle-day">${this._t('cycle_day')} ${cycleDay}/${cycleLength}</div>
+          </div>
+        </div>
+      `;
+    } else if (PROGRESS_MODES.includes(statusKey)) {
+      // Mode 2/3: Progress bar layout
+      bodyHtml = this._buildProgressLayout(statusKey, attrs, status);
+    } else if (ICON_TEXT_MODES.includes(statusKey)) {
+      // Mode 4: Icon + text only
+      bodyHtml = this._buildIconTextLayout(statusKey, status, attrs);
+    } else {
+      // Fallback: cycle mode display
+      const circleHtml = this._buildCycleCircle(cycleDay, cycleLength, attrs);
+      bodyHtml = `
+        <div class="wrap">
+          <div class="circle-wrap">${circleHtml}</div>
+          <div class="info">
+            <div class="status-line">
+              <span class="status-icon" style="border-color:${status.color};color:${status.color};">${this._statusIcon(status.icon, status.color)}</span>
+              <span class="status-text">${status.label}</span>
+            </div>
+            <div class="cycle-day">${this._t('cycle_day')} ${cycleDay}/${cycleLength}</div>
+          </div>
+        </div>
+      `;
+    }
 
     this.shadowRoot.innerHTML = `
       <style>
         :host { display: block; }
         ha-card { padding: 10px 12px; }
+        .title { color: var(--secondary-text-color); font-size: 0.78rem; margin: 0 0 6px; }
+        .empty { padding: 12px; color: var(--secondary-text-color); }
+
+        /* === Cycle circle mode === */
         .wrap { display: flex; align-items: center; gap: 12px; min-width: 0; }
-        .progress-wrap { width: clamp(56px, 20vw, 72px); height: clamp(56px, 20vw, 72px); position: relative; flex: 0 0 auto; }
-        .progress-wrap svg { width: 100%; height: 100%; }
-        .track { fill: none; stroke: var(--divider-color, rgba(127,127,127,0.3)); stroke-width: 6; }
-        .progress { fill: none; stroke: ${status.color}; stroke-width: 6; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset 220ms ease, stroke 220ms ease; }
-        .center-day { font-size: 0.8rem; font-weight: 700; fill: var(--primary-text-color); text-anchor: middle; dominant-baseline: central; }
+        .circle-wrap { width: clamp(64px, 22vw, 80px); height: clamp(64px, 22vw, 80px); flex: 0 0 auto; }
+        .phase-circle { width: 100%; height: 100%; display: block; }
+        .day-num { text-anchor: middle; dominant-baseline: central; font-size: 9px; font-weight: 700; fill: var(--primary-text-color); }
+        .day-total { text-anchor: middle; dominant-baseline: central; font-size: 7px; fill: var(--secondary-text-color); }
+        .marker-dot { animation: pulse 2s ease-in-out infinite; }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; r: 3; }
+          50% { opacity: 0.6; r: 2.2; }
+        }
         .info { min-width: 0; flex: 1; display: grid; gap: 4px; }
         .status-line { display: flex; align-items: center; gap: 8px; }
         .status-icon {
-          width: 26px;
-          height: 26px;
-          border-radius: 50%;
-          border: 1px solid ${status.color};
-          color: ${status.color};
+          width: 26px; height: 26px; border-radius: 50%; border: 1px solid;
           background: var(--ha-card-background, var(--card-background-color));
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          flex: 0 0 auto;
+          display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
         }
         .status-icon svg { width: 18px; height: 18px; display: block; }
         .status-text { font-size: 0.95rem; font-weight: 600; color: var(--primary-text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .cycle-day { color: var(--secondary-text-color); font-size: 0.82rem; }
-        .title { color: var(--secondary-text-color); font-size: 0.78rem; margin: 0 0 6px; }
-        .empty { padding: 12px; color: var(--secondary-text-color); }
+
+        /* === Progress bar mode === */
+        .progress-layout { display: flex; flex-direction: column; gap: 8px; }
+        .progress-header { display: flex; align-items: center; gap: 10px; }
+        .progress-emoji { font-size: 2rem; line-height: 1; flex: 0 0 auto; }
+        .progress-title-wrap { min-width: 0; flex: 1; }
+        .progress-title { font-size: 0.92rem; font-weight: 600; color: var(--primary-text-color); }
+        .progress-subtitle { font-size: 0.78rem; color: var(--secondary-text-color); margin-top: 2px; }
+        .progress-bar-wrap { display: flex; align-items: center; gap: 8px; }
+        .progress-bar-track { flex: 1; height: 8px; border-radius: 4px; background: var(--divider-color, rgba(127,127,127,0.25)); overflow: hidden; }
+        .progress-bar-fill { height: 100%; border-radius: 4px; transition: width 400ms ease; min-width: 4px; }
+        .progress-pct { font-size: 0.78rem; font-weight: 600; color: var(--secondary-text-color); white-space: nowrap; }
+
+        /* === Icon + text mode === */
+        .icon-text-layout { display: flex; align-items: center; gap: 12px; }
+        .big-emoji { font-size: 2.2rem; line-height: 1; flex: 0 0 auto; }
+        .icon-text-info { min-width: 0; }
+        .icon-text-title { font-size: 1rem; font-weight: 600; }
+        .icon-text-sub { font-size: 0.8rem; color: var(--secondary-text-color); margin-top: 2px; }
+
         @media (max-width: 380px) {
           ha-card { padding: 8px 10px; }
           .wrap { gap: 10px; }
@@ -248,26 +542,13 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
           .status-icon svg { width: 16px; height: 16px; }
           .status-text { font-size: 0.9rem; }
           .cycle-day { font-size: 0.76rem; }
+          .progress-emoji { font-size: 1.6rem; }
+          .big-emoji { font-size: 1.8rem; }
         }
       </style>
       <ha-card>
         ${this._config.show_title ? `<div class="title">${this._config.title || this._t('title')}</div>` : ''}
-        <div class="wrap">
-          <div class="progress-wrap" aria-label="${this._t('cycle_day')} ${cycleDay}">
-            <svg viewBox="0 0 64 64" role="img" aria-hidden="true" focusable="false">
-              <circle class="track" cx="32" cy="32" r="24"></circle>
-              <circle class="progress" cx="32" cy="32" r="24" stroke-dasharray="${circleLength.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}"></circle>
-              <text x="32" y="33" class="center-day">${cycleDay}</text>
-            </svg>
-          </div>
-          <div class="info">
-            <div class="status-line">
-              <span class="status-icon">${this._statusIcon(status.icon, status.color)}</span>
-              <span class="status-text">${status.label}</span>
-            </div>
-            <div class="cycle-day">${this._t('cycle_day')} ${cycleDay}/${cycleLength}</div>
-          </div>
-        </div>
+        ${bodyHtml}
       </ha-card>
     `;
   }
