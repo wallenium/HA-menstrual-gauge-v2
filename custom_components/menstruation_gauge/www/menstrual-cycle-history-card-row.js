@@ -365,3 +365,5 @@ window.customCards.push({
   name: 'Menstrual Cycle History (Table)',
   description: 'Tabellarische Ansicht der Zyklus-Historie mit Schwangerschaft und Pre-Menarche Status',
 });
+
+console.log('menstrual-cycle-history-card-row loaded successfully');
