@@ -98,6 +98,9 @@ CARD_RESOURCE_URL = "/menstruation_gauge/menstruation-gauge-card.js"
 HEATMAP_RESOURCE_URL = "/menstruation_gauge/menstruation-cycle-heatmap-card.js"
 TIMER_RESOURCE_URL = "/menstruation_gauge/period-countdown-timer.js"
 PRODUCT_STATS_RESOURCE_URL = "/menstruation_gauge/menstrual-product-stats-card.js"
+COMPACT_CARD_RESOURCE_URL = "/menstruation_gauge/menstrual-cycle-card-compact.js"
+HISTORY_ROW_RESOURCE_URL = "/menstruation_gauge/menstrual-cycle-history-card-row.js"
+HISTORY_ANALOG_RESOURCE_URL = "/menstruation_gauge/menstrual-cycle-history-card-analog.js"
 CARD_RESOURCE_TYPE = "module"
 EXPORT_DIR_NAME = "menstruation_gauge_exports"
 LOVELACE_RESOURCES = (
@@ -105,6 +108,9 @@ LOVELACE_RESOURCES = (
     (HEATMAP_RESOURCE_URL, "menstruation-cycle-heatmap-card.js"),
     (TIMER_RESOURCE_URL, "period-countdown-timer.js"),
     (PRODUCT_STATS_RESOURCE_URL, "menstrual-product-stats-card.js"),
+    (COMPACT_CARD_RESOURCE_URL, "menstrual-cycle-card-compact.js"),
+    (HISTORY_ROW_RESOURCE_URL, "menstrual-cycle-history-card-row.js"),
+    (HISTORY_ANALOG_RESOURCE_URL, "menstrual-cycle-history-card-analog.js"),
 )
 VALID_PRODUCT_USAGE_PRODUCTS = {"tampon", "pad", "cup", "underwear", "liner"}
 VALID_PRODUCT_USAGE_ACTIONS = {"used", "emptied"}
