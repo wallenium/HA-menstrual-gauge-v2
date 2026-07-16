@@ -124,6 +124,7 @@ class MenstruationGaugeCard extends HTMLElement {
     const predicted = this._normalizeISO(attrs.next_predicted_start);
     const fertileStart = this._normalizeISO(attrs.fertile_window_start);
     const fertileEnd = this._normalizeISO(attrs.fertile_window_end);
+    const ovulationDay = this._normalizeISO(attrs.ovulation_day);
 
     const viewDate = this._viewDate || new Date();
     const daysInMonth = this._monthDays(viewDate);
@@ -135,7 +136,8 @@ class MenstruationGaugeCard extends HTMLElement {
         day,
         iso,
         confirmed: confirmedSet.has(iso),
-        fertile: fertileStart && fertileEnd ? (this._dayDiff(iso, fertileStart) >= 0 && this._dayDiff(fertileEnd, iso) >= 0) : false
+      fertile: fertileStart && fertileEnd ? (this._dayDiff(iso, fertileStart) >= 0 && this._dayDiff(fertileEnd, iso) >= 0) : false,
+      ovulation: ovulationDay ? iso === ovulationDay : false
       });
     }
 
@@ -149,6 +151,7 @@ class MenstruationGaugeCard extends HTMLElement {
       periodDuration,
       fertileStart,
       fertileEnd,
+      ovulationDay,
       daysInMonth,
       series,
       todayIso: this._isoFromDate(new Date())
@@ -197,6 +200,7 @@ class MenstruationGaugeCard extends HTMLElement {
         tick: 'rgba(190,24,93,.22)',
         confirmed: '#be123c',
         fertile: '#facc15',
+        ovulation: '#16a34a',
         markerStroke: '#ffe4e6',
         hand: '#be123c',
         ring: 'rgba(190,24,93,.16)',
@@ -230,6 +234,7 @@ class MenstruationGaugeCard extends HTMLElement {
       tick: 'rgba(251,113,133,.42)',
       confirmed: '#fb7185',
       fertile: '#fde047',
+      ovulation: '#4ade80',
       markerStroke: '#2f1f29',
       hand: '#fb7185',
       ring: 'rgba(251,113,133,.32)',
@@ -343,6 +348,21 @@ class MenstruationGaugeCard extends HTMLElement {
       return `<path d="${dPath}" fill="none" stroke="${palette.fertile}" stroke-width="6" stroke-linecap="round" stroke-opacity=".62"></path>`;
     }).join('');
 
+    let ovulationMarker = '';
+    if (showFertile && model.ovulationDay) {
+      const ovulationDt = this._parseISO(model.ovulationDay);
+      if (ovulationDt
+        && ovulationDt.getFullYear() === this._viewDate.getFullYear()
+        && ovulationDt.getMonth() === this._viewDate.getMonth()) {
+        const oDay = ovulationDt.getDate();
+        if (oDay >= 1 && oDay <= total) {
+          const angle = -90 + ((((oDay - 1) + 0.5) / total) * 360);
+          const pos = this._polar(cx, cy, rInner + extraBar * 0.46, angle);
+          ovulationMarker = `<circle cx="${pos.x.toFixed(1)}" cy="${pos.y.toFixed(1)}" r="5" fill="${palette.ovulation}" stroke="${palette.markerStroke}" stroke-width="1.5" opacity="0.90"></circle>`;
+        }
+      }
+    }
+
     let predictedMarker = '';
     let predictedBars = '';
     const predictedDt = this._parseISO(model.predicted);
@@ -384,6 +404,7 @@ class MenstruationGaugeCard extends HTMLElement {
         ${dayLabels}
         ${baseTicks}
         ${fertileBars}
+        ${ovulationMarker}
         ${currentMonthPeriodWindowBars}
         ${confirmedBars}
         ${predictedBars}

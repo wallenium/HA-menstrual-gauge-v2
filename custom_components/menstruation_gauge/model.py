@@ -22,6 +22,7 @@ class CycleModel:
     avg_cycle_length: int | None
     fertile_window_start: str | None
     fertile_window_end: str | None
+    ovulation_day: str | None
     days_until_next_start: int | None
     period_duration_days: int
     learned_period_duration_days: int | None
@@ -206,6 +207,7 @@ def build_cycle_model(
             avg_cycle_length=None,
             fertile_window_start=None,
             fertile_window_end=None,
+            ovulation_day=None,
             days_until_next_start=None,
             period_duration_days=period_duration_days,
             learned_period_duration_days=None,
@@ -229,6 +231,7 @@ def build_cycle_model(
             avg_cycle_length=None,
             fertile_window_start=None,
             fertile_window_end=None,
+            ovulation_day=None,
             days_until_next_start=None,
             period_duration_days=period_duration_days,
             learned_period_duration_days=None,
@@ -258,6 +261,7 @@ def build_cycle_model(
                     avg_cycle_length=None,
                     fertile_window_start=None,
                     fertile_window_end=None,
+                    ovulation_day=None,
                     days_until_next_start=None,
                     period_duration_days=period_duration_days,
                     learned_period_duration_days=None,
@@ -292,11 +296,13 @@ def build_cycle_model(
 
     fertile_start: str | None = None
     fertile_end: str | None = None
+    ovulation_day_iso: str | None = None
     days_until: int | None = None
 
     if next_start:
         next_date = date.fromisoformat(next_start)
         ovulation_day = next_date - timedelta(days=14)
+        ovulation_day_iso = ovulation_day.isoformat()
         fertile_start = (ovulation_day - timedelta(days=4)).isoformat()
         fertile_end = (ovulation_day + timedelta(days=1)).isoformat()
         days_until = (next_date - now).days
@@ -317,6 +323,7 @@ def build_cycle_model(
         avg_cycle_length=avg_cycle,
         fertile_window_start=fertile_start,
         fertile_window_end=fertile_end,
+        ovulation_day=ovulation_day_iso,
         days_until_next_start=days_until,
         period_duration_days=effective_duration,
         learned_period_duration_days=learned_avg_duration,
