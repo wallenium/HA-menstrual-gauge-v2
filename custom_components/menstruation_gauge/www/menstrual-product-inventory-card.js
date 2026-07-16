@@ -290,28 +290,32 @@ class MenstrualProductInventoryCard extends HTMLElement {
 
     this.shadowRoot.querySelectorAll("button[data-action]").forEach((button) => {
       button.addEventListener("click", async (event) => {
-        const action = event.currentTarget.dataset.action;
-        const product = event.currentTarget.dataset.product;
-        if (!action || !product) return;
+        try {
+          const action = event.currentTarget.dataset.action;
+          const product = event.currentTarget.dataset.product;
+          if (!action || !product) return;
 
-        const inputQuantity = Number(this._inputValues?.[product] ?? 1);
-        let quantity = Number(event.currentTarget.dataset.quantity || inputQuantity || 1);
-        if (["set-input", "add-input", "consume-input"].includes(event.currentTarget.dataset.role)) {
-          quantity = inputQuantity;
+          const inputQuantity = Number(this._inputValues?.[product] ?? 1);
+          let quantity = Number(event.currentTarget.dataset.quantity || inputQuantity || 1);
+          if (["set-input", "add-input", "consume-input"].includes(event.currentTarget.dataset.role)) {
+            quantity = inputQuantity;
+          }
+
+          if (action === "set_thresholds") {
+            const warning = Number(this._thresholdValues?.[product]?.warning);
+            const critical = Number(this._thresholdValues?.[product]?.critical);
+            await this._callInventory("set_thresholds", product, null, {
+              warning_threshold: Number.isFinite(warning) ? warning : undefined,
+              critical_threshold: Number.isFinite(critical) ? critical : undefined,
+            });
+            return;
+          }
+
+          const member = this._selectedMember || this.config.member || "";
+          await this._callInventory(action, product, quantity, member ? { member } : {});
+        } catch (error) {
+          console.error("Button click error:", error);
         }
-
-        if (action === "set_thresholds") {
-          const warning = Number(this._thresholdValues?.[product]?.warning);
-          const critical = Number(this._thresholdValues?.[product]?.critical);
-          await this._callInventory("set_thresholds", product, null, {
-            warning_threshold: Number.isFinite(warning) ? warning : undefined,
-            critical_threshold: Number.isFinite(critical) ? critical : undefined,
-          });
-          return;
-        }
-
-        const member = this._selectedMember || this.config.member || "";
-        await this._callInventory(action, product, quantity, member ? { member } : {});
       });
     });
   }
