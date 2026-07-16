@@ -221,8 +221,8 @@ def build_cycle_model(
             pre_menarche_data=pre_men_data,
         )
 
-    # If in pre-menarche mode (tracking explicitly enabled, no cycle history, awaiting first period)
-    if men_data.get("tracking_active") and men_data.get("is_menarche") is False and not normalized:
+    # If in pre-menarche mode (tracking explicitly enabled, awaiting first period)
+    if men_data.get("tracking_active") and men_data.get("is_menarche") is False:
         return CycleModel(
             history=normalized,
             grouped_starts=[],
