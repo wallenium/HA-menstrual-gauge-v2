@@ -200,6 +200,8 @@ class MenstruationGaugeSensor(SensorEntity):
             period_duration_days=runtime.period_duration_days,
             symptom_history=runtime.symptom_history,
             pregnancy_data=runtime.pregnancy_data,
+            menarche_data=runtime.menarche_data,
+            pre_menarche_data=runtime.pre_menarche_data,
             today=dt_util.now().date(),
         )
         usage_stats = _build_product_usage_stats(runtime.history, runtime.product_usage, dt_util.now().date())
@@ -231,11 +233,27 @@ class MenstruationGaugeSensor(SensorEntity):
                 "weeks_pregnant": model.weeks_pregnant,
                 "due_date": model.due_date,
             },
+            ATTR_ESTIMATED_MENARCHE_DATE: model.menarche_data.get("estimated_date"),
+            ATTR_DAYS_UNTIL_MENARCHE: self._calculate_days_until_menarche(model.menarche_data),
+            "menarche_data": model.menarche_data,
+            ATTR_PRE_MENARCHE_DATA: model.pre_menarche_data,
             "profile": runtime.profile,
             "entry_id": self._entry.entry_id,
             "friendly_name": runtime.friendly_name,
             "product_usage_stats": usage_stats,
         }
+
+    def _calculate_days_until_menarche(self, menarche_data: dict[str, Any]) -> int | None:
+        """Calculate days until estimated menarche."""
+        estimated_date = menarche_data.get("estimated_date")
+        if not estimated_date:
+            return None
+        try:
+            est_date = date.fromisoformat(str(estimated_date))
+            today = dt_util.now().date()
+            return (est_date - today).days
+        except (TypeError, ValueError):
+            return None
 
     @property
     def state(self) -> StateType:
