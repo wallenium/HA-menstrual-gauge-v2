@@ -35,6 +35,8 @@ class MenstruationGaugeCard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    // Don't re-render while the symptom modal is open to preserve user input.
+    if (this._modalIso) return;
     this._render();
   }
 
@@ -54,8 +56,90 @@ class MenstruationGaugeCard extends HTMLElement {
 
   _t(key) {
     const i18n = {
-      de: { days_unit: 'Tage', days_unknown: '-- Tage' },
-      en: { days_unit: 'days', days_unknown: '-- days' },
+      de: {
+        days_unit: 'Tage',
+        days_unknown: '-- Tage',
+        // Modal UI
+        modal_edit_day: 'Tag bearbeiten',
+        period_toggle: 'Periode',
+        save: 'Speichern',
+        cancel: 'Abbrechen',
+        basal_temp_label: 'Basaltemperatur (°C)',
+        // Symptom category labels
+        cat_bleeding_strength: 'Blutungsstärke',
+        cat_spotting: 'Schmierblutung',
+        cat_intercourse: 'Geschlechtsverkehr',
+        cat_pain: 'Schmerzen',
+        cat_hygiene: 'Hygiene',
+        cat_test: 'Test',
+        // Symptom option labels
+        opt_light: 'Gering',
+        opt_medium: 'Mittel',
+        opt_heavy: 'Stark',
+        opt_very_heavy: 'Sehr stark',
+        opt_red: 'Rot',
+        opt_brown: 'Braun',
+        opt_protected: 'Geschützt',
+        opt_unprotected: 'Ungeschützt',
+        opt_mittelschmerz: 'Mittelschmerz',
+        opt_cramps: 'Krämpfe',
+        opt_tender_breasts: 'Brustspannung',
+        opt_headache: 'Kopfschmerz',
+        opt_migraine: 'Migräne',
+        opt_lower_back: 'Rückenschmerzen',
+        opt_vulva: 'Vulvaschmerz',
+        opt_pad: 'Binde',
+        opt_liner: 'Slipeinlage',
+        opt_tampon: 'Tampon',
+        opt_cup: 'Menstruationstasse',
+        opt_period_underwear: 'Periodenunterwäsche',
+        opt_positive_ovulation: 'LH positiv',
+        opt_negative_ovulation: 'LH negativ',
+        opt_positive_pregnancy: 'Schwangerschaft +',
+        opt_negative_pregnancy: 'Schwangerschaft -',
+      },
+      en: {
+        days_unit: 'days',
+        days_unknown: '-- days',
+        // Modal UI
+        modal_edit_day: 'Edit Day',
+        period_toggle: 'Period',
+        save: 'Save',
+        cancel: 'Cancel',
+        basal_temp_label: 'Basal Temperature (°C)',
+        // Symptom category labels
+        cat_bleeding_strength: 'Bleeding Strength',
+        cat_spotting: 'Spotting',
+        cat_intercourse: 'Intercourse',
+        cat_pain: 'Pain',
+        cat_hygiene: 'Hygiene',
+        cat_test: 'Test',
+        // Symptom option labels
+        opt_light: 'Light',
+        opt_medium: 'Medium',
+        opt_heavy: 'Heavy',
+        opt_very_heavy: 'Very Heavy',
+        opt_red: 'Red',
+        opt_brown: 'Brown',
+        opt_protected: 'Protected',
+        opt_unprotected: 'Unprotected',
+        opt_mittelschmerz: 'Mittelschmerz',
+        opt_cramps: 'Cramps',
+        opt_tender_breasts: 'Tender Breasts',
+        opt_headache: 'Headache',
+        opt_migraine: 'Migraine',
+        opt_lower_back: 'Lower Back Pain',
+        opt_vulva: 'Vulva Pain',
+        opt_pad: 'Pad',
+        opt_liner: 'Liner',
+        opt_tampon: 'Tampon',
+        opt_cup: 'Cup',
+        opt_period_underwear: 'Period Underwear',
+        opt_positive_ovulation: 'LH Positive',
+        opt_negative_ovulation: 'LH Negative',
+        opt_positive_pregnancy: 'Pregnancy +',
+        opt_negative_pregnancy: 'Pregnancy -',
+      },
     };
     return (i18n[this._lang()] && i18n[this._lang()][key]) || (i18n.en[key] || key);
   }
@@ -126,6 +210,15 @@ class MenstruationGaugeCard extends HTMLElement {
     const fertileEnd = this._normalizeISO(attrs.fertile_window_end);
     const ovulationDay = this._normalizeISO(attrs.ovulation_day);
 
+    // Build a date-keyed symptom lookup
+    const symptomByDate = {};
+    if (Array.isArray(attrs.symptom_history)) {
+      attrs.symptom_history.forEach((entry) => {
+        const d = this._normalizeISO(entry?.date);
+        if (d) symptomByDate[d] = entry;
+      });
+    }
+
     const viewDate = this._viewDate || new Date();
     const daysInMonth = this._monthDays(viewDate);
     const series = [];
@@ -152,6 +245,7 @@ class MenstruationGaugeCard extends HTMLElement {
       fertileStart,
       fertileEnd,
       ovulationDay,
+      symptomByDate,
       daysInMonth,
       series,
       todayIso: this._isoFromDate(new Date())
@@ -172,6 +266,17 @@ class MenstruationGaugeCard extends HTMLElement {
       if (match) return match;
     }
     return configuredEntity || null;
+  }
+
+  _symptomConfig() {
+    return [
+      { key: 'bleeding_strength', icon: 'mdi:water-opacity', multi: false, options: ['light', 'medium', 'heavy', 'very_heavy'] },
+      { key: 'spotting', icon: 'mdi:blood-bag', multi: false, options: ['red', 'brown'] },
+      { key: 'intercourse', icon: 'mdi:heart', multi: false, options: ['protected', 'unprotected'] },
+      { key: 'pain', icon: 'mdi:emoticon-sad-outline', multi: true, options: ['mittelschmerz', 'cramps', 'tender_breasts', 'headache', 'migraine', 'lower_back', 'vulva'] },
+      { key: 'hygiene', icon: 'mdi:medical-bag', multi: true, options: ['pad', 'liner', 'tampon', 'cup', 'period_underwear'] },
+      { key: 'test', icon: 'mdi:test-tube', multi: true, options: ['positive_ovulation', 'negative_ovulation', 'positive_pregnancy', 'negative_pregnancy'] },
+    ];
   }
 
   _stateBg(state) {
@@ -437,7 +542,8 @@ class MenstruationGaugeCard extends HTMLElement {
       const iso = this._isoFromDate(new Date(y, m, day, 12, 0, 0, 0));
       const active = model.confirmedSet.has(iso);
       const today = iso === model.todayIso;
-      items.push(`<button class="day ${active ? 'active' : ''} ${today ? 'today' : ''}" type="button" data-iso="${iso}">${day}</button>`);
+      const hasSymptoms = !!model.symptomByDate?.[iso];
+      items.push(`<button class="day ${active ? 'active' : ''} ${today ? 'today' : ''} ${hasSymptoms ? 'has-symptoms' : ''}" type="button" data-iso="${iso}">${day}</button>`);
     }
     return items.join('');
   }
@@ -490,6 +596,131 @@ class MenstruationGaugeCard extends HTMLElement {
     }
   }
 
+  _renderSymptomModal(iso, model, palette) {
+    const dt = this._parseISO(iso);
+    const locale = this._hass?.locale?.language || 'de';
+    const dateLabel = dt
+      ? new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric' }).format(dt)
+      : iso;
+
+    const isPeriodDay = model.confirmedSet.has(iso);
+    const existing = model.symptomByDate?.[iso] || {};
+    const symptomConfig = this._symptomConfig();
+
+    const categoryRows = symptomConfig.map((cat) => {
+      const catLabel = this._t(`cat_${cat.key}`);
+      if (cat.multi) {
+        const currentValues = Array.isArray(existing[cat.key]) ? existing[cat.key] : [];
+        const checkboxes = cat.options.map((opt) => {
+          const checked = currentValues.includes(opt) ? 'checked' : '';
+          return `<label class="sym-opt-label"><input type="checkbox" class="sym-multi" name="${cat.key}" value="${opt}" ${checked}><span>${this._t(`opt_${opt}`)}</span></label>`;
+        }).join('');
+        return `<div class="sym-row"><div class="sym-cat-head"><ha-icon icon="${cat.icon}"></ha-icon><span>${catLabel}</span></div><div class="sym-options sym-multi-opts">${checkboxes}</div></div>`;
+      }
+      const currentValue = existing[cat.key] || '';
+      const buttons = cat.options.map((opt) => {
+        const sel = currentValue === opt ? ' sym-selected' : '';
+        return `<button type="button" class="sym-opt-btn${sel}" data-cat="${cat.key}" data-val="${opt}">${this._t(`opt_${opt}`)}</button>`;
+      }).join('');
+      return `<div class="sym-row"><div class="sym-cat-head"><ha-icon icon="${cat.icon}"></ha-icon><span>${catLabel}</span></div><div class="sym-options sym-single-opts">${buttons}</div></div>`;
+    }).join('');
+
+    const basalTemp = existing.basal_temp != null ? existing.basal_temp : '';
+
+    return `
+      <div class="sym-overlay" id="sym-modal">
+        <div class="sym-backdrop"></div>
+        <div class="sym-dialog" style="border-color:${palette.border};background:${palette.cardBg};color:${palette.cardColor}">
+          <div class="sym-header">
+            <span>${this._t('modal_edit_day')}: ${dateLabel}</span>
+            <button type="button" class="sym-close" aria-label="close">✕</button>
+          </div>
+          <div class="sym-body">
+            <div class="sym-row">
+              <div class="sym-cat-head"><ha-icon icon="mdi:calendar-heart"></ha-icon><span>${this._t('period_toggle')}</span></div>
+              <div class="sym-options sym-single-opts">
+                <button type="button" class="sym-opt-btn${isPeriodDay ? ' sym-selected' : ''}" data-cat="_period" data-val="yes">✔</button>
+                <button type="button" class="sym-opt-btn${!isPeriodDay ? ' sym-selected' : ''}" data-cat="_period" data-val="no">✗</button>
+              </div>
+            </div>
+            ${categoryRows}
+            <div class="sym-row">
+              <div class="sym-cat-head"><ha-icon icon="mdi:thermometer"></ha-icon><span>${this._t('basal_temp_label')}</span></div>
+              <input id="sym-basal-temp" type="number" step="0.1" min="35" max="42" value="${basalTemp}" class="sym-temp-input" placeholder="36.5">
+            </div>
+          </div>
+          <div class="sym-footer">
+            <button type="button" class="btn sym-save">${this._t('save')}</button>
+            <button type="button" class="btn sym-cancel">${this._t('cancel')}</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  async _handleModalSave() {
+    const iso = this._modalIso;
+    if (!iso) return;
+
+    const root = this.shadowRoot;
+    const model = this._buildModel();
+    const entityId = model.entityId || this._config?.entity || '';
+    const entryId = model.stateObj?.attributes?.entry_id || this._config?.entry_id || '';
+    const profile = model.stateObj?.attributes?.profile;
+
+    // Determine period toggle state from modal
+    const periodYesBtn = root.querySelector('.sym-opt-btn[data-cat="_period"][data-val="yes"]');
+    const wantsPeriod = periodYesBtn?.classList.contains('sym-selected') ?? model.confirmedSet.has(iso);
+    const hasPeriod = model.confirmedSet.has(iso);
+
+    // Collect symptom data from modal inputs
+    const symptomData = {};
+    this._symptomConfig().forEach((cat) => {
+      if (cat.multi) {
+        const checked = Array.from(root.querySelectorAll(`.sym-multi[name="${cat.key}"]:checked`)).map((el) => el.value);
+        if (checked.length > 0) symptomData[cat.key] = checked;
+      } else {
+        const selected = root.querySelector(`.sym-opt-btn.sym-selected[data-cat="${cat.key}"]`);
+        if (selected) symptomData[cat.key] = selected.getAttribute('data-val');
+      }
+    });
+    const rawTemp = root.getElementById('sym-basal-temp')?.value;
+    const basalTemp = parseFloat(rawTemp);
+    if (!Number.isNaN(basalTemp) && rawTemp !== '') symptomData.basal_temp = basalTemp;
+
+    this._modalIso = null;
+
+    // Toggle period start if state changed
+    if (wantsPeriod !== hasPeriod) {
+      try {
+        await this._toggleCycleStart(iso);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('menstruation-gauge-card: failed to toggle period', err);
+      }
+    }
+
+    // Save symptom data if any fields are set
+    if (Object.keys(symptomData).length > 0) {
+      try {
+        const payload = {
+          date: iso,
+          symptom_data: symptomData,
+          ...(entityId ? { entity_id: entityId } : {}),
+          ...(entryId ? { entry_id: entryId } : {}),
+          ...(profile ? { profile } : {}),
+        };
+        await this._hass.callService('menstruation_gauge', 'add_symptom', payload);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('menstruation-gauge-card: failed to save symptoms', err);
+      }
+    }
+
+    await this._refreshSensorEntity(entityId);
+    this._render();
+  }
+
   _attachHandlers() {
     this.shadowRoot.querySelector('[data-nav="prev"]')?.addEventListener('click', () => {
       this._viewDate = new Date(this._viewDate.getFullYear(), this._viewDate.getMonth() - 1, 1);
@@ -507,24 +738,45 @@ class MenstruationGaugeCard extends HTMLElement {
     }
 
     if (this._config?.calendar_edit_enabled !== false) {
-      this.shadowRoot.querySelector('.grid')?.addEventListener('click', async (ev) => {
+      this.shadowRoot.querySelector('.grid')?.addEventListener('click', (ev) => {
         const btn = ev.target?.closest?.('.day[data-iso]');
         if (!btn) return;
         const iso = btn.getAttribute('data-iso');
-        if (!iso || this._toggleInFlight) return;
-        this._toggleInFlight = true;
-        try {
-          await this._toggleCycleStart(iso);
-          await this._refreshSensorEntity(this._buildModel().entityId);
-          this._render();
-        } catch (err) {
-          // Keep a visible trace in browser console when backend rejects the write.
-          // This avoids silent failures in the editor calendar.
-          // eslint-disable-next-line no-console
-          console.error('menstruation-gauge-card: failed to toggle cycle day', err);
-        } finally {
-          this._toggleInFlight = false;
-        }
+        if (!iso) return;
+        this._modalIso = iso;
+        this._render();
+      });
+    }
+
+    // Modal event handlers (only attached when modal is rendered)
+    const modal = this.shadowRoot.getElementById('sym-modal');
+    if (modal) {
+      // Close on backdrop click
+      modal.querySelector('.sym-backdrop')?.addEventListener('click', () => {
+        this._modalIso = null;
+        this._render();
+      });
+      // Close button
+      modal.querySelector('.sym-close')?.addEventListener('click', () => {
+        this._modalIso = null;
+        this._render();
+      });
+      // Cancel button
+      modal.querySelector('.sym-cancel')?.addEventListener('click', () => {
+        this._modalIso = null;
+        this._render();
+      });
+      // Save button
+      modal.querySelector('.sym-save')?.addEventListener('click', () => {
+        this._handleModalSave();
+      });
+      // Single-select option buttons toggle
+      modal.querySelectorAll('.sym-opt-btn[data-cat]').forEach((btn) => {
+        btn.addEventListener('click', (ev) => {
+          const cat = ev.currentTarget.getAttribute('data-cat');
+          modal.querySelectorAll(`.sym-opt-btn[data-cat="${cat}"]`).forEach((b) => b.classList.remove('sym-selected'));
+          ev.currentTarget.classList.add('sym-selected');
+        });
       });
     }
   }
@@ -549,6 +801,8 @@ class MenstruationGaugeCard extends HTMLElement {
 
     this.shadowRoot.innerHTML = `
       <style>
+        :host { display: block; position: relative; }
+        .root-wrap { position: relative; }
         ha-card {
           border-radius: 16px;
           border: 1px solid ${palette.border};
@@ -580,31 +834,55 @@ class MenstruationGaugeCard extends HTMLElement {
         .day.active { background: ${palette.confirmed}; color: #fff; border-color: ${palette.confirmed}; }
         .day.today { outline: 2px solid ${palette.dayToday}; }
         .day.other { opacity: .3; }
+        .day.has-symptoms { box-shadow: 0 0 0 2px #facc15 inset; }
+        .day.active.has-symptoms { box-shadow: 0 0 0 2px #facc15 inset, 0 0 0 4px ${palette.confirmed}33 inset; }
+        /* Symptom modal */
+        .sym-overlay { position: absolute; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; border-radius: 16px; overflow: hidden; }
+        .sym-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.55); }
+        .sym-dialog { position: relative; z-index: 1; border-radius: 12px; border: 1px solid; padding: 0; width: 92%; max-width: 360px; max-height: 85%; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 12px 32px rgba(0,0,0,.32); }
+        .sym-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px 10px; font-weight: 700; font-size: .92rem; border-bottom: 1px solid rgba(128,128,128,.2); }
+        .sym-close { background: transparent; border: none; cursor: pointer; font-size: 1rem; color: inherit; opacity: .7; padding: 2px 6px; }
+        .sym-close:hover { opacity: 1; }
+        .sym-body { overflow-y: auto; padding: 10px 14px; display: grid; gap: 10px; }
+        .sym-footer { display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid rgba(128,128,128,.2); justify-content: flex-end; }
+        .sym-row { display: grid; gap: 6px; }
+        .sym-cat-head { display: flex; align-items: center; gap: 6px; font-size: .82rem; font-weight: 600; opacity: .85; }
+        .sym-cat-head ha-icon { --mdc-icon-size: 16px; }
+        .sym-options { display: flex; flex-wrap: wrap; gap: 5px; }
+        .sym-opt-btn { border: 1px solid rgba(128,128,128,.35); border-radius: 6px; padding: 4px 9px; cursor: pointer; font-size: .8rem; background: transparent; color: inherit; transition: background 120ms, border-color 120ms; }
+        .sym-opt-btn:hover { border-color: rgba(190,18,60,.45); }
+        .sym-opt-btn.sym-selected { background: ${palette.confirmed}; color: #fff; border-color: ${palette.confirmed}; }
+        .sym-opt-label { display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: .82rem; }
+        .sym-opt-label input[type="checkbox"] { accent-color: ${palette.confirmed}; }
+        .sym-temp-input { padding: 5px 8px; border-radius: 6px; border: 1px solid rgba(128,128,128,.35); background: transparent; color: inherit; font-size: .88rem; width: 100px; }
       </style>
-      <ha-card>
-        <div class="wrap">
-          ${(friendlyName || cardTitle) ? `
-          <div class="head">
-            ${friendlyName ? `<div class="friendly">${friendlyName}</div>` : ''}
-            ${cardTitle ? `<div class="title-label">${cardTitle}</div>` : ''}
-          </div>` : ''}
-          <div class="gauge-wrap">
-            ${this._renderGauge(model, palette)}
-            <div class="center"><button type="button" class="countdown ${isOverdueSoon ? 'overdue-soon' : ''} ${canEdit ? '' : 'passive'}" data-action="toggle-editor">${countdown}</button></div>
-          </div>
-          ${this._config.show_editor && canEdit ? `
-          <div class="editor">
-            <div class="toolbar">
-              <div class="title">${monthYear}</div>
-              <div class="nav">
-                <button type="button" class="btn" data-nav="prev">◀</button>
-                <button type="button" class="btn" data-nav="next">▶</button>
-              </div>
+      <div class="root-wrap">
+        <ha-card>
+          <div class="wrap">
+            ${(friendlyName || cardTitle) ? `
+            <div class="head">
+              ${friendlyName ? `<div class="friendly">${friendlyName}</div>` : ''}
+              ${cardTitle ? `<div class="title-label">${cardTitle}</div>` : ''}
+            </div>` : ''}
+            <div class="gauge-wrap">
+              ${this._renderGauge(model, palette)}
+              <div class="center"><button type="button" class="countdown ${isOverdueSoon ? 'overdue-soon' : ''} ${canEdit ? '' : 'passive'}" data-action="toggle-editor">${countdown}</button></div>
             </div>
-            <div class="grid">${this._calendarGrid(model, locale)}</div>
-          </div>` : ''}
-        </div>
-      </ha-card>
+            ${this._config.show_editor && canEdit ? `
+            <div class="editor">
+              <div class="toolbar">
+                <div class="title">${monthYear}</div>
+                <div class="nav">
+                  <button type="button" class="btn" data-nav="prev">◀</button>
+                  <button type="button" class="btn" data-nav="next">▶</button>
+                </div>
+              </div>
+              <div class="grid">${this._calendarGrid(model, locale)}</div>
+            </div>` : ''}
+          </div>
+        </ha-card>
+        ${this._modalIso ? this._renderSymptomModal(this._modalIso, model, palette) : ''}
+      </div>
     `;
 
     this._attachHandlers();
