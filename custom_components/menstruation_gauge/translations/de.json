@@ -15,6 +15,36 @@
       "invalid_profile": "Profil muss Buchstaben oder Zahlen enthalten."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Menstruation Gauge Einstellungen",
+        "description": "Einstellungen zur Zyklusverfolgung anpassen. Änderungen werden sofort gespeichert.",
+        "data": {
+          "friendly_name": "Anzeigename",
+          "icon": "Icon (optional, z. B. mdi:calendar-heart)",
+          "period_duration_days": "Periodendauer (Tage)",
+          "pregnancy_enabled": "Schwangerschaftsmodus aktivieren",
+          "pregnancy_start_date": "Schwangerschafts-Startdatum (JJJJ-MM-TT)",
+          "pre_menarche_enabled": "Prä-Menarche-Tracking aktivieren",
+          "estimated_menarche_date": "Voraussichtliches Menarche-Datum (JJJJ-MM-TT)",
+          "family_menarche_age": "Menarche-Alter in der Familie (8–20, optional)"
+        },
+        "data_description": {
+          "period_duration_days": "Typische Anzahl der Periodentage (1–14).",
+          "pregnancy_enabled": "Aktiviert den Schwangerschafts-Tracking-Modus. Das Startdatum wird automatisch aus dem letzten Zyklus-Start übernommen, falls nicht angegeben.",
+          "pregnancy_start_date": "Erster Tag der letzten Menstruation (LMP). Leer lassen, um den letzten erfassten Zyklus-Start zu verwenden.",
+          "pre_menarche_enabled": "Pubertätszeichen vor der ersten Periode (Menarche) verfolgen.",
+          "estimated_menarche_date": "Voraussichtliches Datum der ersten Periode. Wird für das Countdown-Tracking verwendet.",
+          "family_menarche_age": "Menarche-Alter in der Familie (Mutter/Schwester) zur Schätzung des erwarteten Alters."
+        }
+      }
+    },
+    "error": {
+      "invalid_date": "Ungültiges Datumsformat. Bitte JJJJ-MM-TT verwenden.",
+      "invalid_menarche_age": "Das Alter muss eine Zahl zwischen 8 und 20 sein."
+    }
+  },
   "services": {
     "log_product_usage": {
       "name": "Produktverbrauch protokollieren",
