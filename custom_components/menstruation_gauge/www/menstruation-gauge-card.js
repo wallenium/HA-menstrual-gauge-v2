@@ -59,6 +59,9 @@ class MenstruationGaugeCard extends HTMLElement {
       de: {
         days_unit: 'Tage',
         days_unknown: '-- Tage',
+        days_until_menarche: 'Tage bis Menarche',
+        menarche_expected_in: 'Menarche erwartet in {days} Tagen',
+        menarche_overdue: 'Menarche {days} Tage überfällig',
         // Modal UI
         modal_edit_day: 'Tag bearbeiten',
         period_toggle: 'Periode',
@@ -101,6 +104,9 @@ class MenstruationGaugeCard extends HTMLElement {
       en: {
         days_unit: 'days',
         days_unknown: '-- days',
+        days_until_menarche: 'Days until menarche',
+        menarche_expected_in: 'Menarche expected in {days} days',
+        menarche_overdue: 'Menarche {days} days overdue',
         // Modal UI
         modal_edit_day: 'Edit Day',
         period_toggle: 'Period',
@@ -209,6 +215,14 @@ class MenstruationGaugeCard extends HTMLElement {
     const fertileStart = this._normalizeISO(attrs.fertile_window_start);
     const fertileEnd = this._normalizeISO(attrs.fertile_window_end);
     const ovulationDay = this._normalizeISO(attrs.ovulation_day);
+    const menarcheData = attrs.menarche_data || {};
+    const normalizedEstimatedDate = this._normalizeISO(menarcheData?.estimated_date);
+    const estimatedDate = this._parseISO(normalizedEstimatedDate) || new Date(menarcheData?.estimated_date || '');
+    const today = new Date();
+    const todayNoon = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0, 0, 0);
+    const daysUntilMenarche = String(stateObj?.state || '') === 'pre_menarche' && estimatedDate instanceof Date && !Number.isNaN(estimatedDate.getTime())
+      ? Math.ceil((estimatedDate.getTime() - todayNoon.getTime()) / 86400000)
+      : null;
 
     // Build a date-keyed symptom lookup
     const symptomByDate = {};
@@ -245,6 +259,8 @@ class MenstruationGaugeCard extends HTMLElement {
       fertileStart,
       fertileEnd,
       ovulationDay,
+      menarcheData,
+      daysUntilMenarche,
       symptomByDate,
       daysInMonth,
       series,
@@ -268,8 +284,8 @@ class MenstruationGaugeCard extends HTMLElement {
     return configuredEntity || null;
   }
 
-  _symptomConfig() {
-    return [
+  _symptomConfig(state) {
+    const all = [
       { key: 'bleeding_strength', icon: 'mdi:water-opacity', multi: false, options: ['light', 'medium', 'heavy', 'very_heavy'] },
       { key: 'spotting', icon: 'mdi:blood-bag', multi: false, options: ['red', 'brown'] },
       { key: 'intercourse', icon: 'mdi:heart', multi: false, options: ['protected', 'unprotected'] },
@@ -277,6 +293,11 @@ class MenstruationGaugeCard extends HTMLElement {
       { key: 'hygiene', icon: 'mdi:medical-bag', multi: true, options: ['pad', 'liner', 'tampon', 'cup', 'period_underwear'] },
       { key: 'test', icon: 'mdi:test-tube', multi: true, options: ['positive_ovulation', 'negative_ovulation', 'positive_pregnancy', 'negative_pregnancy'] },
     ];
+    if (String(state || '') === 'pre_menarche') {
+      const allowed = new Set(['spotting', 'pain', 'hygiene']);
+      return all.filter((cat) => allowed.has(cat.key));
+    }
+    return all;
   }
 
   _stateBg(state) {
@@ -605,7 +626,8 @@ class MenstruationGaugeCard extends HTMLElement {
 
     const isPeriodDay = model.confirmedSet.has(iso);
     const existing = model.symptomByDate?.[iso] || {};
-    const symptomConfig = this._symptomConfig();
+    const isPreMenarche = model.state === 'pre_menarche';
+    const symptomConfig = this._symptomConfig(model.state);
 
     const categoryRows = symptomConfig.map((cat) => {
       const catLabel = this._t(`cat_${cat.key}`);
@@ -636,13 +658,14 @@ class MenstruationGaugeCard extends HTMLElement {
             <button type="button" class="sym-close" aria-label="close">✕</button>
           </div>
           <div class="sym-body">
+            ${isPreMenarche ? '' : `
             <div class="sym-row">
               <div class="sym-cat-head"><ha-icon icon="mdi:calendar-heart"></ha-icon><span>${this._t('period_toggle')}</span></div>
               <div class="sym-options sym-single-opts">
                 <button type="button" class="sym-opt-btn${isPeriodDay ? ' sym-selected' : ''}" data-cat="_period" data-val="yes">✔</button>
                 <button type="button" class="sym-opt-btn${!isPeriodDay ? ' sym-selected' : ''}" data-cat="_period" data-val="no">✗</button>
               </div>
-            </div>
+            </div>`}
             ${categoryRows}
             <div class="sym-row">
               <div class="sym-cat-head"><ha-icon icon="mdi:thermometer"></ha-icon><span>${this._t('basal_temp_label')}</span></div>
@@ -669,13 +692,16 @@ class MenstruationGaugeCard extends HTMLElement {
     const profile = model.stateObj?.attributes?.profile;
 
     // Determine period toggle state from modal
+    const allowPeriodToggle = model.state !== 'pre_menarche';
     const periodYesBtn = root.querySelector('.sym-opt-btn[data-cat="_period"][data-val="yes"]');
-    const wantsPeriod = periodYesBtn?.classList.contains('sym-selected') ?? model.confirmedSet.has(iso);
+    const wantsPeriod = allowPeriodToggle
+      ? (periodYesBtn?.classList.contains('sym-selected') ?? model.confirmedSet.has(iso))
+      : model.confirmedSet.has(iso);
     const hasPeriod = model.confirmedSet.has(iso);
 
     // Collect symptom data from modal inputs
     const symptomData = {};
-    this._symptomConfig().forEach((cat) => {
+    this._symptomConfig(model.state).forEach((cat) => {
       if (cat.multi) {
         const checked = Array.from(root.querySelectorAll(`.sym-multi[name="${cat.key}"]:checked`)).map((el) => el.value);
         if (checked.length > 0) symptomData[cat.key] = checked;
@@ -691,7 +717,7 @@ class MenstruationGaugeCard extends HTMLElement {
     this._modalIso = null;
 
     // Toggle period start if state changed
-    if (wantsPeriod !== hasPeriod) {
+    if (allowPeriodToggle && wantsPeriod !== hasPeriod) {
       try {
         await this._toggleCycleStart(iso);
       } catch (err) {
@@ -794,10 +820,15 @@ class MenstruationGaugeCard extends HTMLElement {
     const friendlyName = String(this._config.friendly_name || model.stateObj?.attributes?.friendly_name || '').trim();
     const canEdit = this._config?.calendar_edit_enabled !== false;
     const daysUntil = Number(model.stateObj?.attributes?.days_until_next_start);
-    const isOverdueSoon = Number.isFinite(daysUntil) && daysUntil <= -3;
-    const countdown = Number.isFinite(daysUntil)
-      ? `${daysUntil} ${this._t('days_unit')}`
-      : this._t('days_unknown');
+    const isPreMenarche = model.state === 'pre_menarche' && model.menarcheData?.estimated_date;
+    const isOverdueSoon = !isPreMenarche && Number.isFinite(daysUntil) && daysUntil <= -3;
+    const countdown = isPreMenarche && Number.isFinite(model.daysUntilMenarche)
+      ? (model.daysUntilMenarche >= 0
+        ? this._t('menarche_expected_in').replace('{days}', String(model.daysUntilMenarche))
+        : this._t('menarche_overdue').replace('{days}', String(Math.abs(model.daysUntilMenarche))))
+      : (Number.isFinite(daysUntil)
+        ? `${daysUntil} ${this._t('days_unit')}`
+        : this._t('days_unknown'));
 
     this.shadowRoot.innerHTML = `
       <style>
