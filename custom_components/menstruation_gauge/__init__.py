@@ -39,6 +39,8 @@ from .const import (
     CONF_PROFILE,
     DEFAULT_NAME,
     DEFAULT_PERIOD_DURATION_DAYS,
+    DEFAULT_MENARCHE_AGE_MAX,
+    DEFAULT_MENARCHE_AGE_MIN,
     DOMAIN,
     PRE_MENARCHE_SIGN_OPTIONS,
     SERVICE_ADD_CYCLE_START,
@@ -515,7 +517,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 **common_profile_field,
                 vol.Required("is_menarche"): cv.boolean,
                 vol.Optional(SERVICE_FIELD_ESTIMATED_MENARCHE_DATE): cv.string,
-                vol.Optional(SERVICE_FIELD_FAMILY_MENARCHE_AGE): vol.All(vol.Coerce(int), vol.Range(min=8, max=20)),
+                vol.Optional(SERVICE_FIELD_FAMILY_MENARCHE_AGE): vol.All(vol.Coerce(int), vol.Range(min=DEFAULT_MENARCHE_AGE_MIN, max=DEFAULT_MENARCHE_AGE_MAX)),
             }),
         )
 
