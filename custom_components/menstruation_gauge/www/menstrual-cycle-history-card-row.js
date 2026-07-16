@@ -151,7 +151,9 @@ class MenstrualCycleHistoryCardRow extends HTMLElement {
       const start = starts[index];
       const end = starts[index + 1];
       const length = this._dayDiff(end, start);
-      if (length > 0 && length <= 80) cycles.push({ start, end, length, predicted: false });
+      if (length > 0 && length <= 80) {
+        cycles.push({ start, end, length, predicted: false });
+      }
     }
 
     const normalizedPredicted = this._normalizeISO(predictedNextStart);
@@ -172,12 +174,9 @@ class MenstrualCycleHistoryCardRow extends HTMLElement {
 
     const entityId = this._resolveEntityId();
     const stateObj = entityId ? this._hass?.states?.[entityId] : undefined;
+    
     if (!stateObj) {
-      this.shadowRoot.innerHTML = `
-        <ha-card>
-          <div class="pad">${this._t('entity_not_found')}: ${this._config.entity || this._config.entry_id || this._t('unknown')}</div>
-        </ha-card>
-      `;
+      this.shadowRoot.innerHTML = '<ha-card><div class="pad">Entity not found</div></ha-card>';
       return;
     }
 
@@ -185,185 +184,69 @@ class MenstrualCycleHistoryCardRow extends HTMLElement {
     const groupedStartsAttr = Array.isArray(attrs.grouped_starts) ? attrs.grouped_starts : [];
     const predictedNextStart = attrs.next_predicted_start || null;
     const cycles = this._buildCycles(groupedStartsAttr, predictedNextStart);
-
     const maxRows = Math.max(1, Number(this._config.max_rows || 12));
     const visibleCycles = cycles.slice(0, maxRows);
 
-    if (!visibleCycles.length) {
-      this.shadowRoot.innerHTML = `
-        <style>
-          .pad { padding: 16px; color: var(--secondary-text-color); }
-        </style>
-        <ha-card>
-          <div class="pad">${this._t('entity_not_found')} grouped_starts.</div>
-        </ha-card>
-      `;
-      return;
+    let tableRows = '';
+    if (visibleCycles.length > 0) {
+      visibleCycles.forEach((cycle, index) => {
+        const isCurrentCycle = index === 0 && cycle.predicted;
+        const cycleLabel = isCurrentCycle ? this._t('current_cycle') : `${this._t('cycle')} ${visibleCycles.length - index}`;
+        const startLabel = this._toLocalDateLabel(cycle.start);
+        const endLabel = this._toLocalDateLabel(cycle.end);
+        const statusClass = cycle.predicted ? 'predicted' : 'completed';
+        const statusLabel = cycle.predicted ? this._t('predicted') : this._t('actual_period');
+        tableRows += `<tr class="cycle-row ${statusClass}"><td class="cell-label">${cycleLabel}</td><td class="cell-date">${startLabel}</td><td class="cell-date">${endLabel}</td><td class="cell-length">${cycle.length} ${this._t('days')}</td><td class="cell-status"><span class="status-label">${statusLabel}</span></td></tr>`;
+      });
     }
 
-    const rows = visibleCycles.map((cycle, index) => {
-      const isCurrentCycle = index === 0 && cycle.predicted;
-      const cycleLabel = isCurrentCycle ? this._t('current_cycle') : `${this._t('cycle')} ${visibleCycles.length - index}`;
-      const startLabel = this._toLocalDateLabel(cycle.start);
-      const endLabel = this._toLocalDateLabel(cycle.end);
-      const statusClass = cycle.predicted ? 'predicted' : 'completed';
-      const statusLabel = cycle.predicted ? this._t('predicted') : this._t('actual_period');
+    const html = `<style>
+      :host { display: block; }
+      ha-card { padding: 12px; }
+      .title { font-weight: 600; margin: 0 0 12px; color: var(--primary-text-color); }
+      .table-wrap { overflow-x: auto; }
+      table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+      thead { background: rgba(0,0,0,0.04); color: var(--secondary-text-color); }
+      th { padding: 8px 6px; text-align: left; font-weight: 600; border-bottom: 1px solid var(--divider-color); font-size: 0.75rem; }
+      .cycle-row { border-bottom: 1px solid var(--divider-color); transition: background-color 120ms ease; }
+      .cycle-row:hover { background: rgba(0,0,0,0.02); }
+      .cycle-row.predicted { opacity: 0.7; font-style: italic; }
+      td { padding: 10px 6px; color: var(--primary-text-color); }
+      .cell-label { font-weight: 500; min-width: 80px; }
+      .cell-date { min-width: 70px; color: var(--secondary-text-color); font-size: 0.85rem; }
+      .cell-length { text-align: center; font-weight: 500; min-width: 50px; }
+      .cell-status { text-align: right; min-width: 80px; }
+      .status-label { display: inline-block; padding: 2px 8px; border-radius: 12px; background: rgba(100,100,100,0.1); font-size: 0.75rem; font-weight: 500; color: var(--secondary-text-color); }
+      @media (max-width: 600px) { table { font-size: 0.8rem; } th, td { padding: 6px 4px; } }
+    </style>
+    <ha-card>
+      <div class="title">${this._config.title || this._t('title')}</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>${this._t('cycle')}</th>
+              <th>${this._t('start_date')}</th>
+              <th>${this._t('end_date')}</th>
+              <th>${this._t('length')}</th>
+              <th>${this._t('status')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows || '<tr><td colspan="5">No cycles available</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </ha-card>`;
 
-      return `
-        <tr class="cycle-row ${statusClass}">
-          <td class="cell-label">${cycleLabel}</td>
-          <td class="cell-date">${startLabel}</td>
-          <td class="cell-date">${endLabel}</td>
-          <td class="cell-length">${cycle.length} ${this._t('days')}</td>
-          <td class="cell-status"><span class="status-label">${statusLabel}</span></td>
-        </tr>
-      `;
-    }).join('');
-
-    this.shadowRoot.innerHTML = `
-      <style>
-        :host {
-          display: block;
-        }
-
-        ha-card {
-          padding: 12px;
-        }
-
-        .title {
-          font-weight: 600;
-          margin: 0 0 12px;
-          color: var(--primary-text-color);
-        }
-
-        .table-wrap {
-          overflow-x: auto;
-        }
-
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          font-size: 0.9rem;
-        }
-
-        thead {
-          background: rgba(0, 0, 0, 0.04);
-          color: var(--secondary-text-color);
-        }
-
-        th {
-          padding: 8px 6px;
-          text-align: left;
-          font-weight: 600;
-          border-bottom: 1px solid var(--divider-color);
-          font-size: 0.75rem;
-          letter-spacing: 0.4px;
-        }
-
-        .cycle-row {
-          border-bottom: 1px solid var(--divider-color);
-          transition: background-color 120ms ease;
-        }
-
-        .cycle-row:hover {
-          background: rgba(0, 0, 0, 0.02);
-        }
-
-        .cycle-row.predicted {
-          opacity: 0.7;
-          font-style: italic;
-        }
-
-        td {
-          padding: 10px 6px;
-          color: var(--primary-text-color);
-        }
-
-        .cell-label {
-          font-weight: 500;
-          min-width: 80px;
-        }
-
-        .cell-date {
-          min-width: 70px;
-          color: var(--secondary-text-color);
-          font-size: 0.85rem;
-        }
-
-        .cell-length {
-          text-align: center;
-          font-weight: 500;
-          min-width: 50px;
-        }
-
-        .cell-status {
-          text-align: right;
-          min-width: 80px;
-        }
-
-        .status-label {
-          display: inline-block;
-          padding: 2px 8px;
-          border-radius: 12px;
-          background: rgba(100, 100, 100, 0.1);
-          font-size: 0.75rem;
-          font-weight: 500;
-          color: var(--secondary-text-color);
-        }
-
-        .pad {
-          padding: 16px;
-          color: var(--secondary-text-color);
-        }
-
-        @media (max-width: 600px) {
-          table {
-            font-size: 0.8rem;
-          }
-
-          th, td {
-            padding: 6px 4px;
-          }
-
-          .cell-label {
-            min-width: 60px;
-          }
-
-          .cell-date {
-            min-width: 50px;
-          }
-        }
-      </style>
-      <ha-card>
-        <div class="title">${this._config.title || this._t('title')}</div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>${this._t('cycle')}</th>
-                <th>${this._t('start_date')}</th>
-                <th>${this._t('end_date')}</th>
-                <th>${this._t('length')}</th>
-                <th>${this._t('status')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rows}
-            </tbody>
-          </table>
-        </div>
-      </ha-card>
-    `;
+    this.shadowRoot.innerHTML = html;
   }
 }
 
 customElements.define('menstrual-cycle-history-card-row', MenstrualCycleHistoryCardRow);
-
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'menstrual-cycle-history-card-row',
   name: 'Menstrual Cycle History (Table)',
-  description: 'Tabellarische Ansicht der Zyklus-Historie mit Schwangerschaft und Pre-Menarche Status',
+  description: 'Menstrual cycle history in table format',
 });
-
-console.log('menstrual-cycle-history-card-row loaded successfully');
