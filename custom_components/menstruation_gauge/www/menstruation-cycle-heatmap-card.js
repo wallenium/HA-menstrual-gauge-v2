@@ -226,6 +226,43 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
     return (symptomSources || []).filter((source) => source.dates.has(dateIso));
   }
 
+  _symptomConfig() {
+    return [
+      { key: 'bleeding_strength', icon: 'mdi:water-opacity' },
+      { key: 'spotting', icon: 'mdi:blood-bag' },
+      { key: 'intercourse', icon: 'mdi:heart' },
+      { key: 'pain', icon: 'mdi:emoticon-sad-outline' },
+      { key: 'hygiene', icon: 'mdi:medical-bag' },
+      { key: 'test', icon: 'mdi:test-tube' },
+      { key: 'basal_temp', icon: 'mdi:thermometer' },
+    ];
+  }
+
+  _resolveBuiltinSymptomSources() {
+    const entityId = this._resolveEntityId();
+    const stateObj = entityId ? this._hass?.states?.[entityId] : undefined;
+    const symptomHistory = Array.isArray(stateObj?.attributes?.symptom_history)
+      ? stateObj.attributes.symptom_history
+      : [];
+
+    if (!symptomHistory.length) return [];
+
+    const sources = [];
+    for (const cat of this._symptomConfig()) {
+      const dates = new Set();
+      for (const entry of symptomHistory) {
+        const iso = this._normalizeISO(entry?.date);
+        if (!iso) continue;
+        const val = entry[cat.key];
+        if (val === null || val === undefined) continue;
+        if (Array.isArray(val) && val.length === 0) continue;
+        dates.add(iso);
+      }
+      if (dates.size > 0) sources.push({ name: cat.key, icon: cat.icon, dates });
+    }
+    return sources;
+  }
+
   _phaseClass(day, cycleLength, showFertile) {
     if (!showFertile) return '';
     const fertileStart = 8;
@@ -296,7 +333,7 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
     const sensorPeriodDays = Number(attrs.period_duration_days || 5);
     const periodDays = Math.max(1, Math.min(14, Number(this._config.period_duration_days || sensorPeriodDays || 5)));
     const showFertile = this._config.show_fertile_period !== false;
-    const symptomSources = this._resolveSymptomSources();
+    const symptomSources = [...this._resolveSymptomSources(), ...this._resolveBuiltinSymptomSources()];
     const todayIso = this._normalizeISO(new Date().toISOString().slice(0, 10));
     const alignMode = String(this._config.cycle_alignment || 'top').toLowerCase() === 'bottom' ? 'bottom' : 'top';
 
