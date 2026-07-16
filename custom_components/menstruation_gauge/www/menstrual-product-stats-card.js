@@ -316,13 +316,13 @@ class MenstrualProductStatsCard extends HTMLElement {
   }
 
   _lang() {
-    const language = String(this._hass?.locale?.language || this._hass?.language || "en").toLowerCase();
+    const language = String(this._hass?.locale?.language || "en").toLowerCase();
     return language.startsWith("de") ? "de" : "en";
   }
 
   formatDate(value) {
     const date = new Date(`${value}T00:00:00`);
-    return new Intl.DateTimeFormat(this._hass?.locale?.language || this._hass?.language || "en", {
+    return new Intl.DateTimeFormat(this._hass?.locale?.language || "en", {
       month: "short",
       day: "numeric",
     }).format(date);
