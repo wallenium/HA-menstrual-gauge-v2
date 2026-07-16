@@ -13,6 +13,11 @@ CONF_PROFILE = "profile"
 CONF_FRIENDLY_NAME = "friendly_name"
 CONF_ICON = "icon"
 CONF_PERIOD_DURATION_DAYS = "period_duration_days"
+CONF_PREGNANCY_ENABLED = "pregnancy_enabled"
+CONF_PREGNANCY_START_DATE = "pregnancy_start_date"
+CONF_PRE_MENARCHE_ENABLED = "pre_menarche_enabled"
+CONF_ESTIMATED_MENARCHE_DATE = "estimated_menarche_date"
+CONF_FAMILY_MENARCHE_AGE = "family_menarche_age"
 
 DEFAULT_NAME = "Menstruation"
 DEFAULT_PERIOD_DURATION_DAYS = 5

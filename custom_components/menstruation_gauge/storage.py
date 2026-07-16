@@ -138,6 +138,42 @@ class MenstruationStorage:
             data.get("pre_menarche_data"),
         )
 
+    async def async_load_pregnancy_data(self) -> dict[str, Any]:
+        """Load only the pregnancy data block."""
+        data = await self.async_load()
+        return data["pregnancy_data"]
+
+    async def async_save_pregnancy_data(self, pregnancy_data: dict[str, Any]) -> None:
+        """Persist pregnancy data while preserving all other stored fields."""
+        data = await self.async_load()
+        await self.async_save(
+            data["history"],
+            data["period_duration_days"],
+            data.get("symptom_history", []),
+            data.get("product_usage", []),
+            pregnancy_data,
+            data.get("menarche_data"),
+            data.get("pre_menarche_data"),
+        )
+
+    async def async_load_menarche_data(self) -> dict[str, Any]:
+        """Load only the menarche data block."""
+        data = await self.async_load()
+        return data["menarche_data"]
+
+    async def async_save_menarche_data(self, menarche_data: dict[str, Any]) -> None:
+        """Persist menarche data while preserving all other stored fields."""
+        data = await self.async_load()
+        await self.async_save(
+            data["history"],
+            data["period_duration_days"],
+            data.get("symptom_history", []),
+            data.get("product_usage", []),
+            data.get("pregnancy_data"),
+            menarche_data,
+            data.get("pre_menarche_data"),
+        )
+
     @staticmethod
     def _normalize_iso(value: str) -> str | None:
         try:
