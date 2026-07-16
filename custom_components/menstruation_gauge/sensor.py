@@ -34,7 +34,6 @@ from .const import (
     ATTR_NEXT_PREDICTED_START,
     ATTR_PERIOD_DURATION_DAYS,
     ATTR_PRE_MENARCHE_DATA,
-    ATTR_PRODUCT_USAGE,
     ATTR_PREGNANCY_DATA,
     ATTR_PREGNANCY_START_DATE,
     ATTR_SYMPTOM_HISTORY,
@@ -200,8 +199,6 @@ class MenstruationGaugeSensor(SensorEntity):
             period_duration_days=runtime.period_duration_days,
             symptom_history=runtime.symptom_history,
             pregnancy_data=runtime.pregnancy_data,
-            menarche_data=runtime.menarche_data,
-            pre_menarche_data=runtime.pre_menarche_data,
             today=dt_util.now().date(),
         )
         usage_stats = _build_product_usage_stats(runtime.history, runtime.product_usage, dt_util.now().date())
@@ -209,14 +206,9 @@ class MenstruationGaugeSensor(SensorEntity):
         self._state = model.state
         has_history = bool(model.history)
 
-        menarche_data = model.menarche_data
-        pre_menarche_data = model.pre_menarche_data
-        is_awaiting_menarche = bool(menarche_data.get("tracking_active")) and not bool(menarche_data.get("is_menarche", False))
-
         self._attrs = {
             ATTR_HISTORY: model.history,
             ATTR_SYMPTOM_HISTORY: model.symptom_history,
-            ATTR_PRODUCT_USAGE: runtime.product_usage,
             ATTR_GROUPED_STARTS: model.grouped_starts,
             ATTR_BLEEDING_BLOCKS: model.bleeding_blocks,
             ATTR_NEXT_PREDICTED_START: model.next_predicted_start,
@@ -237,10 +229,6 @@ class MenstruationGaugeSensor(SensorEntity):
                 "weeks_pregnant": model.weeks_pregnant,
                 "due_date": model.due_date,
             },
-            ATTR_AWAITING_MENARCHE: is_awaiting_menarche,
-            ATTR_ESTIMATED_MENARCHE_DATE: menarche_data.get("estimated_date"),
-            ATTR_FAMILY_MENARCHE_AGE: menarche_data.get("family_menarche_age"),
-            ATTR_PRE_MENARCHE_DATA: pre_menarche_data,
             "profile": runtime.profile,
             "entry_id": self._entry.entry_id,
             "friendly_name": runtime.friendly_name,
@@ -315,7 +303,7 @@ class MenstruationGaugeSensor(SensorEntity):
 
 
 class ProductUsageTodaySensor(SensorEntity):
-    """Count logged tampon or pad usage for today."""
+    """Count logged tampon or pad usage for today with profile naming."""
 
     _attr_has_entity_name = True
     _product_labels = {
@@ -328,8 +316,17 @@ class ProductUsageTodaySensor(SensorEntity):
         self.hass = hass
         self._entry = entry
         self._product = product
+        runtime = self.hass.data[DOMAIN][entry.entry_id]
+        self._profile = runtime.profile
+        self._friendly_name = runtime.friendly_name
+        
+        # Create unique ID with profile to avoid duplicates
         self._attr_unique_id = f"{entry.entry_id}_{product}_usage_today"
-        self._attr_name, self._icon = self._product_labels[product]
+        
+        # Create name with profile prefix for clarity
+        base_label, icon = self._product_labels[product]
+        self._attr_name = f"{self._friendly_name}: {base_label}"
+        self._icon = icon
         self._attr_native_unit_of_measurement = "items"
         self._attr_native_value = 0
         self._attrs: dict[str, StateType] = {}
@@ -350,12 +347,20 @@ class ProductUsageTodaySensor(SensorEntity):
 
     async def async_update(self) -> None:
         runtime = self.hass.data[DOMAIN][self._entry.entry_id]
+        self._friendly_name = runtime.friendly_name
+        base_label, _ = self._product_labels[self._product]
+        self._attr_name = f"{self._friendly_name}: {base_label}"
+        
         self._attr_native_value = _build_product_usage_stats(
             runtime.history,
             runtime.product_usage,
             dt_util.now().date(),
         )["today"][self._product]
-        self._attrs = {"profile": runtime.profile}
+        self._attrs = {
+            "profile": runtime.profile,
+            "friendly_name": runtime.friendly_name,
+            "entry_id": self._entry.entry_id,
+        }
 
     @property
     def native_value(self) -> StateType:
@@ -385,35 +390,44 @@ class ProductUsageTodaySensor(SensorEntity):
 
 
 class CupEmptiesTodaySensor(ProductUsageTodaySensor):
-    """Count logged menstrual cup emptying events for today."""
+    """Count logged menstrual cup emptying events for today with profile naming."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         super().__init__(hass, entry, "cup")
+        runtime = self.hass.data[DOMAIN][entry.entry_id]
         self._attr_unique_id = f"{entry.entry_id}_cup_empties_today"
-        self._attr_name = "Cup empties today"
+        self._attr_name = f"{runtime.friendly_name}: Cup empties today"
         self._icon = "mdi:cup-water"
         self._attr_native_unit_of_measurement = "empties"
 
     async def async_update(self) -> None:
         runtime = self.hass.data[DOMAIN][self._entry.entry_id]
+        self._attr_name = f"{runtime.friendly_name}: Cup empties today"
         self._attr_native_value = _build_product_usage_stats(
             runtime.history,
             runtime.product_usage,
             dt_util.now().date(),
         )["today"]["cup_empties"]
-        self._attrs = {"profile": runtime.profile}
+        self._attrs = {
+            "profile": runtime.profile,
+            "friendly_name": runtime.friendly_name,
+            "entry_id": self._entry.entry_id,
+        }
 
 
 class ProductUsageAverageCycleSensor(SensorEntity):
-    """Average logged product usage per recent cycle."""
+    """Average logged product usage per recent cycle with profile naming."""
 
     _attr_has_entity_name = True
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self.hass = hass
         self._entry = entry
+        runtime = self.hass.data[DOMAIN][entry.entry_id]
+        self._friendly_name = runtime.friendly_name
+        
         self._attr_unique_id = f"{entry.entry_id}_product_usage_average_cycle"
-        self._attr_name = "Product usage average cycle"
+        self._attr_name = f"{self._friendly_name}: Product usage average cycle"
         self._icon = "mdi:chart-line"
         self._attr_native_unit_of_measurement = "items/cycle"
         self._attr_native_value = 0.0
@@ -435,11 +449,16 @@ class ProductUsageAverageCycleSensor(SensorEntity):
 
     async def async_update(self) -> None:
         runtime = self.hass.data[DOMAIN][self._entry.entry_id]
+        self._friendly_name = runtime.friendly_name
+        self._attr_name = f"{self._friendly_name}: Product usage average cycle"
+        
         stats = _build_product_usage_stats(runtime.history, runtime.product_usage, dt_util.now().date())
         averages = stats["averages_per_cycle"]
         self._attr_native_value = averages["overall"]
         self._attrs = {
             "profile": runtime.profile,
+            "friendly_name": runtime.friendly_name,
+            "entry_id": self._entry.entry_id,
             "tampon_average_per_cycle": averages["tampon"],
             "pad_average_per_cycle": averages["pad"],
             "cup_empties_average_per_cycle": averages["cup_empties"],
