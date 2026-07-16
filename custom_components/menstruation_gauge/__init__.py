@@ -16,6 +16,11 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
+
+try:
+    from homeassistant.core import SupportsResponse
+except ImportError:
+    SupportsResponse = None  # type: ignore[assignment,misc]
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
@@ -35,7 +40,9 @@ from .const import (
     DEFAULT_NAME,
     DEFAULT_PERIOD_DURATION_DAYS,
     DOMAIN,
+    PRE_MENARCHE_SIGN_OPTIONS,
     SERVICE_ADD_CYCLE_START,
+    SERVICE_ADD_PRE_MENARCHE_SIGN,
     SERVICE_FIELD_ACTION,
     SERVICE_ADD_SYMPTOM,
     SERVICE_ERASE_ALL_HISTORY,
@@ -46,25 +53,40 @@ from .const import (
     SERVICE_FIELD_ENTITY_ID,
     SERVICE_FIELD_ENTRY_ID,
     SERVICE_FIELD_ERASE_ALL,
+    SERVICE_FIELD_ESTIMATED_MENARCHE_DATE,
+    SERVICE_FIELD_FAMILY_MENARCHE_AGE,
     SERVICE_FIELD_FILENAME,
     SERVICE_FIELD_FORMAT,
     SERVICE_FIELD_IS_PREGNANT,
     SERVICE_FIELD_PRODUCT,
     SERVICE_FIELD_PREGNANCY_START_DATE,
+    SERVICE_FIELD_PRE_MENARCHE_SIGN,
     SERVICE_FIELD_PROFILE,
     SERVICE_FIELD_QUANTITY,
     SERVICE_FIELD_SYMPTOM_DATA,
+    SERVICE_FIELD_TANNER_STAGE,
+    SERVICE_GET_MENARCHE_INFO,
     SERVICE_GET_SYMPTOM,
     SERVICE_LOG_PRODUCT_USAGE,
     SERVICE_REFRESH_CYCLE_MODEL,
     SERVICE_REMOVE_CYCLE_START,
+    SERVICE_REMOVE_PRE_MENARCHE_SIGN,
     SERVICE_REMOVE_SYMPTOM,
     SERVICE_SET_CYCLE_HISTORY,
+    SERVICE_SET_MENARCHE_MODE,
     SERVICE_SET_PERIOD_DURATION,
     SERVICE_SET_PREGNANCY_MODE,
+    SERVICE_UPDATE_MENARCHE_DATE,
     SERVICE_UPDATE_PREGNANCY_DATE,
     SIGNAL_HISTORY_UPDATED,
     STORAGE_KEY,
+    SYMPTOM_BASAL_TEMP,
+    SYMPTOM_OPTIONS,
+    TANNER_STAGE_1,
+    TANNER_STAGE_2,
+    TANNER_STAGE_3,
+    TANNER_STAGE_4,
+    TANNER_STAGE_5,
 )
 from .model import normalize_history
 from .storage import MenstruationStorage
@@ -101,6 +123,8 @@ class MenstruationRuntime:
     symptom_history: list[dict[str, Any]]
     product_usage: list[dict[str, Any]]
     pregnancy_data: dict[str, Any] = field(default_factory=lambda: {"is_pregnant": False, "start_date": None})
+    menarche_data: dict[str, Any] = field(default_factory=lambda: {"tracking_active": False, "is_menarche": False, "menarche_date": None, "estimated_date": None, "family_menarche_age": None})
+    pre_menarche_data: dict[str, Any] = field(default_factory=lambda: {"signs": {}, "tanner_stage": None})
     unregister_midnight_listener: Callable[[], None] | None = None
 
 
@@ -186,6 +210,8 @@ async def _async_save_and_notify(hass: HomeAssistant, runtime: MenstruationRunti
         runtime.symptom_history,
         runtime.product_usage,
         runtime.pregnancy_data,
+        runtime.menarche_data,
+        runtime.pre_menarche_data,
     )
     await _async_refresh_cycle_model(hass, {_entry_id_for_runtime(hass, runtime)})
 
@@ -277,6 +303,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         symptom_history=stored.get(ATTR_SYMPTOM_HISTORY, []),
         product_usage=stored.get(ATTR_PRODUCT_USAGE, []),
         pregnancy_data=stored.get("pregnancy_data", {"is_pregnant": False, "start_date": None}),
+        menarche_data=stored.get("menarche_data", {"tracking_active": False, "is_menarche": False, "menarche_date": None, "estimated_date": None, "family_menarche_age": None}),
+        pre_menarche_data=stored.get("pre_menarche_data", {"signs": {}, "tanner_stage": None}),
     )
 
     runtime.unregister_midnight_listener = async_track_time_change(
@@ -319,14 +347,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     async def async_remove_symptom(call: ServiceCall) -> None:
         await _async_handle_remove_symptom(hass, call)
 
-    async def async_get_symptom(call: ServiceCall) -> None:
-        await _async_handle_get_symptom(hass, call)
+    async def async_get_symptom(call: ServiceCall) -> dict[str, Any]:
+        return await _async_handle_get_symptom(hass, call)
 
     async def async_set_pregnancy_mode(call: ServiceCall) -> None:
         await _async_handle_set_pregnancy_mode(hass, call)
 
     async def async_update_pregnancy_date(call: ServiceCall) -> None:
         await _async_handle_update_pregnancy_date(hass, call)
+
+    async def async_set_menarche_mode(call: ServiceCall) -> None:
+        await _async_handle_set_menarche_mode(hass, call)
+
+    async def async_update_menarche_date(call: ServiceCall) -> None:
+        await _async_handle_update_menarche_date(hass, call)
+
+    async def async_get_menarche_info(call: ServiceCall) -> dict[str, Any]:
+        return await _async_handle_get_menarche_info(hass, call)
+
+    async def async_add_pre_menarche_sign(call: ServiceCall) -> None:
+        await _async_handle_add_pre_menarche_sign(hass, call)
+
+    async def async_remove_pre_menarche_sign(call: ServiceCall) -> None:
+        await _async_handle_remove_pre_menarche_sign(hass, call)
 
     common_profile_field = {
         vol.Optional(SERVICE_FIELD_ENTITY_ID): cv.entity_id,
@@ -440,12 +483,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
 
     if not hass.services.has_service(DOMAIN, SERVICE_GET_SYMPTOM):
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_GET_SYMPTOM,
-            async_get_symptom,
-            schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_DATE): cv.string}),
-        )
+        _register_kwargs: dict[str, Any] = {
+            "schema": vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_DATE): cv.string}),
+        }
+        if SupportsResponse is not None:
+            _register_kwargs["supports_response"] = SupportsResponse.OPTIONAL
+        hass.services.async_register(DOMAIN, SERVICE_GET_SYMPTOM, async_get_symptom, **_register_kwargs)
 
     if not hass.services.has_service(DOMAIN, SERVICE_SET_PREGNANCY_MODE):
         hass.services.async_register(
@@ -461,6 +504,58 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_UPDATE_PREGNANCY_DATE,
             async_update_pregnancy_date,
             schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_PREGNANCY_START_DATE): cv.string}),
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_SET_MENARCHE_MODE):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SET_MENARCHE_MODE,
+            async_set_menarche_mode,
+            schema=vol.Schema({
+                **common_profile_field,
+                vol.Required("is_menarche"): cv.boolean,
+                vol.Optional(SERVICE_FIELD_ESTIMATED_MENARCHE_DATE): cv.string,
+                vol.Optional(SERVICE_FIELD_FAMILY_MENARCHE_AGE): vol.All(vol.Coerce(int), vol.Range(min=8, max=20)),
+            }),
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_UPDATE_MENARCHE_DATE):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_UPDATE_MENARCHE_DATE,
+            async_update_menarche_date,
+            schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_DATE): cv.string}),
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_GET_MENARCHE_INFO):
+        _menarche_info_kwargs: dict[str, Any] = {
+            "schema": vol.Schema(common_profile_field),
+        }
+        if SupportsResponse is not None:
+            _menarche_info_kwargs["supports_response"] = SupportsResponse.OPTIONAL
+        hass.services.async_register(DOMAIN, SERVICE_GET_MENARCHE_INFO, async_get_menarche_info, **_menarche_info_kwargs)
+
+    if not hass.services.has_service(DOMAIN, SERVICE_ADD_PRE_MENARCHE_SIGN):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_ADD_PRE_MENARCHE_SIGN,
+            async_add_pre_menarche_sign,
+            schema=vol.Schema({
+                **common_profile_field,
+                vol.Required(SERVICE_FIELD_PRE_MENARCHE_SIGN): vol.In(list(PRE_MENARCHE_SIGN_OPTIONS.keys())),
+                vol.Required(SERVICE_FIELD_TANNER_STAGE): cv.string,
+            }),
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_REMOVE_PRE_MENARCHE_SIGN):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_REMOVE_PRE_MENARCHE_SIGN,
+            async_remove_pre_menarche_sign,
+            schema=vol.Schema({
+                **common_profile_field,
+                vol.Required(SERVICE_FIELD_PRE_MENARCHE_SIGN): vol.In(list(PRE_MENARCHE_SIGN_OPTIONS.keys())),
+            }),
         )
 
     await _async_register_card_static_path(hass)
@@ -492,6 +587,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_GET_SYMPTOM,
             SERVICE_SET_PREGNANCY_MODE,
             SERVICE_UPDATE_PREGNANCY_DATE,
+            SERVICE_SET_MENARCHE_MODE,
+            SERVICE_UPDATE_MENARCHE_DATE,
+            SERVICE_GET_MENARCHE_INFO,
+            SERVICE_ADD_PRE_MENARCHE_SIGN,
+            SERVICE_REMOVE_PRE_MENARCHE_SIGN,
         ):
             if hass.services.has_service(DOMAIN, service):
                 hass.services.async_remove(DOMAIN, service)
@@ -616,6 +716,26 @@ async def _async_handle_add_symptom(hass: HomeAssistant, call: ServiceCall) -> N
     if not isinstance(symptom_data, dict):
         raise HomeAssistantError("Symptom data must be a dictionary.")
 
+    valid_fields = set(SYMPTOM_OPTIONS.keys()) | {SYMPTOM_BASAL_TEMP}
+    for key, value in symptom_data.items():
+        if key not in valid_fields:
+            raise HomeAssistantError(
+                f"Unknown symptom field '{key}'. Valid fields: {', '.join(sorted(valid_fields))}"
+            )
+        if key == SYMPTOM_BASAL_TEMP:
+            try:
+                float(value)
+            except (TypeError, ValueError):
+                raise HomeAssistantError(f"Symptom field '{SYMPTOM_BASAL_TEMP}' must be a number, got '{value}'.")
+        else:
+            allowed = SYMPTOM_OPTIONS[key]
+            values_to_check = value if isinstance(value, list) else [value]
+            for item in values_to_check:
+                if item not in allowed:
+                    raise HomeAssistantError(
+                        f"Invalid value '{item}' for symptom field '{key}'. Allowed: {', '.join(allowed)}"
+                    )
+
     existing = None
     for entry in runtime.symptom_history:
         if entry.get("date") == date_iso:
@@ -643,7 +763,7 @@ async def _async_handle_remove_symptom(hass: HomeAssistant, call: ServiceCall) -
     await _async_save_and_notify(hass, runtime)
 
 
-async def _async_handle_get_symptom(hass: HomeAssistant, call: ServiceCall) -> None:
+async def _async_handle_get_symptom(hass: HomeAssistant, call: ServiceCall) -> dict[str, Any]:
     """Get symptom data for a date."""
     runtime = _runtime_for_call(hass, call)
     date_iso = _normalize_date_or_raise(call.data[SERVICE_FIELD_DATE])
@@ -651,9 +771,10 @@ async def _async_handle_get_symptom(hass: HomeAssistant, call: ServiceCall) -> N
     for entry in runtime.symptom_history:
         if entry.get("date") == date_iso:
             _LOGGER.info("Symptom data for %s: %s", date_iso, entry)
-            return
+            return dict(entry)
 
     _LOGGER.info("No symptom data found for %s", date_iso)
+    return {"date": date_iso, "found": False}
 
 
 async def _async_handle_set_pregnancy_mode(hass: HomeAssistant, call: ServiceCall) -> None:
@@ -676,6 +797,76 @@ async def _async_handle_update_pregnancy_date(hass: HomeAssistant, call: Service
     runtime = _runtime_for_call(hass, call)
     date_iso = _normalize_date_or_raise(call.data[SERVICE_FIELD_PREGNANCY_START_DATE])
     runtime.pregnancy_data["start_date"] = date_iso
+    await _async_save_and_notify(hass, runtime)
+
+
+async def _async_handle_set_menarche_mode(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Set menarche mode - enable pre-menarche tracking or confirm menarche occurred."""
+    runtime = _runtime_for_call(hass, call)
+    is_menarche = bool(call.data.get("is_menarche", False))
+    estimated_date = call.data.get(SERVICE_FIELD_ESTIMATED_MENARCHE_DATE)
+    family_age = call.data.get(SERVICE_FIELD_FAMILY_MENARCHE_AGE)
+
+    if estimated_date:
+        estimated_date = _normalize_date_or_raise(estimated_date)
+
+    runtime.menarche_data = {
+        "tracking_active": True,
+        "is_menarche": is_menarche,
+        "menarche_date": runtime.menarche_data.get("menarche_date"),
+        "estimated_date": estimated_date,
+        "family_menarche_age": int(family_age) if family_age is not None else runtime.menarche_data.get("family_menarche_age"),
+    }
+    await _async_save_and_notify(hass, runtime)
+
+
+async def _async_handle_update_menarche_date(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Record the actual menarche date (first period)."""
+    runtime = _runtime_for_call(hass, call)
+    date_iso = _normalize_date_or_raise(call.data[SERVICE_FIELD_DATE])
+    runtime.menarche_data["tracking_active"] = True
+    runtime.menarche_data["is_menarche"] = True
+    runtime.menarche_data["menarche_date"] = date_iso
+    await _async_save_and_notify(hass, runtime)
+
+
+async def _async_handle_get_menarche_info(hass: HomeAssistant, call: ServiceCall) -> dict[str, Any]:
+    """Get menarche and pre-menarche information."""
+    runtime = _runtime_for_call(hass, call)
+    _LOGGER.info("Menarche info for profile '%s': %s", runtime.profile, runtime.menarche_data)
+    return {
+        "menarche_data": dict(runtime.menarche_data),
+        "pre_menarche_data": dict(runtime.pre_menarche_data),
+    }
+
+
+async def _async_handle_add_pre_menarche_sign(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Add or update a pre-menarche body sign."""
+    runtime = _runtime_for_call(hass, call)
+    sign = str(call.data[SERVICE_FIELD_PRE_MENARCHE_SIGN])
+    stage = str(call.data[SERVICE_FIELD_TANNER_STAGE])
+
+    if sign not in PRE_MENARCHE_SIGN_OPTIONS:
+        raise HomeAssistantError(f"Unknown pre-menarche sign '{sign}'.")
+    allowed_stages = PRE_MENARCHE_SIGN_OPTIONS[sign]
+    if stage not in allowed_stages:
+        raise HomeAssistantError(
+            f"Invalid value '{stage}' for sign '{sign}'. Allowed: {', '.join(allowed_stages)}"
+        )
+
+    if not isinstance(runtime.pre_menarche_data.get("signs"), dict):
+        runtime.pre_menarche_data["signs"] = {}
+    runtime.pre_menarche_data["signs"][sign] = stage
+    await _async_save_and_notify(hass, runtime)
+
+
+async def _async_handle_remove_pre_menarche_sign(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Remove a pre-menarche body sign."""
+    runtime = _runtime_for_call(hass, call)
+    sign = str(call.data[SERVICE_FIELD_PRE_MENARCHE_SIGN])
+
+    if isinstance(runtime.pre_menarche_data.get("signs"), dict):
+        runtime.pre_menarche_data["signs"].pop(sign, None)
     await _async_save_and_notify(hass, runtime)
 
 

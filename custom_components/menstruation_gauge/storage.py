@@ -34,6 +34,8 @@ class MenstruationStorage:
                 "symptom_history": [],
                 "product_usage": [],
                 "pregnancy_data": {"is_pregnant": False, "start_date": None},
+                "menarche_data": {"tracking_active": False, "is_menarche": False, "menarche_date": None, "estimated_date": None, "family_menarche_age": None},
+                "pre_menarche_data": {"signs": {}, "tanner_stage": None},
             }
 
         history = data.get("history", [])
@@ -62,12 +64,29 @@ class MenstruationStorage:
         pregnancy_data.setdefault("is_pregnant", False)
         pregnancy_data.setdefault("start_date", None)
 
+        menarche_data = data.get("menarche_data", {})
+        if not isinstance(menarche_data, dict):
+            menarche_data = {}
+        menarche_data.setdefault("tracking_active", False)
+        menarche_data.setdefault("is_menarche", False)
+        menarche_data.setdefault("menarche_date", None)
+        menarche_data.setdefault("estimated_date", None)
+        menarche_data.setdefault("family_menarche_age", None)
+
+        pre_menarche_data = data.get("pre_menarche_data", {})
+        if not isinstance(pre_menarche_data, dict):
+            pre_menarche_data = {}
+        pre_menarche_data.setdefault("signs", {})
+        pre_menarche_data.setdefault("tanner_stage", None)
+
         return {
             "history": normalized,
             "period_duration_days": days,
             "symptom_history": self._normalize_symptoms(symptom_history),
             "product_usage": self._normalize_product_usage(product_usage),
             "pregnancy_data": pregnancy_data,
+            "menarche_data": menarche_data,
+            "pre_menarche_data": pre_menarche_data,
         }
 
     async def async_save(
@@ -77,6 +96,8 @@ class MenstruationStorage:
         symptom_history: list[dict[str, Any]] | None = None,
         product_usage: list[dict[str, Any]] | None = None,
         pregnancy_data: dict[str, Any] | None = None,
+        menarche_data: dict[str, Any] | None = None,
+        pre_menarche_data: dict[str, Any] | None = None,
     ) -> None:
         """Save data to storage."""
         normalized = sorted({self._normalize_iso(raw) for raw in history if self._normalize_iso(raw)})
@@ -84,6 +105,8 @@ class MenstruationStorage:
         symptoms = self._normalize_symptoms(symptom_history or [])
         usage = self._normalize_product_usage(product_usage or [])
         preg_data = pregnancy_data or {"is_pregnant": False, "start_date": None}
+        men_data = menarche_data or {"tracking_active": False, "is_menarche": False, "menarche_date": None, "estimated_date": None, "family_menarche_age": None}
+        pre_men_data = pre_menarche_data or {"signs": {}, "tanner_stage": None}
 
         await self._store.async_save(
             {
@@ -92,6 +115,8 @@ class MenstruationStorage:
                 "symptom_history": symptoms,
                 "product_usage": usage,
                 "pregnancy_data": preg_data,
+                "menarche_data": men_data,
+                "pre_menarche_data": pre_men_data,
             }
         )
 
@@ -109,6 +134,8 @@ class MenstruationStorage:
             data.get("symptom_history", []),
             product_usage,
             data.get("pregnancy_data"),
+            data.get("menarche_data"),
+            data.get("pre_menarche_data"),
         )
 
     @staticmethod

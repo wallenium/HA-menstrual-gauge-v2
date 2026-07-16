@@ -17,10 +17,15 @@ from homeassistant.helpers.typing import StateType
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    ATTR_AGE_AT_TRACKING,
     ATTR_AVG_CYCLE_LENGTH,
+    ATTR_AWAITING_MENARCHE,
     ATTR_BLEEDING_BLOCKS,
+    ATTR_DAYS_UNTIL_MENARCHE,
     ATTR_DAYS_UNTIL_NEXT_START,
     ATTR_DUE_DATE,
+    ATTR_ESTIMATED_MENARCHE_DATE,
+    ATTR_FAMILY_MENARCHE_AGE,
     ATTR_FERTILE_WINDOW_END,
     ATTR_FERTILE_WINDOW_START,
     ATTR_GROUPED_STARTS,
@@ -28,7 +33,9 @@ from .const import (
     ATTR_IS_PREGNANT,
     ATTR_NEXT_PREDICTED_START,
     ATTR_PERIOD_DURATION_DAYS,
+    ATTR_PRE_MENARCHE_DATA,
     ATTR_PRODUCT_USAGE,
+    ATTR_PREGNANCY_DATA,
     ATTR_PREGNANCY_START_DATE,
     ATTR_SYMPTOM_HISTORY,
     ATTR_WEEKS_PREGNANT,
@@ -193,12 +200,19 @@ class MenstruationGaugeSensor(SensorEntity):
             period_duration_days=runtime.period_duration_days,
             symptom_history=runtime.symptom_history,
             pregnancy_data=runtime.pregnancy_data,
+            menarche_data=runtime.menarche_data,
+            pre_menarche_data=runtime.pre_menarche_data,
             today=dt_util.now().date(),
         )
         usage_stats = _build_product_usage_stats(runtime.history, runtime.product_usage, dt_util.now().date())
 
         self._state = model.state
         has_history = bool(model.history)
+
+        menarche_data = model.menarche_data
+        pre_menarche_data = model.pre_menarche_data
+        is_awaiting_menarche = bool(menarche_data.get("tracking_active")) and not bool(menarche_data.get("is_menarche", False))
+
         self._attrs = {
             ATTR_HISTORY: model.history,
             ATTR_SYMPTOM_HISTORY: model.symptom_history,
@@ -217,6 +231,16 @@ class MenstruationGaugeSensor(SensorEntity):
             ATTR_PREGNANCY_START_DATE: model.pregnancy_start_date,
             ATTR_WEEKS_PREGNANT: model.weeks_pregnant,
             ATTR_DUE_DATE: model.due_date,
+            ATTR_PREGNANCY_DATA: {
+                "is_pregnant": model.is_pregnant,
+                "start_date": model.pregnancy_start_date,
+                "weeks_pregnant": model.weeks_pregnant,
+                "due_date": model.due_date,
+            },
+            ATTR_AWAITING_MENARCHE: is_awaiting_menarche,
+            ATTR_ESTIMATED_MENARCHE_DATE: menarche_data.get("estimated_date"),
+            ATTR_FAMILY_MENARCHE_AGE: menarche_data.get("family_menarche_age"),
+            ATTR_PRE_MENARCHE_DATA: pre_menarche_data,
             "profile": runtime.profile,
             "entry_id": self._entry.entry_id,
             "friendly_name": runtime.friendly_name,

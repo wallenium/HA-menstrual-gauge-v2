@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
 
-from .const import STATE_FERTILE, STATE_NEUTRAL, STATE_PERIOD, STATE_PMS, STATE_PREGNANT
+from .const import STATE_FERTILE, STATE_MENARCHE, STATE_NEUTRAL, STATE_PERIOD, STATE_PMS, STATE_PREGNANT, STATE_PRE_MENARCHE
 
 PREGNANCY_DAYS = 280  # Standard pregnancy duration in days (40 weeks)
 
@@ -31,6 +31,8 @@ class CycleModel:
     pregnancy_start_date: str | None
     weeks_pregnant: int | None
     due_date: str | None
+    menarche_data: dict[str, Any]
+    pre_menarche_data: dict[str, Any]
 
 
 def normalize_history(history: list[str]) -> list[str]:
@@ -172,6 +174,8 @@ def build_cycle_model(
     period_duration_days: int,
     symptom_history: list[dict[str, Any]] | None = None,
     pregnancy_data: dict[str, Any] | None = None,
+    menarche_data: dict[str, Any] | None = None,
+    pre_menarche_data: dict[str, Any] | None = None,
     today: date | None = None,
 ) -> CycleModel:
     """Build complete cycle model for sensor state + attributes."""
@@ -182,6 +186,14 @@ def build_cycle_model(
     preg_data = pregnancy_data or {"is_pregnant": False, "start_date": None}
     is_pregnant = bool(preg_data.get("is_pregnant", False))
     pregnancy_start_date = preg_data.get("start_date")
+
+    men_data: dict[str, Any] = {"tracking_active": False, "is_menarche": False, "menarche_date": None, "estimated_date": None, "family_menarche_age": None}
+    if isinstance(menarche_data, dict):
+        men_data.update(menarche_data)
+
+    pre_men_data: dict[str, Any] = {"signs": {}, "tanner_stage": None}
+    if isinstance(pre_menarche_data, dict):
+        pre_men_data.update(pre_menarche_data)
 
     # If pregnant, return pregnancy state
     if is_pregnant:
@@ -203,7 +215,63 @@ def build_cycle_model(
             pregnancy_start_date=pregnancy_start_date,
             weeks_pregnant=weeks,
             due_date=due_date,
+            menarche_data=men_data,
+            pre_menarche_data=pre_men_data,
         )
+
+    # If in pre-menarche mode (tracking explicitly enabled, no cycle history, awaiting first period)
+    if men_data.get("tracking_active") and men_data.get("is_menarche") is False and not normalized:
+        return CycleModel(
+            history=normalized,
+            grouped_starts=[],
+            bleeding_blocks=[],
+            next_predicted_start=men_data.get("estimated_date"),
+            avg_cycle_length=None,
+            fertile_window_start=None,
+            fertile_window_end=None,
+            days_until_next_start=None,
+            period_duration_days=period_duration_days,
+            learned_period_duration_days=None,
+            state=STATE_PRE_MENARCHE,
+            symptom_history=symptoms,
+            is_pregnant=False,
+            pregnancy_start_date=None,
+            weeks_pregnant=None,
+            due_date=None,
+            menarche_data=men_data,
+            pre_menarche_data=pre_men_data,
+        )
+
+    # If menarche has been recorded, check if we're in the menarche transition state
+    if men_data.get("is_menarche") is True and men_data.get("menarche_date"):
+        menarche_date_str = men_data["menarche_date"]
+        try:
+            menarche_date = date.fromisoformat(str(menarche_date_str))
+            days_since_menarche = (now - menarche_date).days
+            # Menarche state persists for first ~90 days (3 months) after first period
+            if days_since_menarche <= 90 and len(normalized) <= 3:
+                return CycleModel(
+                    history=normalized,
+                    grouped_starts=[],
+                    bleeding_blocks=[],
+                    next_predicted_start=None,
+                    avg_cycle_length=None,
+                    fertile_window_start=None,
+                    fertile_window_end=None,
+                    days_until_next_start=None,
+                    period_duration_days=period_duration_days,
+                    learned_period_duration_days=None,
+                    state=STATE_MENARCHE,
+                    symptom_history=symptoms,
+                    is_pregnant=False,
+                    pregnancy_start_date=None,
+                    weeks_pregnant=None,
+                    due_date=None,
+                    menarche_data=men_data,
+                    pre_menarche_data=pre_men_data,
+                )
+        except ValueError:
+            pass
 
     # Keep model based on confirmed values up to today, but keep full history as attribute.
     base_history = [item for item in normalized if item <= now.isoformat()] or normalized
@@ -258,4 +326,6 @@ def build_cycle_model(
         pregnancy_start_date=None,
         weeks_pregnant=None,
         due_date=None,
+        menarche_data=men_data,
+        pre_menarche_data=pre_men_data,
     )
