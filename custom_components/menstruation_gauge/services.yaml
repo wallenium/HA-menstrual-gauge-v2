@@ -250,6 +250,63 @@ log_product_usage:
       selector:
         text:
 
+manage_household_inventory:
+  name: Manage household inventory
+  description: Manage shared household stock for tampons, pads, cups, liners, and period underwear.
+  fields:
+    inventory_action:
+      required: true
+      example: "add"
+      selector:
+        select:
+          options:
+            - "set"
+            - "add"
+            - "consume"
+            - "set_thresholds"
+            - "reset"
+    product:
+      required: false
+      example: "tampon"
+      selector:
+        select:
+          options:
+            - "tampon"
+            - "pad"
+            - "cup"
+            - "liner"
+            - "underwear"
+    quantity:
+      required: false
+      example: 5
+      selector:
+        number:
+          min: 0
+          max: 5000
+          mode: box
+    warning_threshold:
+      required: false
+      example: 10
+      selector:
+        number:
+          min: 0
+          max: 5000
+          mode: box
+    critical_threshold:
+      required: false
+      example: 5
+      selector:
+        number:
+          min: 0
+          max: 5000
+          mode: box
+    member:
+      required: false
+      example: "Anna"
+      description: Name of the household member for manual consumption logs.
+      selector:
+        text:
+
 add_symptom:
   name: Add or update symptom data for a date
   description: Add or update symptom data for a specific date. Data is merged with existing entries.

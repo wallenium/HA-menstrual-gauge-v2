@@ -25,6 +25,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_time_change
+from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 from homeassistant.util import slugify
 
@@ -67,10 +68,15 @@ from .const import (
     SERVICE_FIELD_QUANTITY,
     SERVICE_FIELD_SYMPTOM_DATA,
     SERVICE_FIELD_TANNER_STAGE,
+    SERVICE_FIELD_WARNING_THRESHOLD,
     SERVICE_GET_MENARCHE_INFO,
     SERVICE_GET_SYMPTOM,
     SERVICE_LOG_PRODUCT_USAGE,
+    SERVICE_MANAGE_HOUSEHOLD_INVENTORY,
+    SERVICE_FIELD_CRITICAL_THRESHOLD,
     SERVICE_REFRESH_CYCLE_MODEL,
+    SERVICE_FIELD_INVENTORY_ACTION,
+    SERVICE_FIELD_MEMBER,
     SERVICE_REMOVE_CYCLE_START,
     SERVICE_REMOVE_PRE_MENARCHE_SIGN,
     SERVICE_REMOVE_SYMPTOM,
@@ -82,6 +88,7 @@ from .const import (
     SERVICE_UPDATE_PREGNANCY_DATE,
     SIGNAL_HISTORY_UPDATED,
     STORAGE_KEY,
+    STORAGE_VERSION,
     SYMPTOM_BASAL_TEMP,
     SYMPTOM_OPTIONS,
     TANNER_STAGE_1,
@@ -98,6 +105,7 @@ CARD_RESOURCE_URL = "/menstruation_gauge/menstruation-gauge-card.js"
 HEATMAP_RESOURCE_URL = "/menstruation_gauge/menstruation-cycle-heatmap-card.js"
 TIMER_RESOURCE_URL = "/menstruation_gauge/period-countdown-timer.js"
 PRODUCT_STATS_RESOURCE_URL = "/menstruation_gauge/menstrual-product-stats-card.js"
+PRODUCT_INVENTORY_RESOURCE_URL = "/menstruation_gauge/menstrual-product-inventory-card.js"
 COMPACT_CARD_RESOURCE_URL = "/menstruation_gauge/menstrual-cycle-card-compact.js"
 HISTORY_ROW_RESOURCE_URL = "/menstruation_gauge/menstrual-cycle-history-card-row.js"
 HISTORY_ANALOG_RESOURCE_URL = "/menstruation_gauge/menstrual-cycle-history-card-analog.js"
@@ -108,12 +116,18 @@ LOVELACE_RESOURCES = (
     (HEATMAP_RESOURCE_URL, "menstruation-cycle-heatmap-card.js"),
     (TIMER_RESOURCE_URL, "period-countdown-timer.js"),
     (PRODUCT_STATS_RESOURCE_URL, "menstrual-product-stats-card.js"),
+    (PRODUCT_INVENTORY_RESOURCE_URL, "menstrual-product-inventory-card.js"),
     (COMPACT_CARD_RESOURCE_URL, "menstrual-cycle-card-compact.js"),
     (HISTORY_ROW_RESOURCE_URL, "menstrual-cycle-history-card-row.js"),
     (HISTORY_ANALOG_RESOURCE_URL, "menstrual-cycle-history-card-analog.js"),
 )
 VALID_PRODUCT_USAGE_PRODUCTS = {"tampon", "pad", "cup", "underwear", "liner"}
 VALID_PRODUCT_USAGE_ACTIONS = {"used", "emptied"}
+HOUSEHOLD_INVENTORY_STATE_ENTITY_ID = "sensor.household_product_stock"
+HOUSEHOLD_INVENTORY_DATA_KEY = f"{DOMAIN}_household_inventory"
+HOUSEHOLD_INVENTORY_STORE_KEY = f"{STORAGE_KEY}.household_inventory"
+HOUSEHOLD_CONSUMPTION_LOG_LIMIT = 50
+HOUSEHOLD_PRODUCTS = ("tampon", "pad", "cup", "liner", "underwear")
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -137,6 +151,178 @@ class MenstruationRuntime:
 
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+
+def _default_household_inventory_data() -> dict[str, Any]:
+    inventory = {product: 0 for product in HOUSEHOLD_PRODUCTS}
+    thresholds = {product: {"warning": 10, "critical": 5} for product in HOUSEHOLD_PRODUCTS}
+    return {
+        "inventory": inventory,
+        "thresholds": thresholds,
+        "consumption_log": [],
+        "last_usage": None,
+    }
+
+
+def _normalize_household_inventory_data(data: Any) -> dict[str, Any]:
+    defaults = _default_household_inventory_data()
+    if not isinstance(data, dict):
+        return defaults
+
+    inventory_raw = data.get("inventory", {})
+    thresholds_raw = data.get("thresholds", {})
+    inventory: dict[str, int] = {}
+    thresholds: dict[str, dict[str, int]] = {}
+
+    for product in HOUSEHOLD_PRODUCTS:
+        try:
+            quantity = int(inventory_raw.get(product, defaults["inventory"][product])) if isinstance(inventory_raw, dict) else defaults["inventory"][product]
+        except (TypeError, ValueError):
+            quantity = defaults["inventory"][product]
+        inventory[product] = max(0, quantity)
+
+        product_thresholds = thresholds_raw.get(product, {}) if isinstance(thresholds_raw, dict) else {}
+        try:
+            warning = int(product_thresholds.get("warning", defaults["thresholds"][product]["warning"])) if isinstance(product_thresholds, dict) else defaults["thresholds"][product]["warning"]
+        except (TypeError, ValueError):
+            warning = defaults["thresholds"][product]["warning"]
+        try:
+            critical = int(product_thresholds.get("critical", defaults["thresholds"][product]["critical"])) if isinstance(product_thresholds, dict) else defaults["thresholds"][product]["critical"]
+        except (TypeError, ValueError):
+            critical = defaults["thresholds"][product]["critical"]
+        if warning < critical:
+            warning = critical
+        thresholds[product] = {"warning": max(0, warning), "critical": max(0, critical)}
+
+    normalized_log: list[dict[str, Any]] = []
+    for entry in data.get("consumption_log", []) if isinstance(data.get("consumption_log"), list) else []:
+        if not isinstance(entry, dict):
+            continue
+        product = str(entry.get("product", "")).strip().lower()
+        if product not in HOUSEHOLD_PRODUCTS:
+            continue
+        try:
+            quantity = max(1, int(entry.get("quantity", 1)))
+        except (TypeError, ValueError):
+            quantity = 1
+        timestamp = str(entry.get("timestamp", "")).strip()
+        if not timestamp:
+            continue
+        normalized_log.append(
+            {
+                "product": product,
+                "quantity": quantity,
+                "member": str(entry.get("member", "")).strip() or "unknown",
+                "timestamp": timestamp,
+                "source": str(entry.get("source", "")).strip() or "manual",
+            }
+        )
+
+    last_usage = data.get("last_usage")
+    if not isinstance(last_usage, dict):
+        last_usage = normalized_log[-1] if normalized_log else None
+
+    return {
+        "inventory": inventory,
+        "thresholds": thresholds,
+        "consumption_log": normalized_log[-HOUSEHOLD_CONSUMPTION_LOG_LIMIT:],
+        "last_usage": last_usage,
+    }
+
+
+def _household_members(hass: HomeAssistant) -> list[dict[str, str]]:
+    members: list[dict[str, str]] = []
+    for runtime in hass.data.get(DOMAIN, {}).values():
+        if not isinstance(runtime, MenstruationRuntime):
+            continue
+        members.append({"profile": runtime.profile, "name": runtime.friendly_name})
+    members.sort(key=lambda item: item["name"].lower())
+    return members
+
+
+async def _async_update_household_inventory_state(hass: HomeAssistant) -> None:
+    household_data = hass.data.get(HOUSEHOLD_INVENTORY_DATA_KEY)
+    if not isinstance(household_data, dict):
+        return
+
+    inventory = household_data.get("inventory", {})
+    thresholds = household_data.get("thresholds", {})
+    total_stock = sum(max(0, int(inventory.get(product, 0))) for product in HOUSEHOLD_PRODUCTS)
+
+    hass.states.async_set(
+        HOUSEHOLD_INVENTORY_STATE_ENTITY_ID,
+        total_stock,
+        {
+            "friendly_name": "Household Product Stock",
+            "inventory": {product: max(0, int(inventory.get(product, 0))) for product in HOUSEHOLD_PRODUCTS},
+            "thresholds": {
+                product: {
+                    "warning": max(0, int((thresholds.get(product) or {}).get("warning", 10))),
+                    "critical": max(0, int((thresholds.get(product) or {}).get("critical", 5))),
+                }
+                for product in HOUSEHOLD_PRODUCTS
+            },
+            "consumption_log": list(household_data.get("consumption_log", []))[-HOUSEHOLD_CONSUMPTION_LOG_LIMIT:],
+            "last_usage": household_data.get("last_usage"),
+            "household_members": _household_members(hass),
+        },
+    )
+
+
+async def _async_save_household_inventory(hass: HomeAssistant) -> None:
+    household_data = hass.data.get(HOUSEHOLD_INVENTORY_DATA_KEY)
+    if not isinstance(household_data, dict):
+        return
+
+    store = Store(hass, STORAGE_VERSION, HOUSEHOLD_INVENTORY_STORE_KEY)
+    await store.async_save(household_data)
+    await _async_update_household_inventory_state(hass)
+
+
+async def _async_ensure_household_inventory_loaded(hass: HomeAssistant) -> None:
+    if HOUSEHOLD_INVENTORY_DATA_KEY in hass.data:
+        await _async_update_household_inventory_state(hass)
+        return
+
+    store = Store(hass, STORAGE_VERSION, HOUSEHOLD_INVENTORY_STORE_KEY)
+    loaded = await store.async_load()
+    hass.data[HOUSEHOLD_INVENTORY_DATA_KEY] = _normalize_household_inventory_data(loaded)
+    await _async_update_household_inventory_state(hass)
+
+
+async def _async_register_consumption(
+    hass: HomeAssistant,
+    product: str,
+    quantity: int,
+    member: str,
+    *,
+    source: str,
+) -> None:
+    household_data = hass.data.get(HOUSEHOLD_INVENTORY_DATA_KEY)
+    if not isinstance(household_data, dict):
+        await _async_ensure_household_inventory_loaded(hass)
+        household_data = hass.data.get(HOUSEHOLD_INVENTORY_DATA_KEY)
+    if not isinstance(household_data, dict):
+        return
+
+    inventory = household_data.setdefault("inventory", {})
+    current = max(0, int(inventory.get(product, 0)))
+    inventory[product] = max(0, current - max(1, int(quantity)))
+
+    entry = {
+        "product": product,
+        "quantity": max(1, int(quantity)),
+        "member": member.strip() or "unknown",
+        "timestamp": dt_util.now().isoformat(),
+        "source": source,
+    }
+    household_data["last_usage"] = entry
+    log = household_data.setdefault("consumption_log", [])
+    if isinstance(log, list):
+        log.append(entry)
+        household_data["consumption_log"] = log[-HOUSEHOLD_CONSUMPTION_LOG_LIMIT:]
+
+    await _async_save_household_inventory(hass)
 
 
 def _profile_from_entry(entry: ConfigEntry) -> str:
@@ -289,6 +475,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up menstruation gauge profile from config entry."""
     hass.data.setdefault(DOMAIN, {})
+    await _async_ensure_household_inventory_loaded(hass)
 
     profile = _profile_from_entry(entry)
     friendly_name = _friendly_name_from_entry(entry)
@@ -324,6 +511,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     hass.data[DOMAIN][entry.entry_id] = runtime
+    await _async_update_household_inventory_state(hass)
 
     async def async_add(call: ServiceCall) -> None:
         await _async_handle_add(hass, call)
@@ -348,6 +536,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     async def async_log_product_usage(call: ServiceCall) -> None:
         await _async_handle_log_product_usage(hass, call)
+
+    async def async_manage_household_inventory(call: ServiceCall) -> None:
+        await _async_handle_manage_household_inventory(hass, call)
 
     async def async_add_symptom(call: ServiceCall) -> None:
         await _async_handle_add_symptom(hass, call)
@@ -474,6 +665,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             ),
         )
 
+    if not hass.services.has_service(DOMAIN, SERVICE_MANAGE_HOUSEHOLD_INVENTORY):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_MANAGE_HOUSEHOLD_INVENTORY,
+            async_manage_household_inventory,
+            schema=vol.Schema(
+                {
+                    **common_profile_field,
+                    vol.Required(SERVICE_FIELD_INVENTORY_ACTION): vol.In(["set", "add", "consume", "set_thresholds", "reset"]),
+                    vol.Optional(SERVICE_FIELD_PRODUCT): vol.In(HOUSEHOLD_PRODUCTS),
+                    vol.Optional(SERVICE_FIELD_QUANTITY, default=1): vol.All(vol.Coerce(int), vol.Range(min=0, max=5000)),
+                    vol.Optional(SERVICE_FIELD_WARNING_THRESHOLD): vol.All(vol.Coerce(int), vol.Range(min=0, max=5000)),
+                    vol.Optional(SERVICE_FIELD_CRITICAL_THRESHOLD): vol.All(vol.Coerce(int), vol.Range(min=0, max=5000)),
+                    vol.Optional(SERVICE_FIELD_MEMBER): cv.string,
+                }
+            ),
+        )
+
     if not hass.services.has_service(DOMAIN, SERVICE_ADD_SYMPTOM):
         hass.services.async_register(
             DOMAIN,
@@ -579,6 +788,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     runtime: MenstruationRuntime | None = hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
     if runtime and runtime.unregister_midnight_listener:
         runtime.unregister_midnight_listener()
+    await _async_update_household_inventory_state(hass)
 
     if not hass.data.get(DOMAIN):
         for service in (
@@ -590,6 +800,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_EXPORT_HISTORY,
             SERVICE_REFRESH_CYCLE_MODEL,
             SERVICE_LOG_PRODUCT_USAGE,
+            SERVICE_MANAGE_HOUSEHOLD_INVENTORY,
             SERVICE_ADD_SYMPTOM,
             SERVICE_REMOVE_SYMPTOM,
             SERVICE_GET_SYMPTOM,
@@ -712,7 +923,52 @@ async def _async_handle_log_product_usage(hass: HomeAssistant, call: ServiceCall
             "action": action,
         }
     )
+    if action == "used":
+        await _async_register_consumption(hass, product, max(1, quantity), runtime.friendly_name, source="log_product_usage")
     await _async_save_and_notify(hass, runtime)
+
+
+async def _async_handle_manage_household_inventory(hass: HomeAssistant, call: ServiceCall) -> None:
+    await _async_ensure_household_inventory_loaded(hass)
+    household_data = hass.data.get(HOUSEHOLD_INVENTORY_DATA_KEY)
+    if not isinstance(household_data, dict):
+        raise HomeAssistantError("Household inventory storage is unavailable.")
+
+    action = str(call.data.get(SERVICE_FIELD_INVENTORY_ACTION, "")).strip().lower()
+    product = str(call.data.get(SERVICE_FIELD_PRODUCT, "")).strip().lower()
+    quantity = int(call.data.get(SERVICE_FIELD_QUANTITY, 1))
+    member = str(call.data.get(SERVICE_FIELD_MEMBER, "")).strip() or "manual"
+
+    if action != "reset" and product not in HOUSEHOLD_PRODUCTS:
+        raise HomeAssistantError(f"Unsupported product '{product}'.")
+
+    if action == "set":
+        household_data["inventory"][product] = max(0, quantity)
+    elif action == "add":
+        current = max(0, int(household_data["inventory"].get(product, 0)))
+        household_data["inventory"][product] = current + max(0, quantity)
+    elif action == "consume":
+        await _async_register_consumption(hass, product, max(1, quantity), member, source="inventory_service")
+        return
+    elif action == "set_thresholds":
+        warning = call.data.get(SERVICE_FIELD_WARNING_THRESHOLD)
+        critical = call.data.get(SERVICE_FIELD_CRITICAL_THRESHOLD)
+        if warning is None and critical is None:
+            raise HomeAssistantError("Provide warning_threshold and/or critical_threshold.")
+        current_thresholds = household_data["thresholds"].setdefault(product, {"warning": 10, "critical": 5})
+        next_warning = current_thresholds.get("warning", 10) if warning is None else max(0, int(warning))
+        next_critical = current_thresholds.get("critical", 5) if critical is None else max(0, int(critical))
+        if next_warning < next_critical:
+            raise HomeAssistantError("warning_threshold must be greater than or equal to critical_threshold.")
+        household_data["thresholds"][product] = {"warning": next_warning, "critical": next_critical}
+    elif action == "reset":
+        hass.data[HOUSEHOLD_INVENTORY_DATA_KEY] = _default_household_inventory_data()
+    else:
+        raise HomeAssistantError(
+            "Unsupported inventory_action. Use one of: set, add, consume, set_thresholds, reset."
+        )
+
+    await _async_save_household_inventory(hass)
 
 
 async def _async_handle_add_symptom(hass: HomeAssistant, call: ServiceCall) -> None:
