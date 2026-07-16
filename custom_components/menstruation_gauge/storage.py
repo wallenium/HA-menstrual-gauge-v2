@@ -36,6 +36,7 @@ class MenstruationStorage:
                 "pregnancy_data": {"is_pregnant": False, "start_date": None},
                 "menarche_data": {"tracking_active": False, "is_menarche": False, "menarche_date": None, "estimated_date": None, "family_menarche_age": None},
                 "pre_menarche_data": {"signs": {}, "tanner_stage": None},
+                "product_inventory": {},
             }
 
         history = data.get("history", [])
@@ -79,6 +80,10 @@ class MenstruationStorage:
         pre_menarche_data.setdefault("signs", {})
         pre_menarche_data.setdefault("tanner_stage", None)
 
+        product_inventory = data.get("product_inventory", {})
+        if not isinstance(product_inventory, dict):
+            product_inventory = {}
+
         return {
             "history": normalized,
             "period_duration_days": days,
@@ -87,6 +92,7 @@ class MenstruationStorage:
             "pregnancy_data": pregnancy_data,
             "menarche_data": menarche_data,
             "pre_menarche_data": pre_menarche_data,
+            "product_inventory": product_inventory,
         }
 
     async def async_save(
@@ -98,6 +104,7 @@ class MenstruationStorage:
         pregnancy_data: dict[str, Any] | None = None,
         menarche_data: dict[str, Any] | None = None,
         pre_menarche_data: dict[str, Any] | None = None,
+        product_inventory: dict[str, Any] | None = None,
     ) -> None:
         """Save data to storage."""
         normalized = sorted({self._normalize_iso(raw) for raw in history if self._normalize_iso(raw)})
@@ -107,6 +114,7 @@ class MenstruationStorage:
         preg_data = pregnancy_data or {"is_pregnant": False, "start_date": None}
         men_data = menarche_data or {"tracking_active": False, "is_menarche": False, "menarche_date": None, "estimated_date": None, "family_menarche_age": None}
         pre_men_data = pre_menarche_data or {"signs": {}, "tanner_stage": None}
+        inv_data = product_inventory if isinstance(product_inventory, dict) else {}
 
         await self._store.async_save(
             {
@@ -117,6 +125,7 @@ class MenstruationStorage:
                 "pregnancy_data": preg_data,
                 "menarche_data": men_data,
                 "pre_menarche_data": pre_men_data,
+                "product_inventory": inv_data,
             }
         )
 
@@ -136,6 +145,7 @@ class MenstruationStorage:
             data.get("pregnancy_data"),
             data.get("menarche_data"),
             data.get("pre_menarche_data"),
+            data.get("product_inventory", {}),
         )
 
     async def async_load_pregnancy_data(self) -> dict[str, Any]:
@@ -154,6 +164,7 @@ class MenstruationStorage:
             pregnancy_data,
             data.get("menarche_data"),
             data.get("pre_menarche_data"),
+            data.get("product_inventory", {}),
         )
 
     async def async_load_menarche_data(self) -> dict[str, Any]:
@@ -172,6 +183,26 @@ class MenstruationStorage:
             data.get("pregnancy_data"),
             menarche_data,
             data.get("pre_menarche_data"),
+            data.get("product_inventory", {}),
+        )
+
+    async def async_load_product_inventory(self) -> dict[str, Any]:
+        """Load only the product inventory data."""
+        data = await self.async_load()
+        return data.get("product_inventory", {})
+
+    async def async_save_product_inventory(self, product_inventory: dict[str, Any]) -> None:
+        """Persist product inventory while preserving all other stored fields."""
+        data = await self.async_load()
+        await self.async_save(
+            data["history"],
+            data["period_duration_days"],
+            data.get("symptom_history", []),
+            data.get("product_usage", []),
+            data.get("pregnancy_data"),
+            data.get("menarche_data"),
+            data.get("pre_menarche_data"),
+            product_inventory,
         )
 
     @staticmethod

@@ -44,6 +44,7 @@ ATTR_DAYS_UNTIL_MENARCHE = "days_until_menarche"
 ATTR_AGE_AT_TRACKING = "age_at_tracking"
 ATTR_FAMILY_MENARCHE_AGE = "family_menarche_age"
 ATTR_PRE_MENARCHE_DATA = "pre_menarche_data"
+ATTR_PRODUCT_INVENTORY = "product_inventory"
 
 SERVICE_ADD_CYCLE_START = "add_cycle_start"
 SERVICE_REMOVE_CYCLE_START = "remove_cycle_start"
@@ -63,6 +64,7 @@ SERVICE_UPDATE_MENARCHE_DATE = "update_menarche_date"
 SERVICE_GET_MENARCHE_INFO = "get_menarche_info"
 SERVICE_ADD_PRE_MENARCHE_SIGN = "add_pre_menarche_sign"
 SERVICE_REMOVE_PRE_MENARCHE_SIGN = "remove_pre_menarche_sign"
+SERVICE_UPDATE_PRODUCT_INVENTORY = "update_product_inventory"
 
 SERVICE_FIELD_DATE = "date"
 SERVICE_FIELD_DATES = "dates"
@@ -83,6 +85,7 @@ SERVICE_FIELD_ESTIMATED_MENARCHE_DATE = "estimated_menarche_date"
 SERVICE_FIELD_FAMILY_MENARCHE_AGE = "family_menarche_age"
 SERVICE_FIELD_PRE_MENARCHE_SIGN = "pre_menarche_sign"
 SERVICE_FIELD_TANNER_STAGE = "tanner_stage"
+SERVICE_FIELD_INVENTORY_DATA = "inventory_data"
 
 SIGNAL_HISTORY_UPDATED = "menstruation_gauge_history_updated"
 

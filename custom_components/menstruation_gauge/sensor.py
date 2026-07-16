@@ -36,6 +36,7 @@ from .const import (
     ATTR_PRE_MENARCHE_DATA,
     ATTR_PREGNANCY_DATA,
     ATTR_PREGNANCY_START_DATE,
+    ATTR_PRODUCT_INVENTORY,
     ATTR_SYMPTOM_HISTORY,
     ATTR_WEEKS_PREGNANT,
     DOMAIN,
@@ -233,6 +234,7 @@ class MenstruationGaugeSensor(SensorEntity):
             "entry_id": self._entry.entry_id,
             "friendly_name": runtime.friendly_name,
             "product_usage_stats": usage_stats,
+            ATTR_PRODUCT_INVENTORY: runtime.product_inventory,
         }
 
     @property

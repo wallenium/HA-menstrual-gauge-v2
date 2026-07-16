@@ -59,6 +59,7 @@ from .const import (
     SERVICE_FIELD_FAMILY_MENARCHE_AGE,
     SERVICE_FIELD_FILENAME,
     SERVICE_FIELD_FORMAT,
+    SERVICE_FIELD_INVENTORY_DATA,
     SERVICE_FIELD_IS_PREGNANT,
     SERVICE_FIELD_PRODUCT,
     SERVICE_FIELD_PREGNANCY_START_DATE,
@@ -80,6 +81,7 @@ from .const import (
     SERVICE_SET_PREGNANCY_MODE,
     SERVICE_UPDATE_MENARCHE_DATE,
     SERVICE_UPDATE_PREGNANCY_DATE,
+    SERVICE_UPDATE_PRODUCT_INVENTORY,
     SIGNAL_HISTORY_UPDATED,
     STORAGE_KEY,
     SYMPTOM_BASAL_TEMP,
@@ -101,6 +103,7 @@ PRODUCT_STATS_RESOURCE_URL = "/menstruation_gauge/menstrual-product-stats-card.j
 COMPACT_CARD_RESOURCE_URL = "/menstruation_gauge/menstrual-cycle-card-compact.js"
 HISTORY_ROW_RESOURCE_URL = "/menstruation_gauge/menstrual-cycle-history-card-row.js"
 HISTORY_ANALOG_RESOURCE_URL = "/menstruation_gauge/menstrual-cycle-history-card-analog.js"
+INVENTORY_CARD_RESOURCE_URL = "/menstruation_gauge/menstrual-product-inventory-card.js"
 CARD_RESOURCE_TYPE = "module"
 EXPORT_DIR_NAME = "menstruation_gauge_exports"
 LOVELACE_RESOURCES = (
@@ -111,6 +114,7 @@ LOVELACE_RESOURCES = (
     (COMPACT_CARD_RESOURCE_URL, "menstrual-cycle-card-compact.js"),
     (HISTORY_ROW_RESOURCE_URL, "menstrual-cycle-history-card-row.js"),
     (HISTORY_ANALOG_RESOURCE_URL, "menstrual-cycle-history-card-analog.js"),
+    (INVENTORY_CARD_RESOURCE_URL, "menstrual-product-inventory-card.js"),
 )
 VALID_PRODUCT_USAGE_PRODUCTS = {"tampon", "pad", "cup", "underwear", "liner"}
 VALID_PRODUCT_USAGE_ACTIONS = {"used", "emptied"}
@@ -130,6 +134,7 @@ class MenstruationRuntime:
     period_duration_days: int
     symptom_history: list[dict[str, Any]]
     product_usage: list[dict[str, Any]]
+    product_inventory: dict[str, Any] = field(default_factory=dict)
     pregnancy_data: dict[str, Any] = field(default_factory=lambda: {"is_pregnant": False, "start_date": None})
     menarche_data: dict[str, Any] = field(default_factory=lambda: {"tracking_active": False, "is_menarche": False, "menarche_date": None, "estimated_date": None, "family_menarche_age": None})
     pre_menarche_data: dict[str, Any] = field(default_factory=lambda: {"signs": {}, "tanner_stage": None})
@@ -220,6 +225,7 @@ async def _async_save_and_notify(hass: HomeAssistant, runtime: MenstruationRunti
         runtime.pregnancy_data,
         runtime.menarche_data,
         runtime.pre_menarche_data,
+        runtime.product_inventory,
     )
     await _async_refresh_cycle_model(hass, {_entry_id_for_runtime(hass, runtime)})
 
@@ -310,6 +316,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         period_duration_days=stored.get(ATTR_PERIOD_DURATION_DAYS, DEFAULT_PERIOD_DURATION_DAYS),
         symptom_history=stored.get(ATTR_SYMPTOM_HISTORY, []),
         product_usage=stored.get(ATTR_PRODUCT_USAGE, []),
+        product_inventory=stored.get("product_inventory", {}),
         pregnancy_data=stored.get("pregnancy_data", {"is_pregnant": False, "start_date": None}),
         menarche_data=stored.get("menarche_data", {"tracking_active": False, "is_menarche": False, "menarche_date": None, "estimated_date": None, "family_menarche_age": None}),
         pre_menarche_data=stored.get("pre_menarche_data", {"signs": {}, "tanner_stage": None}),
@@ -566,6 +573,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             }),
         )
 
+    async def async_update_product_inventory(call: ServiceCall) -> None:
+        await _async_handle_update_product_inventory(hass, call)
+
+    if not hass.services.has_service(DOMAIN, SERVICE_UPDATE_PRODUCT_INVENTORY):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_UPDATE_PRODUCT_INVENTORY,
+            async_update_product_inventory,
+            schema=vol.Schema({
+                **common_profile_field,
+                vol.Required(SERVICE_FIELD_INVENTORY_DATA): dict,
+            }),
+        )
+
     await _async_register_card_static_path(hass)
     await _async_ensure_lovelace_resource(hass)
 
@@ -600,6 +621,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_GET_MENARCHE_INFO,
             SERVICE_ADD_PRE_MENARCHE_SIGN,
             SERVICE_REMOVE_PRE_MENARCHE_SIGN,
+            SERVICE_UPDATE_PRODUCT_INVENTORY,
         ):
             if hass.services.has_service(DOMAIN, service):
                 hass.services.async_remove(DOMAIN, service)
@@ -875,6 +897,32 @@ async def _async_handle_remove_pre_menarche_sign(hass: HomeAssistant, call: Serv
 
     if isinstance(runtime.pre_menarche_data.get("signs"), dict):
         runtime.pre_menarche_data["signs"].pop(sign, None)
+    await _async_save_and_notify(hass, runtime)
+
+
+VALID_INVENTORY_PRODUCTS = {"tampon", "pad", "cup", "liner", "underwear"}
+
+
+async def _async_handle_update_product_inventory(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Update product inventory quantities."""
+    runtime = _runtime_for_call(hass, call)
+    inventory_data = call.data.get(SERVICE_FIELD_INVENTORY_DATA, {})
+
+    if not isinstance(inventory_data, dict):
+        raise HomeAssistantError("inventory_data must be a dictionary.")
+
+    for product, quantity in inventory_data.items():
+        if product not in VALID_INVENTORY_PRODUCTS:
+            valid = ", ".join(sorted(VALID_INVENTORY_PRODUCTS))
+            raise HomeAssistantError(f"Unknown product '{product}'. Use one of: {valid}")
+        try:
+            qty = int(quantity)
+        except (TypeError, ValueError):
+            raise HomeAssistantError(f"Quantity for '{product}' must be an integer, got '{quantity}'.")
+        if qty < 0:
+            raise HomeAssistantError(f"Quantity for '{product}' must be >= 0, got {qty}.")
+        runtime.product_inventory[product] = qty
+
     await _async_save_and_notify(hass, runtime)
 
 

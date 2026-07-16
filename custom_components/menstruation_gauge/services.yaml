@@ -561,3 +561,36 @@ remove_pre_menarche_sign:
             - "acne"
             - "body_odor"
             - "vaginal_discharge"
+
+
+update_product_inventory:
+  name: Update product inventory
+  description: Set current stock quantities for menstrual products.
+  fields:
+    entity_id:
+      required: false
+      example: "sensor.anna"
+      selector:
+        entity:
+          domain: sensor
+    profile:
+      required: false
+      example: "anna"
+      selector:
+        text:
+    entry_id:
+      required: false
+      example: "a1b2c3d4e5f6..."
+      selector:
+        text:
+    inventory_data:
+      required: true
+      description: Dictionary mapping product names to stock quantities (non-negative integers). Products: tampon, pad, cup, liner, underwear.
+      example:
+        tampon: 20
+        pad: 10
+        cup: 1
+        liner: 15
+        underwear: 3
+      selector:
+        object:
