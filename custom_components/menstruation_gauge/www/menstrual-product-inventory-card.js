@@ -35,7 +35,7 @@ class MenstrualProductInventoryCard extends HTMLElement {
   }
 
   _lang() {
-    const language = String(this._hass?.locale?.language || this._hass?.language || "en").toLowerCase();
+    const language = String(this._hass?.locale?.language || "en").toLowerCase();
     return language.startsWith("de") ? "de" : "en";
   }
 
@@ -152,7 +152,7 @@ class MenstrualProductInventoryCard extends HTMLElement {
     if (!ts) return "";
     const date = new Date(ts);
     if (Number.isNaN(date.getTime())) return ts;
-    return new Intl.DateTimeFormat(this._hass?.locale?.language || this._hass?.language || "en", {
+    return new Intl.DateTimeFormat(this._hass?.locale?.language || "en", {
       year: "numeric",
       month: "short",
       day: "numeric",
