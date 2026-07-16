@@ -152,7 +152,7 @@ class MenstrualProductInventoryCard extends HTMLElement {
     if (!ts) return "";
     const date = new Date(ts);
     if (Number.isNaN(date.getTime())) return ts;
-    return new Intl.DateTimeFormat(this._hass?.language || "en", {
+    return new Intl.DateTimeFormat(this._hass?.locale?.language || this._hass?.language || "en", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -175,7 +175,7 @@ class MenstrualProductInventoryCard extends HTMLElement {
     const thresholds = attrs.thresholds || {};
     const members = Array.isArray(attrs.household_members) ? attrs.household_members : [];
     const memberNames = members.map((member) => member?.name).filter(Boolean);
-    const selectedMember = this._selectedMember ?? this.config.member || "";
+    const selectedMember = (this._selectedMember ?? this.config.member) || "";
     const lastUsage = attrs.last_usage;
     const recentLogs = Array.isArray(attrs.consumption_log) ? attrs.consumption_log.slice(-5).reverse() : [];
 
