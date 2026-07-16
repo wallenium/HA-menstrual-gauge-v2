@@ -49,6 +49,242 @@
           "description": "Optionales ISO-Datum für Nachträge. Standard ist heute."
         }
       }
+    },
+    "add_symptom": {
+      "name": "Symptom hinzufügen",
+      "description": "Symptom-Daten für ein bestimmtes Datum hinzufügen oder aktualisieren.",
+      "fields": {
+        "entity_id": {
+          "name": "Entität",
+          "description": "Ziel-Menstruationssensor."
+        },
+        "profile": {
+          "name": "Profil",
+          "description": "Konfigurierter Profil-Slug."
+        },
+        "entry_id": {
+          "name": "Entry-ID",
+          "description": "Kennung des Config-Entries."
+        },
+        "date": {
+          "name": "Datum",
+          "description": "Datum im Format YYYY-MM-DD."
+        },
+        "symptom_data": {
+          "name": "Symptom-Daten",
+          "description": "Wörterbuch mit Symptomfeldern (z. B. bleeding_strength, pain, basal_temp)."
+        }
+      }
+    },
+    "remove_symptom": {
+      "name": "Symptom entfernen",
+      "description": "Alle Symptom-Daten für ein bestimmtes Datum entfernen.",
+      "fields": {
+        "entity_id": {
+          "name": "Entität",
+          "description": "Ziel-Menstruationssensor."
+        },
+        "profile": {
+          "name": "Profil",
+          "description": "Konfigurierter Profil-Slug."
+        },
+        "entry_id": {
+          "name": "Entry-ID",
+          "description": "Kennung des Config-Entries."
+        },
+        "date": {
+          "name": "Datum",
+          "description": "Datum im Format YYYY-MM-DD."
+        }
+      }
+    },
+    "get_symptom": {
+      "name": "Symptom abrufen",
+      "description": "Symptom-Daten für ein bestimmtes Datum abrufen.",
+      "fields": {
+        "entity_id": {
+          "name": "Entität",
+          "description": "Ziel-Menstruationssensor."
+        },
+        "profile": {
+          "name": "Profil",
+          "description": "Konfigurierter Profil-Slug."
+        },
+        "entry_id": {
+          "name": "Entry-ID",
+          "description": "Kennung des Config-Entries."
+        },
+        "date": {
+          "name": "Datum",
+          "description": "Datum im Format YYYY-MM-DD."
+        }
+      }
+    },
+    "set_pregnancy_mode": {
+      "name": "Schwangerschaftsmodus setzen",
+      "description": "Schwangerschaftsmodus aktivieren oder deaktivieren.",
+      "fields": {
+        "entity_id": {
+          "name": "Entität",
+          "description": "Ziel-Menstruationssensor."
+        },
+        "profile": {
+          "name": "Profil",
+          "description": "Konfigurierter Profil-Slug."
+        },
+        "entry_id": {
+          "name": "Entry-ID",
+          "description": "Kennung des Config-Entries."
+        },
+        "is_pregnant": {
+          "name": "Schwanger",
+          "description": "Auf wahr setzen um Schwangerschaftsmodus zu aktivieren, falsch zum Deaktivieren."
+        },
+        "pregnancy_start_date": {
+          "name": "Erster Tag der letzten Periode",
+          "description": "Datum im Format YYYY-MM-DD. Standard ist der letzte bekannte Periodenstart."
+        }
+      }
+    },
+    "update_pregnancy_date": {
+      "name": "Schwangerschaftsdatum aktualisieren",
+      "description": "Den ersten Tag der letzten Menstruation für die Schwangerschaftsberechnung aktualisieren.",
+      "fields": {
+        "entity_id": {
+          "name": "Entität",
+          "description": "Ziel-Menstruationssensor."
+        },
+        "profile": {
+          "name": "Profil",
+          "description": "Konfigurierter Profil-Slug."
+        },
+        "entry_id": {
+          "name": "Entry-ID",
+          "description": "Kennung des Config-Entries."
+        },
+        "pregnancy_start_date": {
+          "name": "Erster Tag der letzten Periode",
+          "description": "Datum im Format YYYY-MM-DD."
+        }
+      }
+    },
+    "set_menarche_mode": {
+      "name": "Menarche-Modus setzen",
+      "description": "Prä-Menarche-Tracking aktivieren oder bestätigen, dass die Menarche eingetreten ist.",
+      "fields": {
+        "entity_id": {
+          "name": "Entität",
+          "description": "Ziel-Menstruationssensor."
+        },
+        "profile": {
+          "name": "Profil",
+          "description": "Konfigurierter Profil-Slug."
+        },
+        "entry_id": {
+          "name": "Entry-ID",
+          "description": "Kennung des Config-Entries."
+        },
+        "is_menarche": {
+          "name": "Menarche eingetreten",
+          "description": "Auf falsch setzen für Prä-Menarche-Tracking, wahr wenn Menarche stattgefunden hat."
+        },
+        "estimated_menarche_date": {
+          "name": "Geschätztes Menarche-Datum",
+          "description": "Voraussichtliches Datum der ersten Periode (YYYY-MM-DD)."
+        },
+        "family_menarche_age": {
+          "name": "Menarche-Alter in der Familie",
+          "description": "Alter der Menarche bei Mutter oder Schwester, zur Schätzung."
+        }
+      }
+    },
+    "update_menarche_date": {
+      "name": "Menarche-Datum aktualisieren",
+      "description": "Das tatsächliche Datum der ersten Periode (Menarche) erfassen.",
+      "fields": {
+        "entity_id": {
+          "name": "Entität",
+          "description": "Ziel-Menstruationssensor."
+        },
+        "profile": {
+          "name": "Profil",
+          "description": "Konfigurierter Profil-Slug."
+        },
+        "entry_id": {
+          "name": "Entry-ID",
+          "description": "Kennung des Config-Entries."
+        },
+        "date": {
+          "name": "Menarche-Datum",
+          "description": "Datum der ersten Periode im Format YYYY-MM-DD."
+        }
+      }
+    },
+    "get_menarche_info": {
+      "name": "Menarche-Informationen abrufen",
+      "description": "Menarche- und Prä-Menarche-Tracking-Daten für ein Profil abrufen.",
+      "fields": {
+        "entity_id": {
+          "name": "Entität",
+          "description": "Ziel-Menstruationssensor."
+        },
+        "profile": {
+          "name": "Profil",
+          "description": "Konfigurierter Profil-Slug."
+        },
+        "entry_id": {
+          "name": "Entry-ID",
+          "description": "Kennung des Config-Entries."
+        }
+      }
+    },
+    "add_pre_menarche_sign": {
+      "name": "Pubertätszeichen hinzufügen",
+      "description": "Ein körperliches Pubertätszeichen für das Prä-Menarche-Tracking erfassen oder aktualisieren.",
+      "fields": {
+        "entity_id": {
+          "name": "Entität",
+          "description": "Ziel-Menstruationssensor."
+        },
+        "profile": {
+          "name": "Profil",
+          "description": "Konfigurierter Profil-Slug."
+        },
+        "entry_id": {
+          "name": "Entry-ID",
+          "description": "Kennung des Config-Entries."
+        },
+        "pre_menarche_sign": {
+          "name": "Pubertätszeichen",
+          "description": "Das zu erfassende Körperzeichen (z. B. breast_development, pubic_hair_growth)."
+        },
+        "tanner_stage": {
+          "name": "Tanner-Stadium",
+          "description": "Aktuelles Stadium oder Level für das gewählte Zeichen."
+        }
+      }
+    },
+    "remove_pre_menarche_sign": {
+      "name": "Pubertätszeichen entfernen",
+      "description": "Ein erfasstes Pubertätszeichen aus dem Prä-Menarche-Tracking entfernen.",
+      "fields": {
+        "entity_id": {
+          "name": "Entität",
+          "description": "Ziel-Menstruationssensor."
+        },
+        "profile": {
+          "name": "Profil",
+          "description": "Konfigurierter Profil-Slug."
+        },
+        "entry_id": {
+          "name": "Entry-ID",
+          "description": "Kennung des Config-Entries."
+        },
+        "pre_menarche_sign": {
+          "name": "Pubertätszeichen",
+          "description": "Das zu entfernende Körperzeichen."
+        }
+      }
     }
   }
 }
