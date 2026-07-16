@@ -538,7 +538,6 @@ class PeriodCountdownTimer extends HTMLElement {
     const logUsageBtn = this.querySelector("#logUsageBtn");
     const logCupBtn = this.querySelector("#logCupBtn");
     const reminderCheckbox = this.querySelector("#reminderCheckbox");
-    const productSelect = this.querySelector("#productSelect");
 
     if (startBtn) startBtn.addEventListener("click", () => this.startTimer());
     if (pauseBtn) pauseBtn.addEventListener("click", () => this.pauseTimer());
@@ -552,13 +551,6 @@ class PeriodCountdownTimer extends HTMLElement {
       });
     }
 
-    if (productSelect) {
-      productSelect.addEventListener("change", (e) => {
-        if (e.target.value) {
-          this.selectProductFromDropdown(e.target.value);
-        }
-      });
-    }
   }
 
   attachReminderListener() {
@@ -622,6 +614,13 @@ class PeriodCountdownTimer extends HTMLElement {
         option.dataset.seconds = product.seconds;
         productSelect.appendChild(option);
       });
+      if (productSelect) {
+        productSelect.addEventListener("change", (e) => {
+          if (e.target.value) {
+            this.selectProductFromDropdown(e.target.value);
+          }
+        });
+      }
       this.updateDisplay();
       this.updateButtonStates();
       this.updateUsageButtons();
@@ -995,7 +994,7 @@ class PeriodCountdownTimer extends HTMLElement {
       },
     };
 
-    const lang = this._hass?.locale?.language || this._hass?.language || 'de';
+    const lang = this._hass?.locale?.language || 'de';
     return translations[lang]?.[key] || translations['en'][key];
   }
 
