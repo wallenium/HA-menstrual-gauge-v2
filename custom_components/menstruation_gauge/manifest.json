@@ -6,22 +6,22 @@
   "dependencies": ["lovelace"],
   "documentation": "https://github.com/nremey/HA-repo-test-menstrual-gauge/wiki",
   "frontend_extra_module_url": [
-    "/menstruation_gauge/menstruation-gauge-card.js?v=1.3.2",
-    "/menstruation_gauge/product-icons.js?v=1.3.2",
-    "/menstruation_gauge/menstruation-cycle-heatmap-card.js?v=1.3.2",
-    "/menstruation_gauge/period-countdown-timer.js?v=1.3.2",
-    "/menstruation_gauge/period-countdown-timer-editor.js?v=1.3.2",
-    "/menstruation_gauge/menstrual-product-stats-card.js?v=1.3.2",
-    "/menstruation_gauge/menstrual-product-inventory-card.js?v=1.3.2",
-    "/menstruation_gauge/menstrual-product-inventory-card-editor.js?v=1.3.2",
-    "/menstruation_gauge/menstruation-cycle-heatmap-card-editor.js?v=1.3.2",
-    "/menstruation_gauge/menstrual-cycle-history-card-row-editor.js?v=1.3.2",
-    "/menstruation_gauge/menstrual-cycle-card-compact.js?v=1.3.2",
-    "/menstruation_gauge/menstrual-cycle-compact-status-card.js?v=1.3.2",
-    "/menstruation_gauge/menstrual-cycle-history-card-row.js?v=1.3.2",
-    "/menstruation_gauge/menstrual-cycle-history-card-analog.js?v=1.3.2"
+    "/menstruation_gauge/menstruation-gauge-card.js?v=1.3.3",
+    "/menstruation_gauge/product-icons.js?v=1.3.3",
+    "/menstruation_gauge/menstruation-cycle-heatmap-card.js?v=1.3.3",
+    "/menstruation_gauge/period-countdown-timer.js?v=1.3.3",
+    "/menstruation_gauge/period-countdown-timer-editor.js?v=1.3.3",
+    "/menstruation_gauge/menstrual-product-stats-card.js?v=1.3.3",
+    "/menstruation_gauge/menstrual-product-inventory-card.js?v=1.3.3",
+    "/menstruation_gauge/menstrual-product-inventory-card-editor.js?v=1.3.3",
+    "/menstruation_gauge/menstruation-cycle-heatmap-card-editor.js?v=1.3.3",
+    "/menstruation_gauge/menstrual-cycle-history-card-row-editor.js?v=1.3.3",
+    "/menstruation_gauge/menstrual-cycle-card-compact.js?v=1.3.3",
+    "/menstruation_gauge/menstrual-cycle-compact-status-card.js?v=1.3.3",
+    "/menstruation_gauge/menstrual-cycle-history-card-row.js?v=1.3.3",
+    "/menstruation_gauge/menstrual-cycle-history-card-analog.js?v=1.3.3"
   ],
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/nremey/HA-repo-test-menstrual-gauge/issues",
-  "version": "1.3.2"
+  "version": "1.3.3"
 }
