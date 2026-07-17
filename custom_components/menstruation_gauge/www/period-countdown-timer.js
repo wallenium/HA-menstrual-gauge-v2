@@ -1,3 +1,85 @@
+class ProductFillAnimator {
+  constructor(svgElement, productKey, totalSeconds, mode) {
+    this.svg = svgElement;
+    this.productKey = productKey;
+    this.totalSeconds = totalSeconds;
+    this.mode = mode || "realistic";
+    this._startTime = null;
+    this._baseElapsed = 0;
+    this._rafId = null;
+    this._running = false;
+  }
+
+  start() {
+    this._startTime = Date.now();
+    this._running = true;
+    this._loop();
+  }
+
+  pause() {
+    if (this._running && this._startTime !== null) {
+      this._baseElapsed += (Date.now() - this._startTime) / 1000;
+    }
+    this._running = false;
+    if (this._rafId) {
+      cancelAnimationFrame(this._rafId);
+      this._rafId = null;
+    }
+  }
+
+  resume() {
+    if (!this._running) {
+      this._startTime = Date.now();
+      this._running = true;
+      this._loop();
+    }
+  }
+
+  reset() {
+    this._running = false;
+    if (this._rafId) {
+      cancelAnimationFrame(this._rafId);
+      this._rafId = null;
+    }
+    this._baseElapsed = 0;
+    this._startTime = null;
+    this._updateFill(0);
+  }
+
+  _loop() {
+    if (!this._running) return;
+    const elapsed = this._baseElapsed + (this._startTime !== null ? (Date.now() - this._startTime) / 1000 : 0);
+    const progress = Math.min(elapsed / this.totalSeconds, 1.0);
+    this._updateFill(progress);
+    if (progress < 1.0) {
+      this._rafId = requestAnimationFrame(() => this._loop());
+    } else {
+      this._running = false;
+    }
+  }
+
+  _updateFill(progress) {
+    if (!this.svg) return;
+    const color = this.mode === "avoid_blood" ? "#2563eb" : "#be123c";
+    const fill = this.svg.querySelector(".anim-fill");
+    if (!fill) return;
+
+    if (this.productKey === "cup") {
+      const maxH = 15;
+      const h = progress * maxH;
+      fill.setAttribute("y", String(18 - h));
+      fill.setAttribute("height", String(h));
+      fill.setAttribute("fill", color);
+    } else if (this.productKey === "tampon") {
+      fill.setAttribute("height", String(progress * 15));
+      fill.setAttribute("fill", color);
+    } else if (this.productKey === "pad") {
+      fill.setAttribute("r", String(progress * 4));
+      fill.setAttribute("fill", color);
+    }
+  }
+}
+
 class PeriodCountdownTimer extends HTMLElement {
   constructor() {
     super();
@@ -13,6 +95,7 @@ class PeriodCountdownTimer extends HTMLElement {
     };
     this.config = null;
     this._lastEntityState = null;
+    this._animator = null;
   }
 
   connectedCallback() {
@@ -617,6 +700,10 @@ class PeriodCountdownTimer extends HTMLElement {
       this.timerState.totalSeconds = 0;
       this.timerState.remainingSeconds = 0;
       this.pauseTimer();
+      if (this._animator) {
+        this._animator.reset();
+        this._animator = null;
+      }
       productSelect.value = "";
 
       while (productSelect.options.length > 1) {
@@ -681,7 +768,27 @@ class PeriodCountdownTimer extends HTMLElement {
       this.timerState.remainingSeconds = product.seconds;
 
       const timerIcon = this.querySelector("#timerIcon");
-      if (timerIcon) timerIcon.innerHTML = product.icon;
+      if (timerIcon) {
+        // Stop any existing animator
+        if (this._animator) {
+          this._animator.reset();
+          this._animator = null;
+        }
+        const animatable = ["cup", "tampon", "pad"];
+        if (this.config?.product_animations !== false && animatable.includes(key)) {
+          const mode = this.config?.animation_style || "realistic";
+          const animSvg = this._createAnimatedProductSVG(key, mode);
+          if (animSvg) {
+            timerIcon.innerHTML = '';
+            timerIcon.appendChild(animSvg);
+            this._animator = new ProductFillAnimator(animSvg, key, product.seconds, mode);
+          } else {
+            timerIcon.innerHTML = product.icon;
+          }
+        } else {
+          timerIcon.innerHTML = product.icon;
+        }
+      }
 
       this.updateDisplay();
       this.updateButtonStates();
@@ -706,6 +813,10 @@ class PeriodCountdownTimer extends HTMLElement {
         this.timerState.isRunning = true;
         this.updateButtonStates();
 
+        if (this._animator) {
+          this._animator.resume();
+        }
+
         this.timerState.intervalId = setInterval(() => {
           this.timerState.remainingSeconds--;
 
@@ -725,6 +836,9 @@ class PeriodCountdownTimer extends HTMLElement {
     try {
       this.timerState.isRunning = false;
       clearInterval(this.timerState.intervalId);
+      if (this._animator) {
+        this._animator.pause();
+      }
       this.updateButtonStates();
       this.updateDisplay();
     } catch (error) {
@@ -738,6 +852,9 @@ class PeriodCountdownTimer extends HTMLElement {
       this.timerState.remainingSeconds = 0;
       clearInterval(this.timerState.intervalId);
       this.timerState.intervalId = null;
+      if (this._animator) {
+        this._animator.reset();
+      }
       this.updateButtonStates();
       this.updateDisplay();
     } catch (error) {
@@ -777,6 +894,9 @@ class PeriodCountdownTimer extends HTMLElement {
       this.timerState.intervalId = null;
       this.timerState.isRunning = false;
       this.timerState.remainingSeconds = this.timerState.totalSeconds;
+      if (this._animator) {
+        this._animator.reset();
+      }
       this.updateDisplay();
       this.updateButtonStates();
       this.updateUsageButtons();
@@ -948,6 +1068,165 @@ class PeriodCountdownTimer extends HTMLElement {
       underwear: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 6L3 10C3 14 6 17 12 17C18 17 21 14 21 10L21 6"/><path d="M3 6L9 6C9 6 10 11 12 11C14 11 15 6 15 6L21 6"/></svg>`,
     };
     return icons[product] || '';
+  }
+
+  _createAnimatedProductSVG(productKey, mode) {
+    if (productKey === "cup") return this._createAnimatedCupSVG(mode);
+    if (productKey === "tampon") return this._createAnimatedTamponSVG(mode);
+    if (productKey === "pad") return this._createAnimatedPadSVG(mode);
+    return null;
+  }
+
+  _createAnimatedCupSVG(mode) {
+    const color = mode === "avoid_blood" ? "#2563eb" : "#be123c";
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("width", "48");
+    svg.setAttribute("height", "48");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("focusable", "false");
+
+    // Animated fill rect – starts empty (height 0) at the bottom of the cup body
+    const fillRect = document.createElementNS(ns, "rect");
+    fillRect.setAttribute("class", "anim-fill");
+    fillRect.setAttribute("x", "8");
+    fillRect.setAttribute("y", "18");
+    fillRect.setAttribute("width", "8");
+    fillRect.setAttribute("height", "0");
+    fillRect.setAttribute("fill", color);
+    fillRect.setAttribute("opacity", "0.8");
+    svg.appendChild(fillRect);
+
+    // Cup outline drawn on top so it masks any fill overflow
+    const cupPath = document.createElementNS(ns, "path");
+    cupPath.setAttribute("d", "M8 3L8 14C8 17.3 9.8 19 12 19C14.2 19 16 17.3 16 14L16 3");
+    cupPath.setAttribute("stroke", "currentColor");
+    cupPath.setAttribute("stroke-width", "1.8");
+    cupPath.setAttribute("stroke-linecap", "round");
+    cupPath.setAttribute("stroke-linejoin", "round");
+    svg.appendChild(cupPath);
+
+    const topLine = document.createElementNS(ns, "line");
+    topLine.setAttribute("x1", "8"); topLine.setAttribute("y1", "3");
+    topLine.setAttribute("x2", "16"); topLine.setAttribute("y2", "3");
+    topLine.setAttribute("stroke", "currentColor");
+    topLine.setAttribute("stroke-width", "1.8");
+    topLine.setAttribute("stroke-linecap", "round");
+    svg.appendChild(topLine);
+
+    const stemLine = document.createElementNS(ns, "line");
+    stemLine.setAttribute("x1", "12"); stemLine.setAttribute("y1", "19");
+    stemLine.setAttribute("x2", "12"); stemLine.setAttribute("y2", "22");
+    stemLine.setAttribute("stroke", "currentColor");
+    stemLine.setAttribute("stroke-width", "1.8");
+    stemLine.setAttribute("stroke-linecap", "round");
+    svg.appendChild(stemLine);
+
+    return svg;
+  }
+
+  _createAnimatedTamponSVG(mode) {
+    const color = mode === "avoid_blood" ? "#2563eb" : "#be123c";
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("width", "48");
+    svg.setAttribute("height", "48");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("focusable", "false");
+
+    // Animated fill rect – grows downward from the tip
+    const fillRect = document.createElementNS(ns, "rect");
+    fillRect.setAttribute("class", "anim-fill");
+    fillRect.setAttribute("x", "9");
+    fillRect.setAttribute("y", "2");
+    fillRect.setAttribute("width", "6");
+    fillRect.setAttribute("height", "0");
+    fillRect.setAttribute("rx", "3");
+    fillRect.setAttribute("fill", color);
+    fillRect.setAttribute("opacity", "0.8");
+    svg.appendChild(fillRect);
+
+    // Tampon body outline drawn on top
+    const bodyRect = document.createElementNS(ns, "rect");
+    bodyRect.setAttribute("x", "9");
+    bodyRect.setAttribute("y", "2");
+    bodyRect.setAttribute("width", "6");
+    bodyRect.setAttribute("height", "15");
+    bodyRect.setAttribute("rx", "3");
+    bodyRect.setAttribute("stroke", "currentColor");
+    bodyRect.setAttribute("stroke-width", "1.8");
+    bodyRect.setAttribute("stroke-linecap", "round");
+    bodyRect.setAttribute("stroke-linejoin", "round");
+    svg.appendChild(bodyRect);
+
+    // Cord
+    const cordLine = document.createElementNS(ns, "line");
+    cordLine.setAttribute("x1", "12"); cordLine.setAttribute("y1", "17");
+    cordLine.setAttribute("x2", "12"); cordLine.setAttribute("y2", "22");
+    cordLine.setAttribute("stroke", "currentColor");
+    cordLine.setAttribute("stroke-width", "1.8");
+    cordLine.setAttribute("stroke-linecap", "round");
+    svg.appendChild(cordLine);
+
+    return svg;
+  }
+
+  _createAnimatedPadSVG(mode) {
+    const color = mode === "avoid_blood" ? "#2563eb" : "#be123c";
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("width", "48");
+    svg.setAttribute("height", "48");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("focusable", "false");
+
+    // Animated fill circle – expands radially from the pad center
+    const fillCircle = document.createElementNS(ns, "circle");
+    fillCircle.setAttribute("class", "anim-fill");
+    fillCircle.setAttribute("cx", "12");
+    fillCircle.setAttribute("cy", "12");
+    fillCircle.setAttribute("r", "0");
+    fillCircle.setAttribute("fill", color);
+    fillCircle.setAttribute("opacity", "0.8");
+    svg.appendChild(fillCircle);
+
+    // Pad body outline drawn on top
+    const bodyRect = document.createElementNS(ns, "rect");
+    bodyRect.setAttribute("x", "8");
+    bodyRect.setAttribute("y", "4");
+    bodyRect.setAttribute("width", "8");
+    bodyRect.setAttribute("height", "16");
+    bodyRect.setAttribute("rx", "4");
+    bodyRect.setAttribute("stroke", "currentColor");
+    bodyRect.setAttribute("stroke-width", "1.8");
+    bodyRect.setAttribute("stroke-linecap", "round");
+    bodyRect.setAttribute("stroke-linejoin", "round");
+    svg.appendChild(bodyRect);
+
+    // Wing paths drawn on top
+    const leftWing = document.createElementNS(ns, "path");
+    leftWing.setAttribute("d", "M8 8C5 8 4 11 4 12C4 13 5 16 8 16");
+    leftWing.setAttribute("stroke", "currentColor");
+    leftWing.setAttribute("stroke-width", "1.8");
+    leftWing.setAttribute("stroke-linecap", "round");
+    leftWing.setAttribute("stroke-linejoin", "round");
+    svg.appendChild(leftWing);
+
+    const rightWing = document.createElementNS(ns, "path");
+    rightWing.setAttribute("d", "M16 8C19 8 20 11 20 12C20 13 19 16 16 16");
+    rightWing.setAttribute("stroke", "currentColor");
+    rightWing.setAttribute("stroke-width", "1.8");
+    rightWing.setAttribute("stroke-linecap", "round");
+    rightWing.setAttribute("stroke-linejoin", "round");
+    svg.appendChild(rightWing);
+
+    return svg;
   }
 
   _t(key) {
@@ -1695,6 +1974,8 @@ class PeriodCountdownTimer extends HTMLElement {
     return {
       type: "custom:period-countdown-timer",
       entity: "sensor.anna",
+      product_animations: true,
+      animation_style: "realistic",
       tampon_duration: 4,
       pad_duration: 4,
       cup_duration: 7,
