@@ -139,21 +139,6 @@ def _build_product_usage_stats(
 
     this_cycle = _count_products_for_block(grouped_usage, blocks[-1]) if blocks else _empty_product_counts()
 
-    timeline_entries: list[dict[str, Any]] = []
-    for entry in reversed(product_usage):
-        date_str = entry.get("date")
-        if not isinstance(date_str, str):
-            continue
-        try:
-            entry_date = date.fromisoformat(date_str)
-        except ValueError:
-            continue
-        if entry_date > today:
-            continue
-        if (today - entry_date) >= timedelta(days=PRODUCT_USAGE_TIMELINE_DAYS):
-            continue
-        timeline_entries.append(entry)
-
     return {
         "today": today_counts,
         "this_cycle": this_cycle,
@@ -161,7 +146,6 @@ def _build_product_usage_stats(
             "average_per_cycle": average_per_cycle,
             "cycles_considered": cycles_considered,
         },
-        "timeline": timeline_entries,
     }
 
 
@@ -366,6 +350,24 @@ def _compact_symptom_history(symptom_history: list[dict[str, Any]]) -> list[dict
     return symptom_history[-SYMPTOM_SENSOR_HISTORY_LIMIT:]
 
 
+def _compact_product_usage_for_sensor(
+    product_usage: list[dict[str, Any]],
+    today: date,
+    days: int = PRODUCT_USAGE_TIMELINE_DAYS,
+) -> list[dict[str, Any]]:
+    """Limit product usage to a recent window for sensor broadcasting."""
+    if not product_usage:
+        return product_usage
+    cutoff = today - timedelta(days=days)
+    compact_entries: list[dict[str, Any]] = []
+    for entry in product_usage:
+        entry_date = _parse_iso_date(entry.get("date"))
+        if entry_date is None or entry_date > today or entry_date < cutoff:
+            continue
+        compact_entries.append(entry)
+    return compact_entries
+
+
 def _compact_history_for_sensor(history: list[str], today: date, months: int = CYCLE_HISTORY_LIMIT_MONTHS) -> list[str]:
     """Limit history to recent months for sensor broadcasting."""
     if not history:
@@ -552,6 +554,7 @@ class MenstruationGaugeSensor(SensorEntity):
 
         symptom_statistics = _build_symptom_statistics(model.history, model.symptom_history, today)
         compact_symptom_history = _compact_symptom_history(model.symptom_history)
+        compact_product_usage = _compact_product_usage_for_sensor(runtime.product_usage, today)
 
         # Cycle start / day in current cycle
         cycle_start_date: str | None = model.grouped_starts[-1] if model.grouped_starts else None
@@ -605,7 +608,7 @@ class MenstruationGaugeSensor(SensorEntity):
             "product_usage_today": usage_stats["today"],
             "product_usage_this_cycle": usage_stats["this_cycle"],
             "product_usage_stats": usage_stats["stats"],
-            "product_usage_timeline": usage_stats["timeline"],
+            "product_usage_timeline": compact_product_usage,
             "symptom_data_today": symptom_data_today,
             "symptom_data_this_cycle": symptom_data_this_cycle,
             "symptom_statistics": symptom_statistics,
