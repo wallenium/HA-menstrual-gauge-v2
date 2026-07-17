@@ -1002,10 +1002,19 @@ class PeriodCountdownTimer extends HTMLElement {
     return `
       :host {
         display: block;
+        --mg-card-bg: var(--ha-card-background, var(--card-background-color, #fff));
+        --mg-border: var(--divider-color, rgba(127, 127, 127, 0.35));
+        --mg-status-error: var(--error-color, #e74c3c);
+        --mg-status-warning: var(--warning-color, #f39c12);
+        --mg-status-success: var(--success-color, #27ae60);
+        --mg-status-info: var(--state-icon-color, #2980b9);
+        --mg-status-accent: var(--primary-color, #8e44ad);
       }
 
       ha-card {
         height: 100%;
+        background: var(--mg-card-bg);
+        border: 1px solid var(--mg-border);
       }
 
       .card-header {
@@ -1040,7 +1049,7 @@ class PeriodCountdownTimer extends HTMLElement {
       .status {
         font-weight: 600;
         padding: 2px 8px;
-        background: #e74c3c;
+        background: var(--mg-status-error);
         color: white;
         border-radius: 4px;
         font-size: 0.75rem;
@@ -1068,8 +1077,8 @@ class PeriodCountdownTimer extends HTMLElement {
         gap: 16px;
         padding: 40px 20px;
         text-align: center;
-        background: linear-gradient(135deg, #27ae6020 0%, #27ae6010 100%);
-        border: 2px solid #27ae60;
+        background: linear-gradient(135deg, color-mix(in srgb, var(--mg-status-success) 18%, transparent) 0%, color-mix(in srgb, var(--mg-status-success) 9%, transparent) 100%);
+        border: 2px solid var(--mg-status-success);
         border-radius: 12px;
       }
 
@@ -1109,24 +1118,24 @@ class PeriodCountdownTimer extends HTMLElement {
         align-items: center;
         gap: 12px;
         padding: 16px;
-        background: linear-gradient(135deg, #9b59b630 0%, #9b59b615 100%);
-        border: 2px solid #9b59b6;
+        background: linear-gradient(135deg, color-mix(in srgb, var(--mg-status-accent) 20%, transparent) 0%, color-mix(in srgb, var(--mg-status-accent) 10%, transparent) 100%);
+        border: 2px solid var(--mg-status-accent);
         border-radius: 12px;
       }
 
       .pregnancy-badge {
-        border-color: #3498db;
-        background: linear-gradient(135deg, #3498db30 0%, #3498db15 100%);
+        border-color: var(--mg-status-info);
+        background: linear-gradient(135deg, color-mix(in srgb, var(--mg-status-info) 20%, transparent) 0%, color-mix(in srgb, var(--mg-status-info) 10%, transparent) 100%);
       }
 
       .postpartum-badge {
-        border-color: #1abc9c;
-        background: linear-gradient(135deg, #1abc9c30 0%, #1abc9c15 100%);
+        border-color: var(--mg-status-success);
+        background: linear-gradient(135deg, color-mix(in srgb, var(--mg-status-success) 20%, transparent) 0%, color-mix(in srgb, var(--mg-status-success) 10%, transparent) 100%);
       }
 
       .menopause-badge {
-        border-color: #34495e;
-        background: linear-gradient(135deg, #34495e30 0%, #34495e15 100%);
+        border-color: var(--mg-border);
+        background: linear-gradient(135deg, color-mix(in srgb, var(--secondary-text-color, #34495e) 20%, transparent) 0%, color-mix(in srgb, var(--secondary-text-color, #34495e) 10%, transparent) 100%);
       }
 
       .badge-emoji {
@@ -1198,8 +1207,8 @@ class PeriodCountdownTimer extends HTMLElement {
         align-items: center;
         gap: 6px;
         padding: 12px;
-        background: var(--ha-card-background);
-        border: 1px solid var(--divider-color);
+        background: var(--mg-card-bg);
+        border: 1px solid var(--mg-border);
         border-radius: 8px;
         text-align: center;
         font-size: 0.8rem;
@@ -1211,8 +1220,8 @@ class PeriodCountdownTimer extends HTMLElement {
       .symptom-btn:hover,
       .mood-option:hover,
       .bleeding-option:hover {
-        border-color: #9b59b6;
-        background: #9b59b610;
+        border-color: var(--mg-status-accent);
+        background: color-mix(in srgb, var(--mg-status-accent) 10%, transparent);
       }
 
       .tip-emoji {
@@ -1263,7 +1272,7 @@ class PeriodCountdownTimer extends HTMLElement {
       .recovery-check {
         font-size: 1.2rem;
         font-weight: 700;
-        color: #27ae60;
+        color: var(--mg-status-success);
         min-width: 24px;
       }
 
@@ -1353,9 +1362,9 @@ class PeriodCountdownTimer extends HTMLElement {
         padding: 12px 16px;
         font-size: 1rem;
         font-weight: 600;
-        border: 2px solid var(--divider-color);
+        border: 2px solid var(--mg-border);
         border-radius: 8px;
-        background: var(--ha-card-background);
+        background: var(--mg-card-bg);
         color: var(--primary-text-color);
         cursor: pointer;
         transition: all 0.2s ease;
@@ -1368,13 +1377,13 @@ class PeriodCountdownTimer extends HTMLElement {
       }
 
       .product-select:hover {
-        border-color: #e74c3c;
+        border-color: var(--mg-status-error);
       }
 
       .product-select:focus {
         outline: none;
-        border-color: #e74c3c;
-        box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.1);
+        border-color: var(--mg-status-error);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--mg-status-error) 18%, transparent);
       }
 
       .timer-container {
@@ -1389,41 +1398,41 @@ class PeriodCountdownTimer extends HTMLElement {
         justify-content: center;
         gap: 16px;
         padding: 24px;
-        background: linear-gradient(135deg, #e74c3c20 0%, #e74c3c10 100%);
-        border: 2px solid #e74c3c;
+        background: linear-gradient(135deg, color-mix(in srgb, var(--mg-status-error) 14%, transparent) 0%, color-mix(in srgb, var(--mg-status-error) 8%, transparent) 100%);
+        border: 2px solid var(--mg-status-error);
         border-radius: 12px;
         transition: all 0.3s ease;
       }
 
       .timer-display.warning {
-        border-color: #f39c12;
-        background: linear-gradient(135deg, #f39c1220 0%, #f39c1210 100%);
+        border-color: var(--mg-status-warning);
+        background: linear-gradient(135deg, color-mix(in srgb, var(--mg-status-warning) 14%, transparent) 0%, color-mix(in srgb, var(--mg-status-warning) 8%, transparent) 100%);
       }
 
       .timer-display.critical {
-        border-color: #e74c3c;
-        background: linear-gradient(135deg, #e74c3c30 0%, #e74c3c20 100%);
+        border-color: var(--mg-status-error);
+        background: linear-gradient(135deg, color-mix(in srgb, var(--mg-status-error) 24%, transparent) 0%, color-mix(in srgb, var(--mg-status-error) 14%, transparent) 100%);
         animation: pulse-border 1s infinite;
       }
 
       @keyframes pulse-border {
-        0%, 100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.3); }
-        50% { box-shadow: 0 0 0 8px rgba(231, 76, 60, 0); }
+        0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--mg-status-error) 34%, transparent); }
+        50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--mg-status-error) 0%, transparent); }
       }
 
       .timer-display.timer-complete {
         animation: complete-pulse 0.5s ease-in-out 3;
-        background: #e74c3c;
+        background: var(--mg-status-error);
       }
 
       .timer-display.logged-success {
-        border-color: #27ae60;
-        background: linear-gradient(135deg, #27ae6020 0%, #27ae6010 100%);
+        border-color: var(--mg-status-success);
+        background: linear-gradient(135deg, color-mix(in srgb, var(--mg-status-success) 14%, transparent) 0%, color-mix(in srgb, var(--mg-status-success) 8%, transparent) 100%);
       }
 
       .timer-display.logged-error {
-        border-color: #c0392b;
-        background: linear-gradient(135deg, #c0392b20 0%, #c0392b10 100%);
+        border-color: var(--mg-status-error);
+        background: linear-gradient(135deg, color-mix(in srgb, var(--mg-status-error) 14%, transparent) 0%, color-mix(in srgb, var(--mg-status-error) 8%, transparent) 100%);
       }
 
       @keyframes complete-pulse {
@@ -1477,15 +1486,15 @@ class PeriodCountdownTimer extends HTMLElement {
       }
 
       .usage-feedback.success {
-        color: #1f7a45;
-        background: rgba(39, 174, 96, 0.12);
-        border-color: rgba(39, 174, 96, 0.3);
+        color: var(--mg-status-success);
+        background: color-mix(in srgb, var(--mg-status-success) 14%, transparent);
+        border-color: color-mix(in srgb, var(--mg-status-success) 36%, transparent);
       }
 
       .usage-feedback.error {
-        color: #a83232;
-        background: rgba(192, 57, 43, 0.12);
-        border-color: rgba(192, 57, 43, 0.3);
+        color: var(--mg-status-error);
+        background: color-mix(in srgb, var(--mg-status-error) 14%, transparent);
+        border-color: color-mix(in srgb, var(--mg-status-error) 36%, transparent);
       }
 
       .btn {
@@ -1501,23 +1510,23 @@ class PeriodCountdownTimer extends HTMLElement {
       }
 
       .btn-start {
-        background: #27ae60;
+        background: var(--mg-status-success);
       }
 
       .btn-start:hover:not(:disabled) {
-        background: #229954;
+        background: color-mix(in srgb, var(--mg-status-success) 85%, #000);
         transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(39, 174, 96, 0.3);
+        box-shadow: 0 4px 8px color-mix(in srgb, var(--mg-status-success) 30%, transparent);
       }
 
       .btn-pause {
-        background: #f39c12;
+        background: var(--mg-status-warning);
       }
 
       .btn-pause:hover:not(:disabled) {
-        background: #e67e22;
+        background: color-mix(in srgb, var(--mg-status-warning) 85%, #000);
         transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(243, 156, 18, 0.3);
+        box-shadow: 0 4px 8px color-mix(in srgb, var(--mg-status-warning) 30%, transparent);
       }
 
       .btn-reset {
@@ -1525,23 +1534,23 @@ class PeriodCountdownTimer extends HTMLElement {
       }
 
       .btn-usage {
-        background: #2980b9;
+        background: var(--mg-status-info);
       }
 
       .btn-usage:hover:not(:disabled) {
-        background: #2471a3;
+        background: color-mix(in srgb, var(--mg-status-info) 85%, #000);
         transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(41, 128, 185, 0.3);
+        box-shadow: 0 4px 8px color-mix(in srgb, var(--mg-status-info) 30%, transparent);
       }
 
       .btn-cup {
-        background: #8e44ad;
+        background: var(--mg-status-accent);
       }
 
       .btn-cup:hover:not(:disabled) {
-        background: #7d3c98;
+        background: color-mix(in srgb, var(--mg-status-accent) 85%, #000);
         transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(142, 68, 173, 0.3);
+        box-shadow: 0 4px 8px color-mix(in srgb, var(--mg-status-accent) 30%, transparent);
       }
 
       .btn-reset:hover:not(:disabled) {
@@ -1556,9 +1565,9 @@ class PeriodCountdownTimer extends HTMLElement {
       }
 
       @media (prefers-color-scheme: dark) {
-        .timer-display { background: linear-gradient(135deg, #e74c3c30 0%, #e74c3c15 100%); }
-        .timer-display.warning { background: linear-gradient(135deg, #f39c1230 0%, #f39c1215 100%); }
-        .timer-display.critical { background: linear-gradient(135deg, #e74c3c40 0%, #e74c3c25 100%); }
+        .timer-display { background: linear-gradient(135deg, color-mix(in srgb, var(--mg-status-error) 24%, transparent) 0%, color-mix(in srgb, var(--mg-status-error) 12%, transparent) 100%); }
+        .timer-display.warning { background: linear-gradient(135deg, color-mix(in srgb, var(--mg-status-warning) 24%, transparent) 0%, color-mix(in srgb, var(--mg-status-warning) 12%, transparent) 100%); }
+        .timer-display.critical { background: linear-gradient(135deg, color-mix(in srgb, var(--mg-status-error) 34%, transparent) 0%, color-mix(in srgb, var(--mg-status-error) 18%, transparent) 100%); }
       }
 
       @media (max-width: 600px) {

@@ -154,10 +154,10 @@ class MenstrualCycleHistoryCardAnalog extends HTMLElement {
     return `<svg width="320" height="320" viewBox="0 0 320 320" class="cycle-analog">
       <defs>
         <style>
-          .segment { fill: rgba(100, 100, 100, 0.1); stroke: var(--divider-color); stroke-width: 0.5; }
-          .segment.period { fill: rgba(231, 76, 60, 0.6); }
-          .segment.fertile { fill: rgba(250, 204, 21, 0.5); }
-          .segment.ovulation { fill: rgba(39, 174, 96, 0.7); filter: drop-shadow(0 0 2px rgba(39, 174, 96, 0.8)); }
+          .segment { fill: color-mix(in srgb, var(--secondary-text-color, #6b7280) 14%, transparent); stroke: var(--divider-color, rgba(127, 127, 127, 0.35)); stroke-width: 0.5; }
+          .segment.period { fill: color-mix(in srgb, var(--error-color, #e74c3c) 62%, transparent); }
+          .segment.fertile { fill: color-mix(in srgb, var(--warning-color, #f39c12) 52%, transparent); }
+          .segment.ovulation { fill: color-mix(in srgb, var(--success-color, #27ae60) 72%, transparent); filter: drop-shadow(0 0 2px color-mix(in srgb, var(--success-color, #27ae60) 80%, transparent)); }
           .segment.current { stroke: var(--primary-text-color); stroke-width: 2; }
           .center-circle { fill: var(--ha-card-background); stroke: var(--divider-color); stroke-width: 1; }
           .day-label { text-anchor: middle; dominant-baseline: central; font-size: 32px; font-weight: 700; color: var(--primary-text-color); }
@@ -223,21 +223,28 @@ class MenstrualCycleHistoryCardAnalog extends HTMLElement {
     }
 
     const html = `<style>
-      :host { display: block; }
-      ha-card { padding: 16px; }
+      :host {
+        display: block;
+        --mg-card-bg: var(--ha-card-background, var(--card-background-color, #fff));
+        --mg-border: var(--divider-color, rgba(127, 127, 127, 0.35));
+      }
+      ha-card { padding: 16px; background: var(--mg-card-bg); }
       .title { font-weight: 600; margin: 0 0 12px; color: var(--primary-text-color); text-align: center; }
       .content { display: flex; flex-direction: column; align-items: center; gap: 16px; }
       .cycle-analog { max-width: 100%; height: auto; }
-      .status-info { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px; background: rgba(0, 0, 0, 0.02); border-radius: 8px; width: 100%; }
+      .status-info { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px; background: color-mix(in srgb, var(--secondary-text-color, #6b7280) 8%, transparent); border-radius: 8px; width: 100%; border: 1px solid var(--mg-border); }
       .status-emoji { font-size: 2rem; }
       .status-text { font-weight: 600; color: var(--primary-text-color); }
       .status-subtext { font-size: 0.85rem; color: var(--secondary-text-color); }
       .legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; width: 100%; font-size: 0.8rem; color: var(--secondary-text-color); margin-top: 8px; }
       .legend-item { display: flex; align-items: center; gap: 4px; }
       .legend-swatch { width: 12px; height: 12px; border-radius: 2px; }
-      .legend-swatch.period { background: rgba(231, 76, 60, 0.6); }
-      .legend-swatch.fertile { background: rgba(250, 204, 21, 0.5); }
-      .legend-swatch.ovulation { background: rgba(39, 174, 96, 0.7); }
+      .legend-swatch.period { background: color-mix(in srgb, var(--error-color, #e74c3c) 62%, transparent); }
+      .legend-swatch.fertile { background: color-mix(in srgb, var(--warning-color, #f39c12) 52%, transparent); }
+      .legend-swatch.ovulation { background: color-mix(in srgb, var(--success-color, #27ae60) 72%, transparent); }
+      @media (prefers-color-scheme: dark) {
+        .status-info { background: color-mix(in srgb, var(--secondary-text-color, #c5ccd5) 16%, transparent); }
+      }
     </style>
     <ha-card>
       <div class="title">${this._config.title || this._t('title')}</div>

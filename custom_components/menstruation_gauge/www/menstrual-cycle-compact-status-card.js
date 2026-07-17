@@ -193,16 +193,16 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
 
   _statusMeta(statusKey) {
     const map = {
-      period: { color: '#e74c3c', label: this._t('period'), icon: 'drop' },
-      pms: { color: '#f39c12', label: this._t('pms'), icon: 'warning' },
-      fertile: { color: '#27ae60', label: this._t('fertile'), icon: 'heart' },
-      ovulation: { color: '#f39c12', label: this._t('ovulation'), icon: 'ovulation' },
-      neutral: { color: '#95a5a6', label: this._t('neutral'), icon: 'dash' },
-      pre_menarche: { color: '#9b59b6', label: this._t('pre_menarche'), icon: 'flower' },
-      pregnant: { color: '#3498db', label: this._t('pregnant'), icon: 'pregnant' },
-      postpartum: { color: '#1abc9c', label: this._t('postpartum'), icon: 'baby' },
-      menarche: { color: '#9b59b6', label: this._t('menarche'), icon: 'flower' },
-      menopause: { color: '#34495e', label: this._t('menopause'), icon: 'moon' },
+      period: { color: 'var(--error-color, #e74c3c)', label: this._t('period'), icon: 'drop' },
+      pms: { color: 'var(--warning-color, #f39c12)', label: this._t('pms'), icon: 'warning' },
+      fertile: { color: 'var(--success-color, #27ae60)', label: this._t('fertile'), icon: 'heart' },
+      ovulation: { color: 'var(--warning-color, #f39c12)', label: this._t('ovulation'), icon: 'ovulation' },
+      neutral: { color: 'var(--secondary-text-color, #95a5a6)', label: this._t('neutral'), icon: 'dash' },
+      pre_menarche: { color: 'var(--primary-color, #9b59b6)', label: this._t('pre_menarche'), icon: 'flower' },
+      pregnant: { color: 'var(--state-icon-color, #3498db)', label: this._t('pregnant'), icon: 'pregnant' },
+      postpartum: { color: 'var(--state-icon-color, #1abc9c)', label: this._t('postpartum'), icon: 'baby' },
+      menarche: { color: 'var(--primary-color, #9b59b6)', label: this._t('menarche'), icon: 'flower' },
+      menopause: { color: 'var(--secondary-text-color, #34495e)', label: this._t('menopause'), icon: 'moon' },
     };
     return map[statusKey] || map.neutral;
   }
@@ -285,15 +285,15 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
       const x4 = cx + innerR * Math.cos(endAngle - gap);
       const y4 = cy + innerR * Math.sin(endAngle - gap);
 
-      let fill = '#95a5a6'; // neutral
+      let fill = 'var(--secondary-text-color, #95a5a6)'; // neutral
       if (day <= periodDays) {
-        fill = '#e74c3c'; // period
+        fill = 'var(--error-color, #e74c3c)'; // period
       } else if (day >= pmsStart && day <= pmsEnd) {
-        fill = '#f39c12'; // pms
+        fill = 'var(--warning-color, #f39c12)'; // pms
       } else if (day === ovulationDay) {
-        fill = '#e67e22'; // ovulation (distinct orange)
+        fill = 'var(--warning-color, #e67e22)'; // ovulation
       } else if (day >= fertileStart && day <= fertileEnd) {
-        fill = '#27ae60'; // fertile
+        fill = 'var(--success-color, #27ae60)'; // fertile
       }
 
       const isCurrent = day === cycleDay;
@@ -354,7 +354,7 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
       progressPercent = Math.min(100, Math.round((weeksPregnant / totalWeeks) * 100));
       titleText = `${this._t('pregnant')} – ${this._t('week')} ${weeksPregnant}/${totalWeeks}`;
       progressLabel = `${progressPercent}%`;
-      progressColor = '#3498db';
+      progressColor = 'var(--state-icon-color, #3498db)';
 
       const dueDateRaw = attrs.due_date;
       const dueDateNorm = this._normalizeISO(dueDateRaw);
@@ -391,7 +391,7 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
 
       titleText = this._t('pre_menarche');
       progressLabel = `${progressPercent}%`;
-      progressColor = '#9b59b6';
+      progressColor = 'var(--primary-color, #9b59b6)';
     } else if (statusKey === 'postpartum') {
       emoji = '👶';
       const birthDateNorm = this._normalizeISO(attrs.birth_date);
@@ -407,7 +407,7 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
       }
       daysSinceBirth = Math.min(daysSinceBirth, postpartumDuration);
       progressPercent = Math.min(100, Math.round((daysSinceBirth / postpartumDuration) * 100));
-      progressColor = '#1abc9c';
+      progressColor = 'var(--state-icon-color, #1abc9c)';
 
       if (postpartumDuration % 7 === 0) {
         const weeksTotal = postpartumDuration / 7;
@@ -551,8 +551,12 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
 
     this.shadowRoot.innerHTML = `
       <style>
-        :host { display: block; }
-        ha-card { padding: 10px 12px; }
+        :host {
+          display: block;
+          --mg-card-bg: var(--ha-card-background, var(--card-background-color, #fff));
+          --mg-border: var(--divider-color, rgba(127, 127, 127, 0.35));
+        }
+        ha-card { padding: 10px 12px; background: var(--mg-card-bg); border: 1px solid var(--mg-border); }
         .title { color: var(--secondary-text-color); font-size: 0.78rem; margin: 0 0 6px; }
         .empty { padding: 12px; color: var(--secondary-text-color); }
 
@@ -596,6 +600,14 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
         .icon-text-info { min-width: 0; }
         .icon-text-title { font-size: 1rem; font-weight: 600; }
         .icon-text-sub { font-size: 0.8rem; color: var(--secondary-text-color); margin-top: 2px; }
+
+        @media (prefers-color-scheme: dark) {
+          .status-icon {
+            background: color-mix(in srgb, var(--mg-card-bg) 84%, #000 16%);
+            border-color: color-mix(in srgb, currentColor 55%, var(--mg-border));
+          }
+          .progress-bar-track { background: color-mix(in srgb, var(--mg-border) 70%, transparent); }
+        }
 
         @media (max-width: 380px) {
           ha-card { padding: 8px 10px; }

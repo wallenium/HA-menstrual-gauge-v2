@@ -235,26 +235,40 @@ class MenstrualProductInventoryCard extends HTMLElement {
 
     this.shadowRoot.innerHTML = `
       <style>
-        :host { display: block; }
-        ha-card { padding: 14px; background: var(--ha-card-background, var(--card-background-color, #fff)); }
+        :host {
+          display: block;
+          --mg-card-bg: var(--ha-card-background, var(--card-background-color, #fff));
+          --mg-text-primary: var(--primary-text-color, #1f2937);
+          --mg-text-secondary: var(--secondary-text-color, #6b7280);
+          --mg-border: var(--divider-color, rgba(127, 127, 127, 0.35));
+          --mg-status-success: var(--success-color, #1e8449);
+          --mg-status-warning: var(--warning-color, #b9770e);
+          --mg-status-error: var(--error-color, #c0392b);
+          --mg-surface-accent: color-mix(in srgb, var(--mg-status-error) 10%, transparent);
+        }
+        ha-card { padding: 14px; background: var(--mg-card-bg); color: var(--mg-text-primary); }
         .title { margin: 0 0 8px; font-size: 1.2rem; font-weight: 700; }
-        .meta { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; color: var(--secondary-text-color); }
+        .meta { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; color: var(--mg-text-secondary); }
         .error { color: var(--error-color); margin-bottom: 10px; font-size: 0.9rem; }
         .rows { display: grid; gap: 12px; }
-        .row { border: 1px solid var(--divider-color); border-radius: 12px; padding: 10px; background: linear-gradient(135deg, rgba(255, 99, 132, 0.08), rgba(75, 192, 192, 0.04)); }
+        .row { border: 1px solid var(--mg-border); border-radius: 12px; padding: 10px; background: linear-gradient(135deg, var(--mg-surface-accent), transparent); }
         .product { font-weight: 600; margin-bottom: 8px; }
         .stock { font-size: 1.5rem; font-weight: 700; display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
         .stock span { font-size: 0.8rem; font-weight: 500; }
-        .stock.good { color: #1e8449; }
-        .stock.warning { color: #b9770e; }
-        .stock.critical { color: #c0392b; }
+        .stock.good { color: var(--mg-status-success); }
+        .stock.warning { color: var(--mg-status-warning); }
+        .stock.critical { color: var(--mg-status-error); }
         .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 8px; }
-        button { border: 1px solid var(--divider-color); border-radius: 8px; padding: 7px 9px; cursor: pointer; background: var(--ha-card-background, #fff); color: var(--primary-text-color); }
-        button.warn { border-color: rgba(192, 57, 43, 0.5); }
-        input { border: 1px solid var(--divider-color); border-radius: 8px; padding: 7px; min-width: 0; background: transparent; color: var(--primary-text-color); }
-        .logs { margin-top: 12px; border-top: 1px solid var(--divider-color); padding-top: 10px; }
+        button, select { border: 1px solid var(--mg-border); border-radius: 8px; padding: 7px 9px; cursor: pointer; background: var(--mg-card-bg); color: var(--mg-text-primary); }
+        button.warn { border-color: color-mix(in srgb, var(--mg-status-error) 55%, transparent); }
+        input { border: 1px solid var(--mg-border); border-radius: 8px; padding: 7px; min-width: 0; background: transparent; color: var(--mg-text-primary); }
+        .logs { margin-top: 12px; border-top: 1px solid var(--mg-border); padding-top: 10px; }
         .log-item { display: flex; justify-content: space-between; gap: 8px; font-size: 0.88rem; margin-top: 6px; }
-        .empty { padding: 16px; color: var(--secondary-text-color); }
+        .empty { padding: 16px; color: var(--mg-text-secondary); }
+        @media (prefers-color-scheme: dark) {
+          :host { --mg-surface-accent: color-mix(in srgb, var(--mg-status-error) 20%, transparent); }
+          button, select, input { background: color-mix(in srgb, var(--mg-card-bg) 88%, #000 12%); }
+        }
       </style>
       <ha-card>
         <h2 class="title">${title}</h2>

@@ -43,11 +43,27 @@ class MenstrualProductStatsCard extends HTMLElement {
       <style>
         :host {
           display: block;
+          --mg-card-bg: var(--ha-card-background, var(--card-background-color, #fff));
+          --mg-border: var(--divider-color, rgba(128, 128, 128, 0.3));
+          --mg-text-primary: var(--primary-text-color, #1f2937);
+          --mg-text-secondary: var(--secondary-text-color, #6b7280);
+          --mg-color-error: var(--error-color, #e74c3c);
+          --mg-color-warning: var(--warning-color, #f39c12);
+          --mg-color-success: var(--success-color, #27ae60);
+          --mg-color-info: #3498db;
+          --mg-chip-text-error: #b03a2e;
+          --mg-chip-text-warning: #af601a;
+          --mg-chip-text-accent: #6c3483;
+          --mg-chip-text-info: #21618c;
+          --mg-stat-alpha-strong: 12%;
+          --mg-stat-alpha-soft: 5%;
+          --mg-chip-alpha: 16%;
+          --mg-chip-border-alpha: 26%;
         }
 
         ha-card {
-          background: var(--ha-card-background, var(--card-background-color, #fff));
-          color: var(--primary-text-color);
+          background: var(--mg-card-bg);
+          color: var(--mg-text-primary);
         }
 
         .header {
@@ -62,7 +78,7 @@ class MenstrualProductStatsCard extends HTMLElement {
 
         .subtitle {
           margin: 4px 0 0;
-          color: var(--secondary-text-color);
+          color: var(--mg-text-secondary);
           font-size: 0.9rem;
         }
 
@@ -75,25 +91,25 @@ class MenstrualProductStatsCard extends HTMLElement {
 
         .stat-card {
           border-radius: 12px;
-          border: 1px solid var(--divider-color);
+          border: 1px solid var(--mg-border);
           padding: 14px;
-          background: linear-gradient(135deg, rgba(231, 76, 60, 0.08), rgba(231, 76, 60, 0.02));
+          background: linear-gradient(135deg, color-mix(in srgb, var(--mg-color-error) var(--mg-stat-alpha-strong), transparent), color-mix(in srgb, var(--mg-color-error) var(--mg-stat-alpha-soft), transparent));
         }
 
         .stat-card.pad {
-          background: linear-gradient(135deg, rgba(243, 156, 18, 0.08), rgba(243, 156, 18, 0.02));
+          background: linear-gradient(135deg, color-mix(in srgb, var(--mg-color-warning) var(--mg-stat-alpha-strong), transparent), color-mix(in srgb, var(--mg-color-warning) var(--mg-stat-alpha-soft), transparent));
         }
 
         .stat-card.cup {
-          background: linear-gradient(135deg, rgba(142, 68, 173, 0.08), rgba(142, 68, 173, 0.02));
+          background: linear-gradient(135deg, color-mix(in srgb, #8e44ad var(--mg-stat-alpha-strong), transparent), color-mix(in srgb, #8e44ad var(--mg-stat-alpha-soft), transparent));
         }
 
         .stat-card.plan {
-          background: linear-gradient(135deg, rgba(39, 174, 96, 0.08), rgba(39, 174, 96, 0.02));
+          background: linear-gradient(135deg, color-mix(in srgb, var(--mg-color-success) var(--mg-stat-alpha-strong), transparent), color-mix(in srgb, var(--mg-color-success) var(--mg-stat-alpha-soft), transparent));
         }
 
         .stat-label {
-          color: var(--secondary-text-color);
+          color: var(--mg-text-secondary);
           font-size: 0.8rem;
           text-transform: uppercase;
           letter-spacing: 0.04em;
@@ -107,12 +123,12 @@ class MenstrualProductStatsCard extends HTMLElement {
 
         .stat-detail {
           margin-top: 6px;
-          color: var(--secondary-text-color);
+          color: var(--mg-text-secondary);
           font-size: 0.85rem;
         }
 
         .timeline {
-          border-top: 1px solid var(--divider-color);
+          border-top: 1px solid var(--mg-border);
           padding: 16px;
         }
 
@@ -136,7 +152,7 @@ class MenstrualProductStatsCard extends HTMLElement {
         }
 
         .timeline-date {
-          color: var(--secondary-text-color);
+          color: var(--mg-text-secondary);
           font-size: 0.85rem;
           padding-top: 4px;
         }
@@ -156,41 +172,52 @@ class MenstrualProductStatsCard extends HTMLElement {
         }
 
         .chip.tampon {
-          background: rgba(231, 76, 60, 0.14);
-          color: #b03a2e;
-          border-color: rgba(231, 76, 60, 0.18);
+          background: color-mix(in srgb, var(--mg-color-error) var(--mg-chip-alpha), transparent);
+          color: var(--mg-chip-text-error);
+          border-color: color-mix(in srgb, var(--mg-color-error) var(--mg-chip-border-alpha), transparent);
         }
 
         .chip.pad {
-          background: rgba(243, 156, 18, 0.14);
-          color: #af601a;
-          border-color: rgba(243, 156, 18, 0.18);
+          background: color-mix(in srgb, var(--mg-color-warning) var(--mg-chip-alpha), transparent);
+          color: var(--mg-chip-text-warning);
+          border-color: color-mix(in srgb, var(--mg-color-warning) var(--mg-chip-border-alpha), transparent);
         }
 
         .chip.cup {
-          background: rgba(142, 68, 173, 0.14);
-          color: #6c3483;
-          border-color: rgba(142, 68, 173, 0.18);
+          background: color-mix(in srgb, #8e44ad var(--mg-chip-alpha), transparent);
+          color: var(--mg-chip-text-accent);
+          border-color: color-mix(in srgb, #8e44ad var(--mg-chip-border-alpha), transparent);
         }
 
         .chip.liner,
         .chip.underwear {
-          background: rgba(52, 152, 219, 0.14);
-          color: #21618c;
-          border-color: rgba(52, 152, 219, 0.18);
+          background: color-mix(in srgb, var(--mg-color-info) var(--mg-chip-alpha), transparent);
+          color: var(--mg-chip-text-info);
+          border-color: color-mix(in srgb, var(--mg-color-info) var(--mg-chip-border-alpha), transparent);
         }
 
         .empty-state {
           padding: 16px;
-          color: var(--secondary-text-color);
+          color: var(--mg-text-secondary);
         }
 
         @media (prefers-color-scheme: dark) {
-          .chip.tampon { color: #f5b7b1; }
-          .chip.pad { color: #f8c471; }
-          .chip.cup { color: #d2b4de; }
+          :host {
+            --mg-stat-alpha-strong: 24%;
+            --mg-stat-alpha-soft: 12%;
+            --mg-chip-alpha: 26%;
+            --mg-chip-border-alpha: 40%;
+            --mg-chip-text-error: #ffd1cc;
+            --mg-chip-text-warning: #ffe3b1;
+            --mg-chip-text-accent: #e8d3ff;
+            --mg-chip-text-info: #d2ebff;
+          }
+
+          .chip.tampon,
+          .chip.pad,
+          .chip.cup,
           .chip.liner,
-          .chip.underwear { color: #aed6f1; }
+          .chip.underwear { text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25); }
         }
       </style>
       <ha-card>
