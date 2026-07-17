@@ -15,6 +15,10 @@ class MenstrualProductStatsCard extends HTMLElement {
     return 5;
   }
 
+  static getConfigElement() {
+    return document.createElement('menstrual-product-stats-card-editor');
+  }
+
   static getStubConfig() {
     return {
       type: "menstrual-product-stats-card",

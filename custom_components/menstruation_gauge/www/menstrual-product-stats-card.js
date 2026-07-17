@@ -15,6 +15,18 @@ class MenstrualProductStatsCard extends HTMLElement {
     return 5;
   }
 
+  static getConfigElement() {
+    return document.createElement('menstrual-product-stats-card-editor');
+  }
+
+  static getStubConfig() {
+    return {
+      type: 'custom:menstrual-product-stats-card',
+      entity: 'sensor.menstruation_gauge',
+      title: 'Product usage'
+    };
+  }
+
   render() {
     if (!this._hass || !this.config?.entity) {
       return;
