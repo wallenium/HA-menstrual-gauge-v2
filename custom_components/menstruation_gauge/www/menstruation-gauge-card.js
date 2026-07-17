@@ -856,6 +856,8 @@ class MenstruationGaugeCard extends HTMLElement {
       this.shadowRoot.querySelector('.grid')?.addEventListener('click', (ev) => {
         const btn = ev.target?.closest?.('.day[data-iso]');
         if (!btn) return;
+        ev.stopPropagation();
+        ev.preventDefault();
         const iso = btn.getAttribute('data-iso');
         if (!iso) return;
         this._modalIso = iso;
@@ -950,7 +952,7 @@ class MenstruationGaugeCard extends HTMLElement {
         .editor { display: ${this._editorOpen ? 'grid' : 'none'}; gap: 8px; }
         .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
         .dow { text-align: center; font-size: 12px; opacity: .75; }
-        .day { min-height: 32px; border: 1px solid ${palette.dayBorder}; border-radius: 8px; background: ${palette.dayBg}; color: ${palette.dayColor}; cursor: pointer; }
+        .day { min-height: 32px; border: 1px solid ${palette.dayBorder}; border-radius: 8px; background: ${palette.dayBg}; color: ${palette.dayColor}; cursor: pointer; user-select: none; -webkit-user-select: none; }
         .day.active { background: ${palette.confirmed}; color: #fff; border-color: ${palette.confirmed}; }
         .day.today { outline: 2px solid ${palette.dayToday}; }
         .day.other { opacity: .3; }
