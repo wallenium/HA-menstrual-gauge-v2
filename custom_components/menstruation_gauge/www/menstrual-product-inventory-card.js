@@ -186,33 +186,7 @@ class MenstrualProductInventoryCard extends HTMLElement {
   }
 
   _getProductIconSvg(productKey) {
-    const icons = {
-      tampon: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <rect x="9" y="2" width="6" height="15" rx="3" stroke="currentColor" stroke-width="1.8" fill="none"/>
-        <line x1="12" y1="17" x2="12" y2="22" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-      </svg>`,
-      pad: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path d="M8 6 Q8 4 10 4 L14 4 Q16 4 16 6 L16 16 Q16 18 14 18 L10 18 Q8 18 8 16 Z" stroke="currentColor" stroke-width="1.8" fill="none"/>
-        <path d="M8 9 Q4 9 4 12 Q4 13 8 13" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-        <path d="M16 9 Q20 9 20 12 Q20 13 16 13" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-      </svg>`,
-      cup: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path d="M8 3 L8 14 Q8 17 12 19 Q16 17 16 14 L16 3" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-        <line x1="8" y1="3" x2="16" y2="3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-        <line x1="12" y1="19" x2="12" y2="22" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-      </svg>`,
-      liner: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <rect x="7" y="8" width="10" height="8" rx="2" stroke="currentColor" stroke-width="1.8" fill="none"/>
-        <line x1="7" y1="15" x2="17" y2="15" stroke="currentColor" stroke-width="1" opacity="0.6" stroke-linecap="round"/>
-      </svg>`,
-      underwear: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <ellipse cx="12" cy="6" rx="8" ry="3" stroke="currentColor" stroke-width="1.8" fill="none"/>
-        <path d="M6 8 Q4 12 4 16 Q4 18 6 18" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-        <path d="M18 8 Q20 12 20 16 Q20 18 18 18" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-        <line x1="12" y1="8" x2="12" y2="18" stroke="currentColor" stroke-width="1" opacity="0.5" stroke-linecap="round"/>
-      </svg>`,
-    };
-    return icons[productKey] || "";
+    return window.MenstrualIcons?.getSvgIcon(productKey, 'large') || '';
   }
 
   _formatTimestamp(ts) {
