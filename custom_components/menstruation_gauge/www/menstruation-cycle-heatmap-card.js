@@ -326,9 +326,28 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
   _resolveBuiltinSymptomSources() {
     const entityId = this._resolveEntityId();
     const stateObj = entityId ? this._hass?.states?.[entityId] : undefined;
-    const symptomHistory = Array.isArray(stateObj?.attributes?.symptom_history)
-      ? stateObj.attributes.symptom_history
-      : [];
+    const attrs = stateObj?.attributes || {};
+    const symptomHistory = Array.isArray(attrs.symptom_history) ? [...attrs.symptom_history] : [];
+
+    if (!symptomHistory.length) {
+      const todayIso = this._normalizeISO(new Date().toISOString().slice(0, 10));
+      if (todayIso && attrs.symptom_data_today && typeof attrs.symptom_data_today === 'object') {
+        symptomHistory.push({ date: todayIso, ...attrs.symptom_data_today });
+      } else if (todayIso && attrs.symptom_data_this_cycle && typeof attrs.symptom_data_this_cycle === 'object') {
+        const cycleData = attrs.symptom_data_this_cycle;
+        symptomHistory.push({
+          date: todayIso,
+          bleeding_strength: cycleData.bleeding_strength,
+          spotting: cycleData.spotting,
+          intercourse: cycleData.intercourse,
+          pain: Array.isArray(cycleData.pain_types) ? cycleData.pain_types : cycleData.pain,
+          hygiene: Array.isArray(cycleData.hygiene_types) ? cycleData.hygiene_types : cycleData.hygiene,
+          test: Array.isArray(cycleData.test_types) ? cycleData.test_types : cycleData.test,
+          basal_temp: cycleData.basal_temp_average ?? cycleData.basal_temp,
+          cervical_mucus: cycleData.cervical_mucus,
+        });
+      }
+    }
 
     if (!symptomHistory.length) return [];
 

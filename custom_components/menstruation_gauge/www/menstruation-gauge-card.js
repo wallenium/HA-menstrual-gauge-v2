@@ -238,11 +238,15 @@ class MenstruationGaugeCard extends HTMLElement {
 
     // Build a date-keyed symptom lookup
     const symptomByDate = {};
-    if (Array.isArray(attrs.symptom_history)) {
-      attrs.symptom_history.forEach((entry) => {
+    const symptomHistory = Array.isArray(attrs.symptom_history) ? attrs.symptom_history : [];
+    if (symptomHistory.length) {
+      symptomHistory.forEach((entry) => {
         const d = this._normalizeISO(entry?.date);
         if (d) symptomByDate[d] = entry;
       });
+    } else if (attrs.symptom_data_today && typeof attrs.symptom_data_today === 'object') {
+      const todayIso = this._isoFromDate(new Date());
+      symptomByDate[todayIso] = { date: todayIso, ...attrs.symptom_data_today };
     }
 
     const viewDate = this._viewDate || new Date();
