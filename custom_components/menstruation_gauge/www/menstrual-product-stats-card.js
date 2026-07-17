@@ -404,7 +404,7 @@ class MenstrualProductStatsCard extends HTMLElement {
   }
 
   _getSvgIcon(product) {
-    return window.MenstrualIcons?.getSvgIcon(product) || '';
+    return window.ProductIcons?.getSvgIcon(product) || '';
   }
 
   _t(key, placeholders = {}) {

@@ -186,7 +186,7 @@ class MenstrualProductInventoryCard extends HTMLElement {
   }
 
   _getProductIconSvg(productKey) {
-    return window.MenstrualIcons?.getSvgIcon(productKey, 'large') || '';
+    return window.ProductIcons?.getSvgIcon(productKey, 'large') || '';
   }
 
   _formatTimestamp(ts) {

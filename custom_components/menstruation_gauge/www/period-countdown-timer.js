@@ -1060,7 +1060,7 @@ class PeriodCountdownTimer extends HTMLElement {
   }
 
   _getSvgIcon(product) {
-    return window.MenstrualIcons?.getSvgIcon(product) || '';
+    return window.ProductIcons?.getSvgIcon(product) || '';
   }
 
   _createAnimatedProductSVG(productKey, mode) {
@@ -1072,7 +1072,7 @@ class PeriodCountdownTimer extends HTMLElement {
 
   _createAnimatedCupSVG(mode) {
     const color = mode === "avoid_blood" ? "#2563eb" : "#be123c";
-    const svg = window.MenstrualIcons?.createAnimatedSvgElement("cup", "large");
+    const svg = window.ProductIcons?.createAnimatedSvgElement("cup", "large");
     if (!svg) return null;
 
     const ns = "http://www.w3.org/2000/svg";
@@ -1091,7 +1091,7 @@ class PeriodCountdownTimer extends HTMLElement {
 
   _createAnimatedTamponSVG(mode) {
     const color = mode === "avoid_blood" ? "#2563eb" : "#be123c";
-    const svg = window.MenstrualIcons?.createAnimatedSvgElement("tampon", "large");
+    const svg = window.ProductIcons?.createAnimatedSvgElement("tampon", "large");
     if (!svg) return null;
 
     const ns = "http://www.w3.org/2000/svg";
@@ -1111,7 +1111,7 @@ class PeriodCountdownTimer extends HTMLElement {
 
   _createAnimatedPadSVG(mode) {
     const color = mode === "avoid_blood" ? "#2563eb" : "#be123c";
-    const svg = window.MenstrualIcons?.createAnimatedSvgElement("pad", "large");
+    const svg = window.ProductIcons?.createAnimatedSvgElement("pad", "large");
     if (!svg) return null;
 
     const ns = "http://www.w3.org/2000/svg";

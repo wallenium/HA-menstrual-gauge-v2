@@ -1,3 +1,7 @@
+/**
+ * Shared product icon definitions for all menstrual cards.
+ */
+
 const PRODUCT_ICON_PATHS = {
   tampon: '<rect x="9" y="2" width="6" height="15" rx="3"/><line x1="12" y1="17" x2="12" y2="22"/>',
   pad: '<rect x="8" y="4" width="8" height="16" rx="4"/><path d="M8 8C5 8 4 11 4 12C4 13 5 16 8 16"/><path d="M16 8C19 8 20 11 20 12C20 13 19 16 16 16"/>',
@@ -56,15 +60,24 @@ function createAnimatedSvgElement(productName, size = 'default') {
   return template.content.firstElementChild;
 }
 
-const MenstrualIcons = {
+const ProductIcons = {
   getSvgIcon,
   createAnimatedSvgElement,
+  getIcon(productKey) {
+    return getSvgIcon(productKey);
+  },
+  getIconWithSize(productKey, size = 24) {
+    return getSvgIcon(productKey, size);
+  },
+  getAllProducts() {
+    return Object.keys(PRODUCT_ICON_PATHS);
+  },
 };
 
 if (typeof window !== 'undefined') {
-  window.MenstrualIcons = MenstrualIcons;
+  window.ProductIcons = ProductIcons;
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = MenstrualIcons;
+  module.exports = ProductIcons;
 }
