@@ -18,16 +18,8 @@ This repository contains:
 - add in 'integration and services' new integration, search for "menstruation gauge"
 - add user/friendly name and icon.
     -may add more users if more bleeding persons are in the household.
-
-- Add the customcards under `Settings -> Devices & Services` (...)-Menu "Add ressouces":
-    - `/menstruation_gauge/menstruation-gauge-card.js`
-    - `/menstruation_gauge/menstruation-cycle-heatmap-card.js`
-    - `/menstruation_gauge/period-countdown-timer.js`
-    - `/menstruation_gauge/menstrual-product-stats-card.js`
-    - each of Type: `JavaScript module`
-    - //mental note: it is correct: ignore of www subfolder within actual folder structure
-
-- restart HA and clear the cache
+- restart HA; the integration registers its custom card resources automatically
+- if a browser still shows an old frontend after an upgrade, refresh the browser cache once
 - ready to add the custom card per user: with the menstruation-gauge-card 
 
 - for daily recalculation of the remaining days, the user has to manually create an

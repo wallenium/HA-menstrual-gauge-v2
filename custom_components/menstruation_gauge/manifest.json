@@ -5,7 +5,18 @@
   "config_flow": true,
   "dependencies": ["http", "lovelace"],
   "documentation": "https://github.com/nremey/HA-repo-test-menstrual-gauge/wiki",
+  "frontend_extra_module_url": [
+    "/menstruation_gauge/menstruation-gauge-card.js",
+    "/menstruation_gauge/menstruation-cycle-heatmap-card.js",
+    "/menstruation_gauge/period-countdown-timer.js",
+    "/menstruation_gauge/menstrual-product-stats-card.js",
+    "/menstruation_gauge/menstrual-product-inventory-card.js",
+    "/menstruation_gauge/menstrual-cycle-card-compact.js",
+    "/menstruation_gauge/menstrual-cycle-history-card-row.js",
+    "/menstruation_gauge/menstrual-cycle-history-card-analog.js",
+    "/menstruation_gauge/menstrual-cycle-compact-status-card.js"
+  ],
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/nremey/HA-repo-test-menstrual-gauge/issues",
-  "version": "1.1.0"
+  "version": "1.2.0"
 }
