@@ -5,7 +5,14 @@ class MenstrualProductInventoryCard extends HTMLElement {
       inventory_entity: "sensor.household_product_stock",
       title: "Household inventory",
       member: "",
+      visible_products: ["tampon", "pad", "cup", "liner", "underwear"],
+      product_order: ["tampon", "pad", "cup", "liner", "underwear"],
+      show_thresholds: true,
     };
+  }
+
+  static getConfigElement() {
+    return document.createElement("menstrual-product-inventory-card-editor");
   }
 
   setConfig(config) {
@@ -13,6 +20,7 @@ class MenstrualProductInventoryCard extends HTMLElement {
       inventory_entity: "sensor.household_product_stock",
       title: "",
       member: "",
+      show_thresholds: true,
       ...config,
     };
     this._ensureRoot();
@@ -112,7 +120,25 @@ class MenstrualProductInventoryCard extends HTMLElement {
   }
 
   _products() {
-    return ["tampon", "pad", "cup", "liner", "underwear"];
+    const ALL_PRODUCTS = ["tampon", "pad", "cup", "liner", "underwear"];
+
+    // Apply custom order if specified
+    let ordered;
+    if (Array.isArray(this.config?.product_order) && this.config.product_order.length > 0) {
+      const validOrder = this.config.product_order.filter((p) => ALL_PRODUCTS.includes(p));
+      const missing = ALL_PRODUCTS.filter((p) => !validOrder.includes(p));
+      ordered = [...validOrder, ...missing];
+    } else {
+      ordered = [...ALL_PRODUCTS];
+    }
+
+    // Apply visibility filter – if not set, show all products (backward compatible)
+    if (Array.isArray(this.config?.visible_products) && this.config.visible_products.length > 0) {
+      const visibleSet = new Set(this.config.visible_products.filter((p) => ALL_PRODUCTS.includes(p)));
+      return ordered.filter((p) => visibleSet.has(p));
+    }
+
+    return ordered;
   }
 
   _getEntity() {
@@ -204,6 +230,8 @@ class MenstrualProductInventoryCard extends HTMLElement {
       ? `${this._escapeHtml(this._t(lastUsage.product))} ×${this._escapeHtml(lastUsage.quantity)} · ${this._escapeHtml(lastUsage.member || this._t("unknown_member"))} · ${this._escapeHtml(this._formatTimestamp(lastUsage.timestamp))}`
       : this._t("no_usage");
 
+    const showThresholds = this.config.show_thresholds !== false;
+
     const rows = this._products()
       .map((product) => {
         const quantity = Math.max(0, Number(inventory[product] || 0));
@@ -224,9 +252,11 @@ class MenstrualProductInventoryCard extends HTMLElement {
               <button class="btn" data-action="set" data-product="${product}" data-role="set-input">${this._t("set")}</button>
               <button class="btn" data-action="add" data-product="${product}" data-role="add-input">${this._t("add")}</button>
               <button class="btn warn" data-action="consume" data-product="${product}" data-role="consume-input">${this._t("consume")}</button>
+              ${showThresholds ? `
               <input class="thr" type="number" min="0" data-role="warning" data-product="${product}" value="${warningValue}" placeholder="${this._t("warning")}">
               <input class="thr" type="number" min="0" data-role="critical" data-product="${product}" value="${criticalValue}" placeholder="${this._t("critical")}">
               <button class="btn" data-action="set_thresholds" data-product="${product}">${this._t("save_thresholds")}</button>
+              ` : ""}
             </div>
           </div>
         `;
