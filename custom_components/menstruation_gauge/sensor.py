@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 from statistics import mean
 from typing import Any
@@ -42,7 +42,7 @@ from .const import (
     DOMAIN,
     SIGNAL_HISTORY_UPDATED,
 )
-from .model import bleeding_blocks, build_cycle_model, normalize_history
+from .model import bleeding_blocks, build_cycle_model, grouped_cycle_starts, normalize_history
 
 
 async def async_setup_entry(
@@ -63,6 +63,10 @@ async def async_setup_entry(
 PRODUCT_USAGE_PRODUCTS = ("tampon", "pad", "cup", "liner", "underwear")
 PRODUCT_USAGE_CYCLES_CONSIDERED = 3
 PRODUCT_USAGE_TIMELINE_DAYS = 30
+SYMPTOM_SENSOR_HISTORY_LIMIT = 60
+SYMPTOM_STATS_MAX_CYCLES = 6
+SYMPTOM_MULTI_VALUE_KEYS = ("pain", "hygiene", "test")
+BLEEDING_STRENGTH_PRIORITY = {"light": 1, "medium": 2, "heavy": 3, "very_heavy": 4}
 
 
 def _group_product_usage_by_date(product_usage: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
@@ -158,6 +162,207 @@ def _build_product_usage_stats(
     }
 
 
+def _parse_iso_date(raw: Any) -> date | None:
+    if not isinstance(raw, str):
+        return None
+    try:
+        return date.fromisoformat(raw)
+    except ValueError:
+        return None
+
+
+def _symptom_entries_for_period(
+    symptom_history: list[dict[str, Any]],
+    start: date,
+    end: date,
+) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    for entry in symptom_history:
+        entry_date = _parse_iso_date(entry.get("date"))
+        if entry_date is None or entry_date < start or entry_date > end:
+            continue
+        entries.append(entry)
+    return entries
+
+
+def _coerce_multi_values(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(item) for item in value if item not in (None, "")]
+    if value in (None, ""):
+        return []
+    return [str(value)]
+
+
+def _summarize_symptoms_for_period(
+    symptom_history: list[dict[str, Any]],
+    start: date,
+    end: date,
+) -> dict[str, Any]:
+    period_entries = _symptom_entries_for_period(symptom_history, start, end)
+    if not period_entries:
+        return {}
+
+    if start == end and len(period_entries) == 1:
+        return {
+            key: value
+            for key, value in period_entries[0].items()
+            if key != "date" and value not in (None, "", [], {})
+        }
+
+    summary: dict[str, Any] = {}
+
+    bleeding_values: list[tuple[int, str]] = []
+    for index, entry in enumerate(period_entries):
+        value = entry.get("bleeding_strength")
+        if not isinstance(value, str):
+            continue
+        bleeding_values.append((index, value))
+    if bleeding_values:
+        _, strongest_bleeding = max(
+            bleeding_values,
+            key=lambda item: (BLEEDING_STRENGTH_PRIORITY.get(item[1], 0), item[0]),
+        )
+        summary["bleeding_strength"] = strongest_bleeding
+
+    for key in ("spotting", "intercourse", "cervical_mucus"):
+        values = [str(entry[key]) for entry in period_entries if entry.get(key) not in (None, "")]
+        if values:
+            summary[key] = Counter(values).most_common(1)[0][0]
+
+    for key in SYMPTOM_MULTI_VALUE_KEYS:
+        days_with_value = 0
+        value_counter: Counter[str] = Counter()
+        for entry in period_entries:
+            values = _coerce_multi_values(entry.get(key))
+            if not values:
+                continue
+            days_with_value += 1
+            value_counter.update(values)
+
+        if not value_counter:
+            continue
+
+        types = [name for name, _ in value_counter.most_common()]
+        summary[f"{key}_days"] = days_with_value
+        summary[f"{key}_types"] = types
+        if key == "pain":
+            summary["pain_days"] = days_with_value
+            summary["pain_types"] = types
+
+    basal_temps: list[float] = []
+    for entry in period_entries:
+        value = entry.get("basal_temp")
+        if value in (None, ""):
+            continue
+        try:
+            basal_temps.append(float(value))
+        except (TypeError, ValueError):
+            continue
+    if basal_temps:
+        summary["basal_temp_average"] = round(mean(basal_temps), 1)
+        summary["basal_temp_min"] = round(min(basal_temps), 1)
+        summary["basal_temp_max"] = round(max(basal_temps), 1)
+
+    return summary
+
+
+def _build_symptom_statistics(
+    history: list[str],
+    symptom_history: list[dict[str, Any]],
+    today: date,
+) -> dict[str, Any]:
+    normalized_history = normalize_history(history)
+    usable_history = [item for item in normalized_history if item <= today.isoformat()] or normalized_history
+    cycle_starts = grouped_cycle_starts(usable_history)
+    cycle_starts = cycle_starts[-SYMPTOM_STATS_MAX_CYCLES:]
+
+    periods: list[tuple[date, date]] = []
+    for idx, start_iso in enumerate(cycle_starts):
+        start_date = _parse_iso_date(start_iso)
+        if start_date is None:
+            continue
+        if idx + 1 < len(cycle_starts):
+            next_start = _parse_iso_date(cycle_starts[idx + 1])
+            if next_start is None:
+                continue
+            end_date = min(today, next_start - timedelta(days=1))
+        else:
+            end_date = today
+        if end_date >= start_date:
+            periods.append((start_date, end_date))
+
+    if not periods:
+        return {"cycles_analyzed": 0}
+
+    cycles_analyzed = len(periods)
+    cycles_with_pain = 0
+    pain_days_per_cycle: list[int] = []
+    pain_types: Counter[str] = Counter()
+    bleeding_strengths: Counter[str] = Counter()
+    cervical_mucus: Counter[str] = Counter()
+    basal_temps: list[float] = []
+
+    for start, end in periods:
+        entries = _symptom_entries_for_period(symptom_history, start, end)
+        cycle_pain_days = 0
+        for entry in entries:
+            pain_values = _coerce_multi_values(entry.get("pain"))
+            if pain_values:
+                cycle_pain_days += 1
+                pain_types.update(pain_values)
+
+            bleeding = entry.get("bleeding_strength")
+            if isinstance(bleeding, str) and bleeding:
+                bleeding_strengths[bleeding] += 1
+
+            mucus = entry.get("cervical_mucus")
+            if isinstance(mucus, str) and mucus:
+                cervical_mucus[mucus] += 1
+
+            temp_value = entry.get("basal_temp")
+            if temp_value not in (None, ""):
+                try:
+                    basal_temps.append(float(temp_value))
+                except (TypeError, ValueError):
+                    pass
+
+        pain_days_per_cycle.append(cycle_pain_days)
+        if cycle_pain_days > 0:
+            cycles_with_pain += 1
+
+    pain_total = sum(pain_types.values())
+    bleeding_total = sum(bleeding_strengths.values())
+
+    typical_bleeding = None
+    if bleeding_strengths:
+        top_count = max(bleeding_strengths.values())
+        candidates = [value for value, count in bleeding_strengths.items() if count == top_count]
+        typical_bleeding = max(candidates, key=lambda value: BLEEDING_STRENGTH_PRIORITY.get(value, 0))
+
+    return {
+        "pain_frequency": round((cycles_with_pain / cycles_analyzed) * 100) if cycles_analyzed else 0,
+        "average_pain_days_per_cycle": round(mean(pain_days_per_cycle), 1) if pain_days_per_cycle else 0.0,
+        "common_pain_types": {
+            key: round((count / pain_total) * 100)
+            for key, count in pain_types.items()
+        } if pain_total else {},
+        "typical_bleeding_strength": typical_bleeding,
+        "bleeding_strength_distribution": {
+            key: round((count / bleeding_total) * 100)
+            for key, count in bleeding_strengths.items()
+        } if bleeding_total else {},
+        "typical_cervical_mucus": cervical_mucus.most_common(1)[0][0] if cervical_mucus else None,
+        "average_basal_temp": round(mean(basal_temps), 1) if basal_temps else None,
+        "cycles_analyzed": cycles_analyzed,
+    }
+
+
+def _compact_symptom_history(symptom_history: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if len(symptom_history) <= SYMPTOM_SENSOR_HISTORY_LIMIT:
+        return symptom_history
+    return symptom_history[-SYMPTOM_SENSOR_HISTORY_LIMIT:]
+
+
 class MenstruationGaugeSensor(SensorEntity):
     """Expose cycle state and computed attributes including symptoms and pregnancy."""
 
@@ -193,6 +398,7 @@ class MenstruationGaugeSensor(SensorEntity):
     async def async_update(self) -> None:
         """Update sensor from shared runtime."""
         runtime = self.hass.data[DOMAIN][self._entry.entry_id]
+        today = dt_util.now().date()
         self._attr_name = runtime.friendly_name
         self._icon = runtime.icon or None
         model = build_cycle_model(
@@ -202,16 +408,30 @@ class MenstruationGaugeSensor(SensorEntity):
             pregnancy_data=runtime.pregnancy_data,
             menarche_data=runtime.menarche_data,
             pre_menarche_data=runtime.pre_menarche_data,
-            today=dt_util.now().date(),
+            today=today,
         )
-        usage_stats = _build_product_usage_stats(runtime.history, runtime.product_usage, dt_util.now().date())
+        usage_stats = _build_product_usage_stats(runtime.history, runtime.product_usage, today)
+        symptom_data_today = _summarize_symptoms_for_period(model.symptom_history, today, today)
+
+        symptom_data_this_cycle: dict[str, Any] = {}
+        if model.grouped_starts:
+            cycle_start = _parse_iso_date(model.grouped_starts[-1])
+            if cycle_start is not None:
+                symptom_data_this_cycle = _summarize_symptoms_for_period(
+                    model.symptom_history,
+                    cycle_start,
+                    today,
+                )
+
+        symptom_statistics = _build_symptom_statistics(model.history, model.symptom_history, today)
+        compact_symptom_history = _compact_symptom_history(model.symptom_history)
 
         self._state = model.state
         has_history = bool(model.history)
 
         self._attrs = {
             ATTR_HISTORY: model.history,
-            ATTR_SYMPTOM_HISTORY: model.symptom_history,
+            ATTR_SYMPTOM_HISTORY: compact_symptom_history,
             ATTR_GROUPED_STARTS: model.grouped_starts,
             ATTR_BLEEDING_BLOCKS: model.bleeding_blocks,
             ATTR_NEXT_PREDICTED_START: model.next_predicted_start,
@@ -244,6 +464,9 @@ class MenstruationGaugeSensor(SensorEntity):
             "product_usage_this_cycle": usage_stats["this_cycle"],
             "product_usage_stats": usage_stats["stats"],
             "product_usage_timeline": usage_stats["timeline"],
+            "symptom_data_today": symptom_data_today,
+            "symptom_data_this_cycle": symptom_data_this_cycle,
+            "symptom_statistics": symptom_statistics,
         }
 
     def _calculate_days_until_menarche(self, menarche_data: dict[str, Any]) -> int | None:
