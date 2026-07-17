@@ -11,13 +11,12 @@ class PeriodCountdownTimer extends HTMLElement {
       currentStatus: null,
       reminderEnabled: true,
     };
-    this.config = {};
+    this.config = null;
     this._lastEntityState = null;
   }
 
   connectedCallback() {
     try {
-      this.render();
       this.setupEventListeners();
       
       if (Notification.permission === "default") {
@@ -32,25 +31,50 @@ class PeriodCountdownTimer extends HTMLElement {
   setConfig(config) {
     this.config = config || {};
     this._lastEntityState = null;
-    if (this._hass) {
-      this.updateStatus();
-    }
+    this._render();
   }
 
   set hass(hass) {
     this._hass = hass;
-    if (this.config && this.config.entity) {
-      const stateObj = hass.states[this.config.entity];
-      const newState = stateObj ? JSON.stringify({ state: stateObj.state, attributes: stateObj.attributes }) : null;
-      if (newState !== this._lastEntityState) {
-        this._lastEntityState = newState;
-        this.updateStatus();
-      }
+    if (!this.config) {
+      return;
+    }
+
+    if (!this.config.entity) {
+      this._render();
+      return;
+    }
+
+    const stateObj = hass.states[this.config.entity];
+    const newState = stateObj ? JSON.stringify({ state: stateObj.state, attributes: stateObj.attributes }) : null;
+    if (newState !== this._lastEntityState) {
+      this._lastEntityState = newState;
+      this._render();
     }
   }
 
-  render() {
-    this.innerHTML = `
+  querySelector(selector) {
+    if (this.shadowRoot) {
+      return this.shadowRoot.querySelector(selector);
+    }
+    return super.querySelector(selector);
+  }
+
+  _ensureRoot() {
+    if (!this.shadowRoot) {
+      this.attachShadow({ mode: "open" });
+    }
+    return this.shadowRoot;
+  }
+
+  _render() {
+    const root = this._ensureRoot();
+    if (!this.config || !this._hass) {
+      return;
+    }
+
+    root.innerHTML = `
+      <style>${this.getStyles()}</style>
       <ha-card>
         <div class="card-header">
           <h2 class="card-title">Menstruations-Countdown</h2>
@@ -61,10 +85,7 @@ class PeriodCountdownTimer extends HTMLElement {
         </div>
       </ha-card>
     `;
-
-    const style = document.createElement("style");
-    style.textContent = this.getStyles();
-    this.appendChild(style);
+    this.updateStatus();
   }
 
   setupEventListeners() {
