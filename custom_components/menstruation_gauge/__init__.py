@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 import voluptuous as vol
 
@@ -1236,6 +1237,21 @@ def _normalize_resource_url(url: str | None) -> str | None:
     return url.split("?", 1)[0]
 
 
+def _extract_resource_version(url: str | None) -> str | None:
+    """Extract the resource version value from a URL query string."""
+    if not url:
+        return None
+
+    try:
+        version_values = parse_qs(urlsplit(url).query).get("v")
+    except Exception:
+        return None
+
+    if not version_values:
+        return None
+    return version_values[-1]
+
+
 def _build_lovelace_resource_payloads(resource_url: str) -> list[dict[str, str]]:
     """Build payloads for supported Lovelace resource schemas."""
     payloads: list[dict[str, str]] = []
@@ -1335,12 +1351,17 @@ async def _async_ensure_lovelace_resource(hass: HomeAssistant) -> None:
             for item in items or []
             if isinstance(item, dict) and item.get("url")
         }
+        existing_exact_urls = {
+            str(item.get("url"))
+            for item in items or []
+            if isinstance(item, dict) and item.get("url")
+        }
 
         added_count = 0
         failed_urls: list[str] = []
         for resource_url, _static_url, filename in LOVELACE_RESOURCES:
             normalized_resource_url = _normalize_resource_url(resource_url)
-            if normalized_resource_url in existing_urls:
+            if resource_url in existing_exact_urls:
                 _LOGGER.debug("Lovelace resource already registered: %s", resource_url)
                 continue
 
@@ -1350,6 +1371,7 @@ async def _async_ensure_lovelace_resource(hass: HomeAssistant) -> None:
                     await _maybe_await(collection.async_create_item(payload))
                     added_count += 1
                     existing_urls.add(normalized_resource_url)
+                    existing_exact_urls.add(resource_url)
                     _LOGGER.info("Registered Lovelace resource automatically: %s", resource_url)
                     break
                 except Exception as err:
@@ -1370,7 +1392,53 @@ async def _async_ensure_lovelace_resource(hass: HomeAssistant) -> None:
             )
             return
 
+        await _async_cleanup_old_lovelace_resources(hass, RESOURCE_VERSION)
         hass.data[_LOVELACE_RESOURCES_ENSURED_KEY] = True
         _LOGGER.info("Lovelace resource registration complete; %s new resources added", added_count)
     except Exception as err:
         _LOGGER.exception("Auto-registration of Lovelace resources failed: %s", err)
+
+
+async def _async_cleanup_old_lovelace_resources(hass: HomeAssistant, current_version: str) -> None:
+    """Remove outdated Lovelace resource entries from previous integration versions."""
+    collection, _resource_mode = await _async_get_lovelace_resource_collection(hass)
+    if collection is None or not hasattr(collection, "async_items") or not hasattr(collection, "async_delete_item"):
+        return
+
+    try:
+        items = await _maybe_await(collection.async_items())
+    except Exception as err:
+        _LOGGER.debug("Lovelace resource cleanup skipped: %s", err)
+        return
+
+    if not items:
+        return
+
+    current_base_urls = {_normalize_resource_url(resource_url) for resource_url, _static_url, _filename in LOVELACE_RESOURCES}
+    removed_count = 0
+
+    for item in items:
+        if not isinstance(item, dict) or not item.get("url"):
+            continue
+
+        item_url = str(item["url"])
+        if _normalize_resource_url(item_url) not in current_base_urls:
+            continue
+
+        item_version = _extract_resource_version(item_url)
+        if item_version is None or item_version == current_version:
+            continue
+
+        item_id = item.get("id")
+        try:
+            if item_id is None:
+                await _maybe_await(collection.async_delete_item(item))
+            else:
+                await _maybe_await(collection.async_delete_item(item_id))
+            removed_count += 1
+            _LOGGER.info("Removed outdated Lovelace resource: %s", item_url)
+        except Exception as err:
+            _LOGGER.debug("Could not remove outdated Lovelace resource %s: %s", item_url, err)
+
+    if removed_count:
+        _LOGGER.info("Lovelace resource cleanup complete; removed %s outdated resource entries", removed_count)
