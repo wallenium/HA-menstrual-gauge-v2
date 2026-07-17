@@ -71,7 +71,9 @@ class ProductFillAnimator {
       fill.setAttribute("height", String(h));
       fill.setAttribute("fill", color);
     } else if (this.productKey === "tampon") {
-      fill.setAttribute("height", String(progress * 15));
+      const h = progress * 15;
+      fill.setAttribute("y", String(17 - h));
+      fill.setAttribute("height", String(h));
       fill.setAttribute("fill", color);
     } else if (this.productKey === "pad") {
       fill.setAttribute("r", String(progress * 4));
@@ -1098,7 +1100,7 @@ class PeriodCountdownTimer extends HTMLElement {
     const fillRect = document.createElementNS(ns, "rect");
     fillRect.setAttribute("class", "anim-fill");
     fillRect.setAttribute("x", "9");
-    fillRect.setAttribute("y", "2");
+    fillRect.setAttribute("y", "17");
     fillRect.setAttribute("width", "6");
     fillRect.setAttribute("height", "0");
     fillRect.setAttribute("rx", "3");
