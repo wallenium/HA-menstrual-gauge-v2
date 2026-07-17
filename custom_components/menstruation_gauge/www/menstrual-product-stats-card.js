@@ -22,7 +22,7 @@ class MenstrualProductStatsCard extends HTMLElement {
 
     const stateObj = this._hass.states[this.config.entity];
     if (!stateObj) {
-      this.innerHTML = `<ha-card><div class="empty-state">Entity not found: ${this.config.entity}</div></ha-card>`;
+      this.innerHTML = `<ha-card><div class="empty-state">Entity not found: ${this.escapeHtml(this.config.entity)}</div></ha-card>`;
       return;
     }
 
@@ -187,8 +187,8 @@ class MenstrualProductStatsCard extends HTMLElement {
       </style>
       <ha-card>
         <div class="header">
-          <h2 class="title">${this.config.title || this._t("title")}</h2>
-          <p class="subtitle">${attrs.friendly_name || this.config.entity}</p>
+          <h2 class="title">${this.escapeHtml(this.config.title || this._t("title"))}</h2>
+          <p class="subtitle">${this.escapeHtml(attrs.friendly_name || this.config.entity)}</p>
         </div>
         <div class="stats-grid">
           <div class="stat-card tampon">
@@ -280,8 +280,8 @@ class MenstrualProductStatsCard extends HTMLElement {
             <div class="timeline-date">${this.formatDate(dateKey)}</div>
             <div class="timeline-items">
               ${usageByDate.get(dateKey).map((entry) => `
-                <span class="chip ${entry.product}">
-                  ${this.productLabel(entry)} ×${this.normalizeQuantity(entry.quantity)}
+                <span class="chip ${this.escapeClassName(entry.product)}">
+                  ${this.escapeHtml(this.productLabel(entry))} ×${this.normalizeQuantity(entry.quantity)}
                 </span>
               `).join("")}
             </div>
@@ -320,12 +320,45 @@ class MenstrualProductStatsCard extends HTMLElement {
     return language.startsWith("de") ? "de" : "en";
   }
 
+  escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  escapeClassName(value) {
+    const sanitized = String(value ?? "")
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, "");
+    return sanitized || "unknown";
+  }
+
+  dateLocale() {
+    const locale = this._hass?.locale?.language || this._hass?.language;
+    if (!locale) {
+      return this._lang();
+    }
+
+    try {
+      return Intl.getCanonicalLocales(locale)[0] || this._lang();
+    } catch (_error) {
+      return this._lang();
+    }
+  }
+
   formatDate(value) {
     const date = new Date(`${value}T00:00:00`);
-    return new Intl.DateTimeFormat(this._hass?.locale?.language || "en", {
-      month: "short",
-      day: "numeric",
-    }).format(date);
+    try {
+      return new Intl.DateTimeFormat(this.dateLocale(), {
+        month: "short",
+        day: "numeric",
+      }).format(date);
+    } catch (_error) {
+      return value;
+    }
   }
 
   _t(key, placeholders = {}) {
@@ -373,7 +406,9 @@ class MenstrualProductStatsCard extends HTMLElement {
   }
 }
 
-customElements.define("menstrual-product-stats-card", MenstrualProductStatsCard);
+if (!customElements.get("menstrual-product-stats-card")) {
+  customElements.define("menstrual-product-stats-card", MenstrualProductStatsCard);
+}
 
 window.customCards = window.customCards || [];
 window.customCards.push({
