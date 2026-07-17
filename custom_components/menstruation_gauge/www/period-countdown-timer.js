@@ -71,7 +71,9 @@ class ProductFillAnimator {
       fill.setAttribute("height", String(h));
       fill.setAttribute("fill", color);
     } else if (this.productKey === "tampon") {
-      fill.setAttribute("height", String(progress * 15));
+      const h = progress * 15;
+      fill.setAttribute("y", String(17 - h));
+      fill.setAttribute("height", String(h));
       fill.setAttribute("fill", color);
     } else if (this.productKey === "pad") {
       fill.setAttribute("r", String(progress * 4));
@@ -1060,14 +1062,7 @@ class PeriodCountdownTimer extends HTMLElement {
   }
 
   _getSvgIcon(product) {
-    const icons = {
-      tampon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="9" y="2" width="6" height="15" rx="3"/><line x1="12" y1="17" x2="12" y2="22"/></svg>`,
-      pad: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="8" y="4" width="8" height="16" rx="4"/><path d="M8 8C5 8 4 11 4 12C4 13 5 16 8 16"/><path d="M16 8C19 8 20 11 20 12C20 13 19 16 16 16"/></svg>`,
-      cup: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 3L8 14C8 17.3 9.8 19 12 19C14.2 19 16 17.3 16 14L16 3"/><line x1="8" y1="3" x2="16" y2="3"/><line x1="12" y1="19" x2="12" y2="22"/></svg>`,
-      liner: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="5" y="9" width="14" height="6" rx="3"/></svg>`,
-      underwear: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 6L3 10C3 14 6 17 12 17C18 17 21 14 21 10L21 6"/><path d="M3 6L9 6C9 6 10 11 12 11C14 11 15 6 15 6L21 6"/></svg>`,
-    };
-    return icons[product] || '';
+    return window.ProductIcons?.getSvgIcon(product) || '';
   }
 
   _createAnimatedProductSVG(productKey, mode) {
@@ -1079,16 +1074,10 @@ class PeriodCountdownTimer extends HTMLElement {
 
   _createAnimatedCupSVG(mode) {
     const color = mode === "avoid_blood" ? "#2563eb" : "#be123c";
-    const ns = "http://www.w3.org/2000/svg";
-    const svg = document.createElementNS(ns, "svg");
-    svg.setAttribute("viewBox", "0 0 24 24");
-    svg.setAttribute("width", "48");
-    svg.setAttribute("height", "48");
-    svg.setAttribute("fill", "none");
-    svg.setAttribute("aria-hidden", "true");
-    svg.setAttribute("focusable", "false");
+    const svg = window.ProductIcons?.createAnimatedSvgElement("cup", "large");
+    if (!svg) return null;
 
-    // Animated fill rect – starts empty (height 0) at the bottom of the cup body
+    const ns = "http://www.w3.org/2000/svg";
     const fillRect = document.createElementNS(ns, "rect");
     fillRect.setAttribute("class", "anim-fill");
     fillRect.setAttribute("x", "8");
@@ -1097,96 +1086,37 @@ class PeriodCountdownTimer extends HTMLElement {
     fillRect.setAttribute("height", "0");
     fillRect.setAttribute("fill", color);
     fillRect.setAttribute("opacity", "0.8");
-    svg.appendChild(fillRect);
-
-    // Cup outline drawn on top so it masks any fill overflow
-    const cupPath = document.createElementNS(ns, "path");
-    cupPath.setAttribute("d", "M8 3L8 14C8 17.3 9.8 19 12 19C14.2 19 16 17.3 16 14L16 3");
-    cupPath.setAttribute("stroke", "currentColor");
-    cupPath.setAttribute("stroke-width", "1.8");
-    cupPath.setAttribute("stroke-linecap", "round");
-    cupPath.setAttribute("stroke-linejoin", "round");
-    svg.appendChild(cupPath);
-
-    const topLine = document.createElementNS(ns, "line");
-    topLine.setAttribute("x1", "8"); topLine.setAttribute("y1", "3");
-    topLine.setAttribute("x2", "16"); topLine.setAttribute("y2", "3");
-    topLine.setAttribute("stroke", "currentColor");
-    topLine.setAttribute("stroke-width", "1.8");
-    topLine.setAttribute("stroke-linecap", "round");
-    svg.appendChild(topLine);
-
-    const stemLine = document.createElementNS(ns, "line");
-    stemLine.setAttribute("x1", "12"); stemLine.setAttribute("y1", "19");
-    stemLine.setAttribute("x2", "12"); stemLine.setAttribute("y2", "22");
-    stemLine.setAttribute("stroke", "currentColor");
-    stemLine.setAttribute("stroke-width", "1.8");
-    stemLine.setAttribute("stroke-linecap", "round");
-    svg.appendChild(stemLine);
+    svg.insertBefore(fillRect, svg.firstChild);
 
     return svg;
   }
 
   _createAnimatedTamponSVG(mode) {
     const color = mode === "avoid_blood" ? "#2563eb" : "#be123c";
-    const ns = "http://www.w3.org/2000/svg";
-    const svg = document.createElementNS(ns, "svg");
-    svg.setAttribute("viewBox", "0 0 24 24");
-    svg.setAttribute("width", "48");
-    svg.setAttribute("height", "48");
-    svg.setAttribute("fill", "none");
-    svg.setAttribute("aria-hidden", "true");
-    svg.setAttribute("focusable", "false");
+    const svg = window.ProductIcons?.createAnimatedSvgElement("tampon", "large");
+    if (!svg) return null;
 
-    // Animated fill rect – grows downward from the tip
+    const ns = "http://www.w3.org/2000/svg";
     const fillRect = document.createElementNS(ns, "rect");
     fillRect.setAttribute("class", "anim-fill");
     fillRect.setAttribute("x", "9");
-    fillRect.setAttribute("y", "2");
+    fillRect.setAttribute("y", "17");
     fillRect.setAttribute("width", "6");
     fillRect.setAttribute("height", "0");
     fillRect.setAttribute("rx", "3");
     fillRect.setAttribute("fill", color);
     fillRect.setAttribute("opacity", "0.8");
-    svg.appendChild(fillRect);
-
-    // Tampon body outline drawn on top
-    const bodyRect = document.createElementNS(ns, "rect");
-    bodyRect.setAttribute("x", "9");
-    bodyRect.setAttribute("y", "2");
-    bodyRect.setAttribute("width", "6");
-    bodyRect.setAttribute("height", "15");
-    bodyRect.setAttribute("rx", "3");
-    bodyRect.setAttribute("stroke", "currentColor");
-    bodyRect.setAttribute("stroke-width", "1.8");
-    bodyRect.setAttribute("stroke-linecap", "round");
-    bodyRect.setAttribute("stroke-linejoin", "round");
-    svg.appendChild(bodyRect);
-
-    // Cord
-    const cordLine = document.createElementNS(ns, "line");
-    cordLine.setAttribute("x1", "12"); cordLine.setAttribute("y1", "17");
-    cordLine.setAttribute("x2", "12"); cordLine.setAttribute("y2", "22");
-    cordLine.setAttribute("stroke", "currentColor");
-    cordLine.setAttribute("stroke-width", "1.8");
-    cordLine.setAttribute("stroke-linecap", "round");
-    svg.appendChild(cordLine);
+    svg.insertBefore(fillRect, svg.firstChild);
 
     return svg;
   }
 
   _createAnimatedPadSVG(mode) {
     const color = mode === "avoid_blood" ? "#2563eb" : "#be123c";
-    const ns = "http://www.w3.org/2000/svg";
-    const svg = document.createElementNS(ns, "svg");
-    svg.setAttribute("viewBox", "0 0 24 24");
-    svg.setAttribute("width", "48");
-    svg.setAttribute("height", "48");
-    svg.setAttribute("fill", "none");
-    svg.setAttribute("aria-hidden", "true");
-    svg.setAttribute("focusable", "false");
+    const svg = window.ProductIcons?.createAnimatedSvgElement("pad", "large");
+    if (!svg) return null;
 
-    // Animated fill circle – expands radially from the pad center
+    const ns = "http://www.w3.org/2000/svg";
     const fillCircle = document.createElementNS(ns, "circle");
     fillCircle.setAttribute("class", "anim-fill");
     fillCircle.setAttribute("cx", "12");
@@ -1194,37 +1124,7 @@ class PeriodCountdownTimer extends HTMLElement {
     fillCircle.setAttribute("r", "0");
     fillCircle.setAttribute("fill", color);
     fillCircle.setAttribute("opacity", "0.8");
-    svg.appendChild(fillCircle);
-
-    // Pad body outline drawn on top
-    const bodyRect = document.createElementNS(ns, "rect");
-    bodyRect.setAttribute("x", "8");
-    bodyRect.setAttribute("y", "4");
-    bodyRect.setAttribute("width", "8");
-    bodyRect.setAttribute("height", "16");
-    bodyRect.setAttribute("rx", "4");
-    bodyRect.setAttribute("stroke", "currentColor");
-    bodyRect.setAttribute("stroke-width", "1.8");
-    bodyRect.setAttribute("stroke-linecap", "round");
-    bodyRect.setAttribute("stroke-linejoin", "round");
-    svg.appendChild(bodyRect);
-
-    // Wing paths drawn on top
-    const leftWing = document.createElementNS(ns, "path");
-    leftWing.setAttribute("d", "M8 8C5 8 4 11 4 12C4 13 5 16 8 16");
-    leftWing.setAttribute("stroke", "currentColor");
-    leftWing.setAttribute("stroke-width", "1.8");
-    leftWing.setAttribute("stroke-linecap", "round");
-    leftWing.setAttribute("stroke-linejoin", "round");
-    svg.appendChild(leftWing);
-
-    const rightWing = document.createElementNS(ns, "path");
-    rightWing.setAttribute("d", "M16 8C19 8 20 11 20 12C20 13 19 16 16 16");
-    rightWing.setAttribute("stroke", "currentColor");
-    rightWing.setAttribute("stroke-width", "1.8");
-    rightWing.setAttribute("stroke-linecap", "round");
-    rightWing.setAttribute("stroke-linejoin", "round");
-    svg.appendChild(rightWing);
+    svg.insertBefore(fillCircle, svg.firstChild);
 
     return svg;
   }

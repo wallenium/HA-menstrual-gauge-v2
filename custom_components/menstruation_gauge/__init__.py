@@ -133,6 +133,7 @@ def _build_card_resource_url(filename: str) -> str:
 RESOURCE_VERSION = _load_manifest_version()
 CARD_STATIC_URL = _build_card_static_url("menstruation-gauge-card.js")
 HEATMAP_STATIC_URL = _build_card_static_url("menstruation-cycle-heatmap-card.js")
+PRODUCT_ICONS_STATIC_URL = _build_card_static_url("product-icons.js")
 TIMER_STATIC_URL = _build_card_static_url("period-countdown-timer.js")
 TIMER_EDITOR_STATIC_URL = _build_card_static_url("period-countdown-timer-editor.js")
 PRODUCT_STATS_STATIC_URL = _build_card_static_url("menstrual-product-stats-card.js")
@@ -146,6 +147,7 @@ HISTORY_ANALOG_STATIC_URL = _build_card_static_url("menstrual-cycle-history-card
 COMPACT_STATUS_STATIC_URL = _build_card_static_url("menstrual-cycle-compact-status-card.js")
 CARD_RESOURCE_URL = _build_card_resource_url("menstruation-gauge-card.js")
 HEATMAP_RESOURCE_URL = _build_card_resource_url("menstruation-cycle-heatmap-card.js")
+PRODUCT_ICONS_RESOURCE_URL = _build_card_resource_url("product-icons.js")
 TIMER_RESOURCE_URL = _build_card_resource_url("period-countdown-timer.js")
 TIMER_EDITOR_RESOURCE_URL = _build_card_resource_url("period-countdown-timer-editor.js")
 PRODUCT_STATS_RESOURCE_URL = _build_card_resource_url("menstrual-product-stats-card.js")
@@ -161,6 +163,7 @@ CARD_RESOURCE_TYPE = "module"
 EXPORT_DIR_NAME = "menstruation_gauge_exports"
 LOVELACE_RESOURCES = (
     (CARD_RESOURCE_URL, CARD_STATIC_URL, "menstruation-gauge-card.js"),
+    (PRODUCT_ICONS_RESOURCE_URL, PRODUCT_ICONS_STATIC_URL, "product-icons.js"),
     (HEATMAP_RESOURCE_URL, HEATMAP_STATIC_URL, "menstruation-cycle-heatmap-card.js"),
     (TIMER_RESOURCE_URL, TIMER_STATIC_URL, "period-countdown-timer.js"),
     (TIMER_EDITOR_RESOURCE_URL, TIMER_EDITOR_STATIC_URL, "period-countdown-timer-editor.js"),
