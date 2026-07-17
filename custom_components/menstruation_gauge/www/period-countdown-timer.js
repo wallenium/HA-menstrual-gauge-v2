@@ -114,7 +114,7 @@ class PeriodCountdownTimer extends HTMLElement {
         const friendlyName = stateObj.attributes?.friendly_name || this.config.entity;
         cardMeta.innerHTML = `
           <div class="meta-info">
-            <span class="status">${status.toUpperCase()}</span>
+            <span class="status">${this._t(status) || status.toUpperCase()}</span>
             <span class="entity-name">${friendlyName}</span>
           </div>
         `;
@@ -364,7 +364,7 @@ class PeriodCountdownTimer extends HTMLElement {
 
       <div class="timer-container">
         <div class="timer-display" id="timerDisplay">
-          <div class="timer-icon" id="timerIcon">🩸</div>
+        <div class="timer-icon" id="timerIcon"></div>
           <div class="timer-content">
             <div class="timer-time" id="timerTime">00:00</div>
             <div class="timer-label" id="timerLabel">Bereit</div>
@@ -599,16 +599,16 @@ class PeriodCountdownTimer extends HTMLElement {
 
       const productConfig = {
         period: {
-          tampon: { icon: "🩸", name: "Tampon", seconds: (this.config?.tampon_duration || 4) * 3600 },
-          pad: { icon: "🩹", name: "Binde", seconds: (this.config?.pad_duration || 4) * 3600 },
-          cup: { icon: "🔴", name: "Menstruationstasse", seconds: (this.config?.cup_duration || 7) * 3600 },
-          underwear: { icon: "👙", name: "Periodenunterwäsche", seconds: (this.config?.underwear_duration || 6) * 3600 },
+          tampon: { icon: this._getSvgIcon("tampon"), name: this._t("tampon"), seconds: (this.config?.tampon_duration || 4) * 3600 },
+          pad: { icon: this._getSvgIcon("pad"), name: this._t("pad"), seconds: (this.config?.pad_duration || 4) * 3600 },
+          cup: { icon: this._getSvgIcon("cup"), name: this._t("cup"), seconds: (this.config?.cup_duration || 7) * 3600 },
+          underwear: { icon: this._getSvgIcon("underwear"), name: this._t("underwear"), seconds: (this.config?.underwear_duration || 6) * 3600 },
         },
         fertile: {
-          liner: { icon: "🧴", name: "Slipeinlage", seconds: (this.config?.liner_duration || 8) * 3600 },
+          liner: { icon: this._getSvgIcon("liner"), name: this._t("liner"), seconds: (this.config?.liner_duration || 8) * 3600 },
         },
         pms: {
-          liner: { icon: "🧴", name: "Slipeinlage", seconds: (this.config?.liner_duration || 8) * 3600 },
+          liner: { icon: this._getSvgIcon("liner"), name: this._t("liner"), seconds: (this.config?.liner_duration || 8) * 3600 },
         },
       };
 
@@ -636,7 +636,7 @@ class PeriodCountdownTimer extends HTMLElement {
       Object.entries(products).forEach(([key, product]) => {
         const option = document.createElement("option");
         option.value = key;
-        option.textContent = `${product.icon} ${product.name}`;
+        option.textContent = product.name;
         option.dataset.icon = product.icon;
         option.dataset.seconds = product.seconds;
         productSelect.appendChild(option);
@@ -672,7 +672,7 @@ class PeriodCountdownTimer extends HTMLElement {
 
       const product = {
         icon: selectedOption.dataset.icon,
-        name: selectedOption.textContent.substring(2),
+        name: selectedOption.textContent,
         seconds: parseInt(selectedOption.dataset.seconds),
       };
 
@@ -681,7 +681,7 @@ class PeriodCountdownTimer extends HTMLElement {
       this.timerState.remainingSeconds = product.seconds;
 
       const timerIcon = this.querySelector("#timerIcon");
-      if (timerIcon) timerIcon.textContent = product.icon;
+      if (timerIcon) timerIcon.innerHTML = product.icon;
 
       this.updateDisplay();
       this.updateButtonStates();
@@ -939,16 +939,47 @@ class PeriodCountdownTimer extends HTMLElement {
     }
   }
 
+  _getSvgIcon(product) {
+    const icons = {
+      tampon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="9" y="2" width="6" height="15" rx="3"/><line x1="12" y1="17" x2="12" y2="22"/></svg>`,
+      pad: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="8" y="4" width="8" height="16" rx="4"/><path d="M8 8C5 8 4 11 4 12C4 13 5 16 8 16"/><path d="M16 8C19 8 20 11 20 12C20 13 19 16 16 16"/></svg>`,
+      cup: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 3L8 14C8 17.3 9.8 19 12 19C14.2 19 16 17.3 16 14L16 3"/><line x1="8" y1="3" x2="16" y2="3"/><line x1="12" y1="19" x2="12" y2="22"/></svg>`,
+      liner: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="5" y="9" width="14" height="6" rx="3"/></svg>`,
+      underwear: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 6L3 10C3 14 6 17 12 17C18 17 21 14 21 10L21 6"/><path d="M3 6L9 6C9 6 10 11 12 11C14 11 15 6 15 6L21 6"/></svg>`,
+    };
+    return icons[product] || '';
+  }
+
   _t(key) {
     const translations = {
       de: {
+        // Status labels
+        period: "Periode",
+        fertile: "Fruchtbar",
+        pms: "PMS",
+        neutral: "Neutral",
         pre_menarche: "Pre-Menarche",
-        pre_menarche_desc: "Pubertät - Zyklus noch nicht begonnen",
-        neutral_title: "Keine Periode",
-        neutral_products_message: "Keine Periode - keine Produkte nötig",
         pregnant: "Schwanger",
         postpartum: "Wochenbett",
         menopause: "Menopause",
+        // Product names
+        tampon: "Tampon",
+        pad: "Binde",
+        cup: "Menstruationstasse",
+        liner: "Slipeinlage",
+        underwear: "Periodenunterwäsche",
+        // Symptom fields
+        bleeding_strength: "Blutungsstärke",
+        pain: "Schmerz",
+        cervical_mucus: "Zervixschleim",
+        basal_temp: "Basaltemperatur",
+        mood: "Stimmung",
+        energy: "Energie",
+        notes: "Notizen",
+        // Cycle info
+        pre_menarche_desc: "Pubertät - Zyklus noch nicht begonnen",
+        neutral_title: "Keine Periode",
+        neutral_products_message: "Keine Periode - keine Produkte nötig",
         preparation_tips: "Vorbereitungstipps",
         learn_about_cycle: "Lerne über den Zyklus",
         hygiene_products: "Hygiene-Produkte",
@@ -981,13 +1012,33 @@ class PeriodCountdownTimer extends HTMLElement {
         usage_logged_error: "Produktverbrauch konnte nicht gespeichert werden."
       },
       en: {
+        // Status labels
+        period: "Period",
+        fertile: "Fertile",
+        pms: "PMS",
+        neutral: "Neutral",
         pre_menarche: "Pre-Menarche",
-        pre_menarche_desc: "Puberty - cycle not yet started",
-        neutral_title: "No period",
-        neutral_products_message: "No period - no products needed",
         pregnant: "Pregnant",
         postpartum: "Postpartum",
         menopause: "Menopause",
+        // Product names
+        tampon: "Tampon",
+        pad: "Pad",
+        cup: "Menstrual Cup",
+        liner: "Liner",
+        underwear: "Period Underwear",
+        // Symptom fields
+        bleeding_strength: "Bleeding Strength",
+        pain: "Pain",
+        cervical_mucus: "Cervical Mucus",
+        basal_temp: "Basal Temperature",
+        mood: "Mood",
+        energy: "Energy",
+        notes: "Notes",
+        // Cycle info
+        pre_menarche_desc: "Puberty - cycle not yet started",
+        neutral_title: "No period",
+        neutral_products_message: "No period - no products needed",
         preparation_tips: "Preparation Tips",
         learn_about_cycle: "Learn about your cycle",
         hygiene_products: "Hygiene products",
@@ -1470,6 +1521,18 @@ class PeriodCountdownTimer extends HTMLElement {
       .timer-icon {
         font-size: 3rem;
         line-height: 1;
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+
+      .timer-icon svg {
+        width: 48px;
+        height: 48px;
+        color: var(--primary-color, #8e44ad);
       }
 
       .timer-content {
@@ -1600,7 +1663,8 @@ class PeriodCountdownTimer extends HTMLElement {
       @media (max-width: 600px) {
         .timer-display { flex-direction: column; gap: 12px; padding: 16px; }
         .timer-time { font-size: 2rem; }
-        .timer-icon { font-size: 2.5rem; }
+        .timer-icon { font-size: 2.5rem; width: 40px; height: 40px; }
+        .timer-icon svg { width: 40px; height: 40px; }
         .btn { padding: 8px 12px; font-size: 0.8rem; }
         
         .tips-grid,
