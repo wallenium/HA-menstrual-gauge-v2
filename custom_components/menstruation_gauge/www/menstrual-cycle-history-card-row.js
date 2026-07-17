@@ -1,4 +1,8 @@
 class MenstrualCycleHistoryCardRow extends HTMLElement {
+  static getConfigElement() {
+    return document.createElement('menstrual-cycle-history-card-row-editor');
+  }
+
   static getStubConfig() {
     return {
       type: 'custom:menstrual-cycle-history-card-row',
