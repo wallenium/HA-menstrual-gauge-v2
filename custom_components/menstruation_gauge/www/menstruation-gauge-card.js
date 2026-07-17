@@ -409,6 +409,59 @@ class MenstruationGaugeCard extends HTMLElement {
     return ranges;
   }
 
+  _bleedingBlocks(history) {
+    const days = Array.from(new Set((history || []).map((value) => this._normalizeISO(value)).filter(Boolean))).sort();
+    if (!days.length) return [];
+    const blocks = [];
+    let current = [days[0]];
+    for (let i = 1; i < days.length; i += 1) {
+      if (this._dayDiff(days[i], days[i - 1]) <= 2) {
+        current.push(days[i]);
+        continue;
+      }
+      blocks.push({ start: current[0], end: current[current.length - 1], days: current });
+      current = [days[i]];
+    }
+    blocks.push({ start: current[0], end: current[current.length - 1], days: current });
+    return blocks;
+  }
+
+  _periodModalContext(iso, model) {
+    const safeDuration = Number.isFinite(Number(model?.periodDuration))
+      ? Math.max(1, Math.min(14, Math.round(Number(model.periodDuration))))
+      : 5;
+    const blocks = this._bleedingBlocks(model?.history);
+    for (let i = blocks.length - 1; i >= 0; i -= 1) {
+      const block = blocks[i];
+      const daysFromStart = this._dayDiff(iso, block.start);
+      if (daysFromStart < 0 || daysFromStart >= safeDuration) continue;
+      return {
+        showPeriodToggle: iso === block.start,
+        continuationBlock: iso === block.start ? null : block,
+      };
+    }
+    return {
+      showPeriodToggle: true,
+      continuationBlock: null,
+    };
+  }
+
+  _daysToAutoConfirm(iso, model, continuationBlock) {
+    if (!continuationBlock || model.confirmedSet.has(iso)) return [];
+    const gapFromBlockEnd = this._dayDiff(iso, continuationBlock.end);
+    if (gapFromBlockEnd <= 0) return [iso];
+    const days = [];
+    const endDate = this._parseISO(continuationBlock.end);
+    if (!endDate) return [iso];
+    for (let offset = 1; offset <= gapFromBlockEnd; offset += 1) {
+      const next = new Date(endDate);
+      next.setDate(endDate.getDate() + offset);
+      const nextIso = this._isoFromDate(next);
+      if (nextIso && !model.confirmedSet.has(nextIso)) days.push(nextIso);
+    }
+    return days;
+  }
+
   _renderGauge(model, palette) {
     const cx = 210;
     const cy = 210;
@@ -627,6 +680,7 @@ class MenstruationGaugeCard extends HTMLElement {
     const isPeriodDay = model.confirmedSet.has(iso);
     const existing = model.symptomByDate?.[iso] || {};
     const isPreMenarche = model.state === 'pre_menarche';
+    const periodModalContext = this._periodModalContext(iso, model);
     const symptomConfig = this._symptomConfig(model.state);
 
     const categoryRows = symptomConfig.map((cat) => {
@@ -658,7 +712,7 @@ class MenstruationGaugeCard extends HTMLElement {
             <button type="button" class="sym-close" aria-label="close">✕</button>
           </div>
           <div class="sym-body">
-            ${isPreMenarche ? '' : `
+            ${isPreMenarche || !periodModalContext.showPeriodToggle ? '' : `
             <div class="sym-row">
               <div class="sym-cat-head"><ha-icon icon="mdi:calendar-heart"></ha-icon><span>${this._t('period_toggle')}</span></div>
               <div class="sym-options sym-single-opts">
@@ -692,7 +746,8 @@ class MenstruationGaugeCard extends HTMLElement {
     const profile = model.stateObj?.attributes?.profile;
 
     // Determine period toggle state from modal
-    const allowPeriodToggle = model.state !== 'pre_menarche';
+    const periodModalContext = this._periodModalContext(iso, model);
+    const allowPeriodToggle = model.state !== 'pre_menarche' && periodModalContext.showPeriodToggle;
     const periodYesBtn = root.querySelector('.sym-opt-btn[data-cat="_period"][data-val="yes"]');
     const wantsPeriod = allowPeriodToggle
       ? (periodYesBtn?.classList.contains('sym-selected') ?? model.confirmedSet.has(iso))
@@ -713,6 +768,9 @@ class MenstruationGaugeCard extends HTMLElement {
     const rawTemp = root.getElementById('sym-basal-temp')?.value;
     const basalTemp = parseFloat(rawTemp);
     if (!Number.isNaN(basalTemp) && rawTemp !== '') symptomData.basal_temp = basalTemp;
+    const autoConfirmDays = symptomData.bleeding_strength
+      ? this._daysToAutoConfirm(iso, model, periodModalContext.continuationBlock)
+      : [];
 
     this._modalIso = null;
 
@@ -723,6 +781,18 @@ class MenstruationGaugeCard extends HTMLElement {
       } catch (err) {
         // eslint-disable-next-line no-console
         console.error('menstruation-gauge-card: failed to toggle period', err);
+      }
+    }
+
+    if (!allowPeriodToggle && autoConfirmDays.length > 0) {
+      try {
+        for (const dayIso of autoConfirmDays) {
+          // eslint-disable-next-line no-await-in-loop
+          await this._toggleCycleStart(dayIso);
+        }
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('menstruation-gauge-card: failed to auto-confirm period day', err);
       }
     }
 
