@@ -108,6 +108,7 @@ SYMPTOM_PAIN = "pain"
 SYMPTOM_BASAL_TEMP = "basal_temp"
 SYMPTOM_HYGIENE = "hygiene"
 SYMPTOM_TEST = "test"
+SYMPTOM_CERVICAL_MUCUS = "cervical_mucus"
 
 # Symptom options for reference (used in UI)
 SYMPTOM_OPTIONS = {
@@ -117,6 +118,7 @@ SYMPTOM_OPTIONS = {
     SYMPTOM_PAIN: ["mittelschmerz", "cramps", "tender_breasts", "headache", "migraine", "lower_back", "vulva"],
     SYMPTOM_HYGIENE: ["pad", "liner", "tampon", "cup", "period_underwear"],
     SYMPTOM_TEST: ["positive_ovulation", "negative_ovulation", "positive_pregnancy", "negative_pregnancy"],
+    SYMPTOM_CERVICAL_MUCUS: ["keinen", "klebrig", "cremig", "fadenziehend", "untypisch"],
 }
 
 # Pre-Menarche Body Signs - Tanner Stages

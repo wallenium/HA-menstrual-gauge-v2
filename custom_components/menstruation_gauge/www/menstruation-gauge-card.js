@@ -75,6 +75,7 @@ class MenstruationGaugeCard extends HTMLElement {
         cat_pain: 'Schmerzen',
         cat_hygiene: 'Hygiene',
         cat_test: 'Test',
+        cat_cervical_mucus: 'Zervixschleim',
         // Symptom option labels
         opt_light: 'Gering',
         opt_medium: 'Mittel',
@@ -100,6 +101,11 @@ class MenstruationGaugeCard extends HTMLElement {
         opt_negative_ovulation: 'LH negativ',
         opt_positive_pregnancy: 'Schwangerschaft +',
         opt_negative_pregnancy: 'Schwangerschaft -',
+        opt_keinen: 'Keinen',
+        opt_klebrig: 'Klebrig',
+        opt_cremig: 'Cremig',
+        opt_fadenziehend: 'Fadenziehend',
+        opt_untypisch: 'Untypisch',
       },
       en: {
         days_unit: 'days',
@@ -120,6 +126,7 @@ class MenstruationGaugeCard extends HTMLElement {
         cat_pain: 'Pain',
         cat_hygiene: 'Hygiene',
         cat_test: 'Test',
+        cat_cervical_mucus: 'Cervical Mucus',
         // Symptom option labels
         opt_light: 'Light',
         opt_medium: 'Medium',
@@ -145,6 +152,11 @@ class MenstruationGaugeCard extends HTMLElement {
         opt_negative_ovulation: 'LH Negative',
         opt_positive_pregnancy: 'Pregnancy +',
         opt_negative_pregnancy: 'Pregnancy -',
+        opt_keinen: 'None',
+        opt_klebrig: 'Sticky',
+        opt_cremig: 'Creamy',
+        opt_fadenziehend: 'Stretchy',
+        opt_untypisch: 'Atypical',
       },
     };
     return (i18n[this._lang()] && i18n[this._lang()][key]) || (i18n.en[key] || key);
@@ -292,6 +304,7 @@ class MenstruationGaugeCard extends HTMLElement {
       { key: 'pain', icon: 'mdi:emoticon-sad-outline', multi: true, options: ['mittelschmerz', 'cramps', 'tender_breasts', 'headache', 'migraine', 'lower_back', 'vulva'] },
       { key: 'hygiene', icon: 'mdi:medical-bag', multi: true, options: ['pad', 'liner', 'tampon', 'cup', 'period_underwear'] },
       { key: 'test', icon: 'mdi:test-tube', multi: true, options: ['positive_ovulation', 'negative_ovulation', 'positive_pregnancy', 'negative_pregnancy'] },
+      { key: 'cervical_mucus', icon: 'mdi:water', multi: false, options: ['keinen', 'klebrig', 'cremig', 'fadenziehend', 'untypisch'] },
     ];
     if (String(state || '') === 'pre_menarche') {
       const allowed = new Set(['spotting', 'pain', 'hygiene']);
