@@ -811,7 +811,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             }),
         )
 
-    await _async_register_card_static_path(hass)
     await _async_ensure_lovelace_resource(hass)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -1217,26 +1216,3 @@ async def _async_ensure_lovelace_resource(hass: HomeAssistant) -> None:
     except Exception as err:
         _LOGGER.warning("Auto-registration of Lovelace resources failed, add them manually (%s)", err)
 
-
-async def _async_register_card_static_path(hass: HomeAssistant) -> None:
-    """Register card JS files as static paths across HA core API variants."""
-    static_files = [
-        (static_url, str(Path(__file__).parent / "www" / filename))
-        for _resource_url, static_url, filename in LOVELACE_RESOURCES
-    ]
-    if hasattr(hass.http, "async_register_static_paths"):
-        try:
-            from homeassistant.components.http import StaticPathConfig
-            await _maybe_await(hass.http.async_register_static_paths([StaticPathConfig(url_path=url, path=path, cache_headers=False) for url, path in static_files]))
-            return
-        except Exception:
-            pass
-    if hasattr(hass.http, "async_register_static_path"):
-        for url, path in static_files:
-            await _maybe_await(hass.http.async_register_static_path(url, path, False))
-        return
-    if hasattr(hass.http, "register_static_path"):
-        for url, path in static_files:
-            await hass.async_add_executor_job(hass.http.register_static_path, url, path, False)
-        return
-    _LOGGER.warning("No compatible HA HTTP static-path API found for %s", CARD_RESOURCE_URL)
