@@ -68,6 +68,45 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
         legend_alignment_bottom: 'Ausrichtung: Zyklusende (E/-Tage)',
         legend_alignment_top: 'Ausrichtung: Zyklusstart (Tag 1..X)',
         scroll: 'scroll',
+        // Symptom category labels
+        cat_bleeding_strength: 'Blutungsstärke',
+        cat_spotting: 'Schmierblutung',
+        cat_intercourse: 'Geschlechtsverkehr',
+        cat_pain: 'Schmerzen',
+        cat_hygiene: 'Hygiene',
+        cat_test: 'Test',
+        cat_cervical_mucus: 'Zervixschleim',
+        cat_basal_temp: 'Basaltemperatur',
+        // Symptom option labels
+        opt_light: 'Gering',
+        opt_medium: 'Mittel',
+        opt_heavy: 'Stark',
+        opt_very_heavy: 'Sehr stark',
+        opt_red: 'Rot',
+        opt_brown: 'Braun',
+        opt_protected: 'Geschützt',
+        opt_unprotected: 'Ungeschützt',
+        opt_mittelschmerz: 'Mittelschmerz',
+        opt_cramps: 'Krämpfe',
+        opt_tender_breasts: 'Brustspannung',
+        opt_headache: 'Kopfschmerz',
+        opt_migraine: 'Migräne',
+        opt_lower_back: 'Rückenschmerzen',
+        opt_vulva: 'Vulvaschmerz',
+        opt_pad: 'Binde',
+        opt_liner: 'Slipeinlage',
+        opt_tampon: 'Tampon',
+        opt_cup: 'Menstruationstasse',
+        opt_period_underwear: 'Periodenunterwäsche',
+        opt_positive_ovulation: 'LH positiv',
+        opt_negative_ovulation: 'LH negativ',
+        opt_positive_pregnancy: 'Schwangerschaft +',
+        opt_negative_pregnancy: 'Schwangerschaft -',
+        opt_keinen: 'Keinen',
+        opt_klebrig: 'Klebrig',
+        opt_cremig: 'Cremig',
+        opt_fadenziehend: 'Fadenziehend',
+        opt_untypisch: 'Untypisch',
       },
       en: {
         entity_not_found: 'Entity not found',
@@ -85,6 +124,45 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
         legend_alignment_bottom: 'Alignment: cycle end (E/-days)',
         legend_alignment_top: 'Alignment: cycle start (day 1..X)',
         scroll: 'scroll',
+        // Symptom category labels
+        cat_bleeding_strength: 'Bleeding',
+        cat_spotting: 'Spotting',
+        cat_intercourse: 'Intercourse',
+        cat_pain: 'Pain',
+        cat_hygiene: 'Hygiene',
+        cat_test: 'Test',
+        cat_cervical_mucus: 'Cervical Mucus',
+        cat_basal_temp: 'Basal Temp.',
+        // Symptom option labels
+        opt_light: 'Light',
+        opt_medium: 'Medium',
+        opt_heavy: 'Heavy',
+        opt_very_heavy: 'Very Heavy',
+        opt_red: 'Red',
+        opt_brown: 'Brown',
+        opt_protected: 'Protected',
+        opt_unprotected: 'Unprotected',
+        opt_mittelschmerz: 'Mittelschmerz',
+        opt_cramps: 'Cramps',
+        opt_tender_breasts: 'Tender Breasts',
+        opt_headache: 'Headache',
+        opt_migraine: 'Migraine',
+        opt_lower_back: 'Lower Back Pain',
+        opt_vulva: 'Vulva Pain',
+        opt_pad: 'Pad',
+        opt_liner: 'Liner',
+        opt_tampon: 'Tampon',
+        opt_cup: 'Cup',
+        opt_period_underwear: 'Period Underwear',
+        opt_positive_ovulation: 'LH Positive',
+        opt_negative_ovulation: 'LH Negative',
+        opt_positive_pregnancy: 'Pregnancy +',
+        opt_negative_pregnancy: 'Pregnancy -',
+        opt_keinen: 'None',
+        opt_klebrig: 'Sticky',
+        opt_cremig: 'Creamy',
+        opt_fadenziehend: 'Stretchy',
+        opt_untypisch: 'Atypical',
       },
     };
     return (i18n[this._lang()] && i18n[this._lang()][key]) || (i18n.en[key] || key);
@@ -223,7 +301,13 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
   }
 
   _symptomsForDate(symptomSources, dateIso) {
-    return (symptomSources || []).filter((source) => source.dates.has(dateIso));
+    return (symptomSources || [])
+      .filter((source) => source.dates.has(dateIso))
+      .map((source) => ({
+        name: source.name,
+        icon: source.icon,
+        value: source.valuesByDate ? source.valuesByDate[dateIso] : undefined,
+      }));
   }
 
   _symptomConfig() {
@@ -235,6 +319,7 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
       { key: 'hygiene', icon: 'mdi:medical-bag' },
       { key: 'test', icon: 'mdi:test-tube' },
       { key: 'basal_temp', icon: 'mdi:thermometer' },
+      { key: 'cervical_mucus', icon: 'mdi:water-circle-outline' },
     ];
   }
 
@@ -250,6 +335,7 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
     const sources = [];
     for (const cat of this._symptomConfig()) {
       const dates = new Set();
+      const valuesByDate = {};
       for (const entry of symptomHistory) {
         const iso = this._normalizeISO(entry?.date);
         if (!iso) continue;
@@ -257,8 +343,9 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
         if (val === null || val === undefined) continue;
         if (Array.isArray(val) && val.length === 0) continue;
         dates.add(iso);
+        valuesByDate[iso] = val;
       }
-      if (dates.size > 0) sources.push({ name: cat.key, icon: cat.icon, dates });
+      if (dates.size > 0) sources.push({ name: cat.key, icon: cat.icon, dates, valuesByDate });
     }
     return sources;
   }
@@ -271,6 +358,93 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
     if (day === ovulationDay) return 'is-ovulation';
     if (day >= fertileStart && day <= fertileEnd) return 'is-fertile';
     return '';
+  }
+
+  _escAttr(str) {
+    return String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  _buildTooltipHTML(tooltip, data) {
+    tooltip.innerHTML = '';
+    const { cs, cd, cl, dbe, symptoms } = data;
+
+    const header = document.createElement('div');
+    header.className = 'tip-header';
+    header.textContent = `${this._t('cycle_start')}: ${cs}, ${this._t('day')} ${cd}/${cl}`;
+    tooltip.appendChild(header);
+
+    const sub = document.createElement('div');
+    sub.className = 'tip-sub';
+    sub.textContent = dbe === 0 ? this._t('end') : `${dbe} ${this._t('days_before_end')}`;
+    tooltip.appendChild(sub);
+
+    if (symptoms && symptoms.length) {
+      const label = document.createElement('div');
+      label.className = 'tip-symptoms-label';
+      label.textContent = `${this._t('symptoms')}:`;
+      tooltip.appendChild(label);
+
+      const ul = document.createElement('ul');
+      ul.className = 'tip-symptoms';
+
+      for (const s of symptoms) {
+        const li = document.createElement('li');
+        li.className = 'tip-symptom';
+
+        const icon = document.createElement('ha-icon');
+        icon.className = 'tip-icon';
+        icon.setAttribute('icon', String(s.i || ''));
+        li.appendChild(icon);
+
+        const catKey = `cat_${s.k}`;
+        const catLabel = this._t(catKey) !== catKey ? this._t(catKey) : (s.k || '');
+        const valStr = Array.isArray(s.v) ? s.v.join(', ') : String(s.v || '');
+        const optKey = `opt_${valStr}`;
+        const valLabel = valStr ? (this._t(optKey) !== optKey ? this._t(optKey) : valStr) : '';
+
+        const span = document.createElement('span');
+        span.textContent = valLabel ? `${catLabel}: ${valLabel}` : catLabel;
+        li.appendChild(span);
+
+        ul.appendChild(li);
+      }
+
+      tooltip.appendChild(ul);
+    }
+  }
+
+  _bindTooltipEvents() {
+    const root = this.shadowRoot;
+    if (!root) return;
+    const heatmap = root.querySelector('.heatmap');
+    const tooltip = root.getElementById('mg-tooltip');
+    if (!heatmap || !tooltip) return;
+
+    const show = (cell) => {
+      const tipJson = cell.getAttribute('data-tip');
+      if (!tipJson) return;
+      let data;
+      try { data = JSON.parse(tipJson); } catch { return; }
+      tooltip.innerHTML = '';
+      this._buildTooltipHTML(tooltip, data);
+      tooltip.style.display = 'block';
+      const rect = cell.getBoundingClientRect();
+      const tipRect = tooltip.getBoundingClientRect();
+      let left = rect.left + rect.width / 2 - tipRect.width / 2;
+      let top = rect.bottom + 6;
+      if (top + tipRect.height > window.innerHeight - 8) top = rect.top - tipRect.height - 6;
+      left = Math.max(8, Math.min(left, window.innerWidth - tipRect.width - 8));
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top = `${top}px`;
+    };
+
+    const hide = () => { tooltip.style.display = 'none'; };
+
+    heatmap.addEventListener('mouseover', (e) => {
+      const cell = e.target.closest && e.target.closest('.cell:not(.spacer)');
+      if (cell) show(cell);
+    });
+    heatmap.addEventListener('mouseleave', hide);
   }
 
   _bindHeatmapScrollCues() {
@@ -376,13 +550,13 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
         if (dayIso && todayIso && dayIso === todayIso) classes.push('is-today');
         const symptoms = this._symptomsForDate(symptomSources, dayIso);
         if (symptoms.length) classes.push('has-symptom');
-        const symptomInfo = symptoms.length ? ` | ${this._t('symptoms')}: ${symptoms.map((item) => item.name).join(', ')}` : '';
         const daysBeforeEnd = cycle.length - cycleDay;
-        const tooltip = `${this._t('cycle_start')} ${cycle.start}, ${this._t('day')} ${cycleDay}/${cycle.length} | ${daysBeforeEnd === 0 ? this._t('end') : `${daysBeforeEnd} ${this._t('days_before_end')}`}${symptomInfo}`;
+        const plainTooltip = `${this._t('cycle_start')} ${cycle.start}, ${this._t('day')} ${cycleDay}/${cycle.length} | ${daysBeforeEnd === 0 ? this._t('end') : `${daysBeforeEnd} ${this._t('days_before_end')}`}${symptoms.length ? ` | ${this._t('symptoms')}: ${symptoms.map((s) => s.name).join(', ')}` : ''}`;
+        const tipData = { cs: cycle.start, cd: cycleDay, cl: cycle.length, dbe: daysBeforeEnd, symptoms: symptoms.map((s) => ({ k: s.name, i: s.icon, v: s.value })) };
         const symptomIconHtml = symptoms.length
           ? `<span class="symptom-wrap"><ha-icon class="symptom-icon" icon="${symptoms[0].icon}"></ha-icon>${symptoms.length > 1 ? `<span class="symptom-count">${symptoms.length}</span>` : ''}</span>`
           : '';
-        return `<div class="${classes.join(' ')}" title="${tooltip}">${symptomIconHtml}</div>`;
+        return `<div class="${classes.join(' ')}" title="${this._escAttr(plainTooltip)}" data-tip="${this._escAttr(JSON.stringify(tipData))}">${symptomIconHtml}</div>`;
       }).join('');
 
       const predictedClass = cycle.predicted ? ' predicted' : '';
@@ -574,6 +748,56 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
           .is-ovulation { background: color-mix(in srgb, var(--success-color, #4ade80) 68%, transparent); }
           .is-today { box-shadow: 0 0 0 1px color-mix(in srgb, var(--mg-card-bg) 20%, white); }
         }
+        #mg-tooltip {
+          display: none;
+          position: fixed;
+          z-index: 9999;
+          background: var(--ha-card-background, var(--card-background-color, #fff));
+          color: var(--primary-text-color);
+          border: 1px solid var(--divider-color, rgba(127, 127, 127, 0.35));
+          border-radius: 8px;
+          padding: 10px 12px;
+          min-width: 160px;
+          max-width: 280px;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+          pointer-events: none;
+          font-size: 12px;
+          line-height: 1.5;
+        }
+        .tip-header {
+          font-weight: 600;
+          margin-bottom: 2px;
+        }
+        .tip-sub {
+          color: var(--secondary-text-color);
+          font-size: 11px;
+          margin-bottom: 6px;
+        }
+        .tip-symptoms-label {
+          font-weight: 500;
+          margin-bottom: 4px;
+          border-top: 1px solid var(--divider-color, rgba(127, 127, 127, 0.25));
+          padding-top: 6px;
+        }
+        .tip-symptoms {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        .tip-symptom {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .tip-icon {
+          --mdc-icon-size: 14px;
+          width: 14px;
+          height: 14px;
+          flex-shrink: 0;
+        }
       </style>
       <ha-card>
         <div class="title">${this._config.title}</div>
@@ -593,8 +817,10 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
           <span class="legend-item">${alignMode === 'bottom' ? this._t('legend_alignment_bottom') : this._t('legend_alignment_top')}</span>
         </div>
       </ha-card>
+      <div id="mg-tooltip"></div>
     `;
     this._bindHeatmapScrollCues();
+    this._bindTooltipEvents();
   }
 }
 
