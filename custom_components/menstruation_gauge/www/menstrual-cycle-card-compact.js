@@ -59,8 +59,8 @@ class MenstrualCycleCard extends HTMLElement {
 
     if (statusBadge) {
       statusBadge.style.borderColor = status.color;
-      statusBadge.style.background = `${status.color}20`;
-      statusBadge.style.boxShadow = `0 0 0 3px ${status.color}40, inset 0 0 0 2px ${status.color}`;
+      statusBadge.style.background = status.badgeBg;
+      statusBadge.style.boxShadow = `0 0 0 3px ${status.badgeGlow}, inset 0 0 0 2px ${status.color}`;
       statusBadge.innerHTML = `
         <span class="status-emoji">${status.emoji}</span>
         <span class="status-label">${status.label}</span>
@@ -81,22 +81,30 @@ class MenstrualCycleCard extends HTMLElement {
     const statusMap = {
       period: {
         emoji: "🩸",
-        color: "#e74c3c",
+        color: "var(--error-color, #e74c3c)",
+        badgeBg: "rgba(231, 76, 60, 0.14)",
+        badgeGlow: "rgba(231, 76, 60, 0.30)",
         label: this._t('period'),
       },
       fertile: {
         emoji: "💚",
-        color: "#27ae60",
+        color: "var(--success-color, #27ae60)",
+        badgeBg: "rgba(39, 174, 96, 0.14)",
+        badgeGlow: "rgba(39, 174, 96, 0.30)",
         label: this._t('fertile'),
       },
       pms: {
         emoji: "⚠️",
-        color: "#f39c12",
+        color: "var(--warning-color, #f39c12)",
+        badgeBg: "rgba(243, 156, 18, 0.14)",
+        badgeGlow: "rgba(243, 156, 18, 0.30)",
         label: this._t('pms'),
       },
       neutral: {
         emoji: "⭕",
-        color: "#95a5a6",
+        color: "var(--secondary-text-color, #95a5a6)",
+        badgeBg: "rgba(149, 165, 166, 0.14)",
+        badgeGlow: "rgba(149, 165, 166, 0.30)",
         label: this._t('neutral'),
       },
     };
@@ -131,11 +139,14 @@ class MenstrualCycleCard extends HTMLElement {
     style.textContent = `
       :host {
         display: block;
+        --mg-card-bg: var(--ha-card-background, var(--card-background-color, #fff));
+        --mg-card-border: var(--divider-color, rgba(127, 127, 127, 0.35));
       }
 
       ha-card {
         height: 100%;
-        background: var(--ha-card-background);
+        background: var(--mg-card-bg);
+        border: 1px solid var(--mg-card-border);
         border-radius: 16px;
       }
 
@@ -203,7 +214,7 @@ class MenstrualCycleCard extends HTMLElement {
       /* Dark Mode */
       @media (prefers-color-scheme: dark) {
         .status-badge {
-          box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1) !important;
+          box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-text-color, #f5f5f5) 25%, transparent) !important;
         }
       }
 

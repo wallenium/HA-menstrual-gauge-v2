@@ -395,11 +395,17 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
 
     this.shadowRoot.innerHTML = `
       <style>
-        :host { display: block; }
+        :host {
+          display: block;
+          --mg-card-bg: var(--ha-card-background, var(--card-background-color, #fff));
+          --mg-border: var(--divider-color, rgba(127, 127, 127, 0.35));
+        }
         ha-card {
           --cell-size: 11px;
           --cell-gap: 2px;
           padding: 12px;
+          background: var(--mg-card-bg);
+          border: 1px solid var(--mg-border);
         }
         .title {
           font-weight: 600;
@@ -456,11 +462,11 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
         }
         .scroll-cue.left {
           left: 0;
-          background: linear-gradient(90deg, var(--card-background-color, #fff) 18%, rgba(255, 255, 255, 0));
+          background: linear-gradient(90deg, var(--mg-card-bg) 18%, transparent);
         }
         .scroll-cue.right {
           right: 0;
-          background: linear-gradient(270deg, var(--card-background-color, #fff) 18%, rgba(255, 255, 255, 0));
+          background: linear-gradient(270deg, var(--mg-card-bg) 18%, transparent);
         }
         .scroll-cue.active { opacity: 0.92; }
         .heatmap-wrap.is-scrollable::after {
@@ -490,21 +496,21 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
           height: var(--cell-size);
           border-radius: 2px;
           background: transparent;
-          border: 1px solid rgba(120, 120, 120, 0.35);
+          border: 1px solid var(--mg-border);
           box-sizing: border-box;
           position: relative;
           overflow: hidden;
         }
         .spacer { visibility: hidden; }
-        .is-period-window { background: rgba(190, 18, 60, 0.14); }
+        .is-period-window { background: color-mix(in srgb, var(--error-color, #be123c) 16%, transparent); }
         .is-period-day {
           background:
             radial-gradient(circle at 36% 28%, rgba(255,255,255,0.52) 0 16%, transparent 17%),
-            linear-gradient(165deg, #9f1239, #e11d48);
-          box-shadow: inset 0 0 0 1px rgba(136, 19, 55, 0.18);
+            linear-gradient(165deg, color-mix(in srgb, var(--error-color, #be123c) 78%, #50051f), color-mix(in srgb, var(--error-color, #be123c) 92%, #ff4f7a));
+          box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--error-color, #be123c) 30%, transparent);
         }
-        .is-fertile { background: rgba(250, 204, 21, 0.45); }
-        .is-ovulation { background: rgba(22, 163, 74, 0.55); }
+        .is-fertile { background: color-mix(in srgb, var(--warning-color, #facc15) 50%, transparent); }
+        .is-ovulation { background: color-mix(in srgb, var(--success-color, #16a34a) 58%, transparent); }
         .is-future {
           opacity: 0.42;
           filter: saturate(0.7);
@@ -539,9 +545,9 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
           font-size: 6px;
           line-height: 8px;
           text-align: center;
-          background: var(--card-background-color, #fff);
+          background: var(--mg-card-bg);
           color: var(--secondary-text-color);
-          border: 1px solid rgba(120, 120, 120, 0.4);
+          border: 1px solid var(--mg-border);
           box-sizing: border-box;
         }
         .legend {
@@ -561,6 +567,12 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
           width: 10px;
           height: 10px;
           border-radius: 2px;
+        }
+        @media (prefers-color-scheme: dark) {
+          .is-period-window { background: color-mix(in srgb, var(--error-color, #ff6b89) 26%, transparent); }
+          .is-fertile { background: color-mix(in srgb, var(--warning-color, #ffd45a) 62%, transparent); }
+          .is-ovulation { background: color-mix(in srgb, var(--success-color, #4ade80) 68%, transparent); }
+          .is-today { box-shadow: 0 0 0 1px color-mix(in srgb, var(--mg-card-bg) 20%, white); }
         }
       </style>
       <ha-card>

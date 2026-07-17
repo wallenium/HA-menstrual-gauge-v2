@@ -318,26 +318,27 @@ class MenstruationGaugeCard extends HTMLElement {
     if (!dark) {
       return {
         cardBg: this._stateBg(state),
-        cardColor: '#4a044e',
-        border: 'rgba(190,24,93,.20)',
+        cardColor: 'var(--primary-text-color, #4a044e)',
+        border: 'var(--divider-color, rgba(190,24,93,.20))',
         shadow: '0 8px 20px rgba(131,24,67,.10)',
-        monthText: 'rgba(131,24,67,.72)',
-        dayLabel: 'rgba(131,24,67,.68)',
+        monthText: 'var(--secondary-text-color, rgba(131,24,67,.72))',
+        dayLabel: 'var(--secondary-text-color, rgba(131,24,67,.68))',
         tick: 'rgba(190,24,93,.22)',
-        confirmed: '#be123c',
-        fertile: '#facc15',
-        ovulation: '#16a34a',
+        confirmed: 'var(--error-color, #be123c)',
+        fertile: 'var(--warning-color, #facc15)',
+        ovulation: 'var(--success-color, #16a34a)',
         markerStroke: '#ffe4e6',
-        hand: '#be123c',
+        hand: 'var(--error-color, #be123c)',
         ring: 'rgba(190,24,93,.16)',
-        countdownBg: 'rgba(255,255,255,.44)',
-        countdownColor: '#831843',
-        buttonBg: '#fff',
-        buttonColor: '#831843',
-        buttonBorder: 'rgba(190,24,93,.25)',
-        dayBg: '#fff',
-        dayColor: '#6b1b4a',
-        dayBorder: 'rgba(190,24,93,.16)',
+        confirmedInset: 'rgba(190,24,93,.20)',
+        countdownBg: 'color-mix(in srgb, var(--ha-card-background, var(--card-background-color, #fff)) 72%, white)',
+        countdownColor: 'var(--primary-text-color, #831843)',
+        buttonBg: 'var(--ha-card-background, var(--card-background-color, #fff))',
+        buttonColor: 'var(--primary-text-color, #831843)',
+        buttonBorder: 'var(--divider-color, rgba(190,24,93,.25))',
+        dayBg: 'var(--ha-card-background, var(--card-background-color, #fff))',
+        dayColor: 'var(--primary-text-color, #6b1b4a)',
+        dayBorder: 'var(--divider-color, rgba(190,24,93,.16))',
         dayToday: 'rgba(190,24,93,.35)',
       };
     }
@@ -352,26 +353,27 @@ class MenstruationGaugeCard extends HTMLElement {
 
     return {
       cardBg: bg,
-      cardColor: '#f8d9e9',
-      border: 'rgba(251,113,133,.34)',
+      cardColor: 'var(--primary-text-color, #f8d9e9)',
+      border: 'var(--divider-color, rgba(251,113,133,.34))',
       shadow: '0 10px 24px rgba(0,0,0,.34)',
-      monthText: 'rgba(251,214,232,.82)',
-      dayLabel: 'rgba(251,214,232,.78)',
+      monthText: 'var(--secondary-text-color, rgba(251,214,232,.82))',
+      dayLabel: 'var(--secondary-text-color, rgba(251,214,232,.78))',
       tick: 'rgba(251,113,133,.42)',
-      confirmed: '#fb7185',
-      fertile: '#fde047',
-      ovulation: '#4ade80',
+      confirmed: 'var(--error-color, #fb7185)',
+      fertile: 'var(--warning-color, #fde047)',
+      ovulation: 'var(--success-color, #4ade80)',
       markerStroke: '#2f1f29',
-      hand: '#fb7185',
+      hand: 'var(--error-color, #fb7185)',
       ring: 'rgba(251,113,133,.32)',
+      confirmedInset: 'rgba(251,113,133,.36)',
       countdownBg: 'rgba(32,20,29,.72)',
-      countdownColor: '#ffd4e6',
+      countdownColor: 'var(--primary-text-color, #ffd4e6)',
       buttonBg: 'rgba(41,27,36,.95)',
-      buttonColor: '#ffd4e6',
-      buttonBorder: 'rgba(251,113,133,.45)',
+      buttonColor: 'var(--primary-text-color, #ffd4e6)',
+      buttonBorder: 'var(--divider-color, rgba(251,113,133,.45))',
       dayBg: 'rgba(41,27,36,.95)',
-      dayColor: '#f9d8e9',
-      dayBorder: 'rgba(251,113,133,.30)',
+      dayColor: 'var(--primary-text-color, #f9d8e9)',
+      dayBorder: 'var(--divider-color, rgba(251,113,133,.30))',
       dayToday: 'rgba(251,113,133,.66)',
     };
   }
@@ -935,8 +937,8 @@ class MenstruationGaugeCard extends HTMLElement {
         .day.active { background: ${palette.confirmed}; color: #fff; border-color: ${palette.confirmed}; }
         .day.today { outline: 2px solid ${palette.dayToday}; }
         .day.other { opacity: .3; }
-        .day.has-symptoms { box-shadow: 0 0 0 2px #facc15 inset; }
-        .day.active.has-symptoms { box-shadow: 0 0 0 2px #facc15 inset, 0 0 0 4px ${palette.confirmed}33 inset; }
+        .day.has-symptoms { box-shadow: 0 0 0 2px ${palette.fertile} inset; }
+        .day.active.has-symptoms { box-shadow: 0 0 0 2px ${palette.fertile} inset, 0 0 0 4px ${palette.confirmedInset} inset; }
         /* Symptom modal */
         .sym-overlay { position: absolute; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; border-radius: 16px; overflow: hidden; }
         .sym-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.55); }

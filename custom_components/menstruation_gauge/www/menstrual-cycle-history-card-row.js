@@ -201,22 +201,30 @@ class MenstrualCycleHistoryCardRow extends HTMLElement {
     }
 
     const html = `<style>
-      :host { display: block; }
-      ha-card { padding: 12px; }
+      :host {
+        display: block;
+        --mg-card-bg: var(--ha-card-background, var(--card-background-color, #fff));
+        --mg-text-secondary: var(--secondary-text-color, #6b7280);
+        --mg-border: var(--divider-color, rgba(127, 127, 127, 0.35));
+      }
+      ha-card { padding: 12px; background: var(--mg-card-bg); }
       .title { font-weight: 600; margin: 0 0 12px; color: var(--primary-text-color); }
       .table-wrap { overflow-x: auto; }
       table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-      thead { background: rgba(0,0,0,0.04); color: var(--secondary-text-color); }
-      th { padding: 8px 6px; text-align: left; font-weight: 600; border-bottom: 1px solid var(--divider-color); font-size: 0.75rem; }
-      .cycle-row { border-bottom: 1px solid var(--divider-color); transition: background-color 120ms ease; }
-      .cycle-row:hover { background: rgba(0,0,0,0.02); }
+      thead { background: color-mix(in srgb, var(--mg-text-secondary) 10%, transparent); color: var(--mg-text-secondary); }
+      th { padding: 8px 6px; text-align: left; font-weight: 600; border-bottom: 1px solid var(--mg-border); font-size: 0.75rem; }
+      .cycle-row { border-bottom: 1px solid var(--mg-border); transition: background-color 120ms ease; }
+      .cycle-row:hover { background: color-mix(in srgb, var(--mg-text-secondary) 8%, transparent); }
       .cycle-row.predicted { opacity: 0.7; font-style: italic; }
       td { padding: 10px 6px; color: var(--primary-text-color); }
       .cell-label { font-weight: 500; min-width: 80px; }
-      .cell-date { min-width: 70px; color: var(--secondary-text-color); font-size: 0.85rem; }
+      .cell-date { min-width: 70px; color: var(--mg-text-secondary); font-size: 0.85rem; }
       .cell-length { text-align: center; font-weight: 500; min-width: 50px; }
       .cell-status { text-align: right; min-width: 80px; }
-      .status-label { display: inline-block; padding: 2px 8px; border-radius: 12px; background: rgba(100,100,100,0.1); font-size: 0.75rem; font-weight: 500; color: var(--secondary-text-color); }
+      .status-label { display: inline-block; padding: 2px 8px; border-radius: 12px; background: color-mix(in srgb, var(--mg-text-secondary) 14%, transparent); font-size: 0.75rem; font-weight: 500; color: var(--mg-text-secondary); border: 1px solid var(--mg-border); }
+      @media (prefers-color-scheme: dark) {
+        .cycle-row:hover { background: color-mix(in srgb, var(--mg-text-secondary) 16%, transparent); }
+      }
       @media (max-width: 600px) { table { font-size: 0.8rem; } th, td { padding: 6px 4px; } }
     </style>
     <ha-card>
