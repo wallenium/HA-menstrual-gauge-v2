@@ -140,6 +140,7 @@ class MenstrualProductInventoryCard extends HTMLElement {
       this._setError("");
     } catch (error) {
       this._setError(`${this._t("error_prefix")}: ${error?.message || error}`);
+      throw error;
     }
   }
 
@@ -148,25 +149,44 @@ class MenstrualProductInventoryCard extends HTMLElement {
     this._render();
   }
 
+  _escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    }[char]));
+  }
+
   _formatTimestamp(ts) {
     if (!ts) return "";
     const date = new Date(ts);
     if (Number.isNaN(date.getTime())) return ts;
-    return new Intl.DateTimeFormat(this._hass?.locale?.language || "en", {
+    const locale = typeof this._hass?.locale?.language === "string" ? this._hass.locale.language : "en";
+    const safeLocale = Intl.DateTimeFormat.supportedLocalesOf([locale])[0] || "en";
+    const options = {
       year: "numeric",
       month: "short",
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-    }).format(date);
+    };
+
+    try {
+      return new Intl.DateTimeFormat(safeLocale, options).format(date);
+    } catch (error) {
+      return new Intl.DateTimeFormat("en", options).format(date);
+    }
   }
 
   _render() {
     if (!this.shadowRoot || !this._hass || !this.config) return;
 
+    const inventoryEntity = this._escapeHtml(this.config.inventory_entity);
     const stateObj = this._getEntity();
     if (!stateObj) {
-      this.shadowRoot.innerHTML = `<ha-card><div class="empty">${this._t("entity_not_found")}: ${this.config.inventory_entity}</div></ha-card>`;
+      this.shadowRoot.innerHTML = `<ha-card><div class="empty">${this._t("entity_not_found")}: ${inventoryEntity}</div></ha-card>`;
       return;
     }
 
@@ -178,6 +198,11 @@ class MenstrualProductInventoryCard extends HTMLElement {
     const selectedMember = (this._selectedMember ?? this.config.member) || "";
     const lastUsage = attrs.last_usage;
     const recentLogs = Array.isArray(attrs.consumption_log) ? attrs.consumption_log.slice(-5).reverse() : [];
+    const title = this._escapeHtml(this.config.title || this._t("title"));
+    const memberList = memberNames.length ? memberNames.map((name) => this._escapeHtml(name)).join(", ") : "-";
+    const lastUsageText = lastUsage
+      ? `${this._escapeHtml(this._t(lastUsage.product))} ×${this._escapeHtml(lastUsage.quantity)} · ${this._escapeHtml(lastUsage.member || this._t("unknown_member"))} · ${this._escapeHtml(this._formatTimestamp(lastUsage.timestamp))}`
+      : this._t("no_usage");
 
     const rows = this._products()
       .map((product) => {
@@ -232,26 +257,26 @@ class MenstrualProductInventoryCard extends HTMLElement {
         .empty { padding: 16px; color: var(--secondary-text-color); }
       </style>
       <ha-card>
-        <h2 class="title">${this.config.title || this._t("title")}</h2>
+        <h2 class="title">${title}</h2>
         <div class="meta">
-          <div><strong>${this._t("members")}:</strong> ${memberNames.length ? memberNames.join(", ") : "-"}</div>
+          <div><strong>${this._t("members")}:</strong> ${memberList}</div>
           <label>
             <strong>${this._t("member")}:</strong>
             <select id="memberSelector">
               <option value="">${this._t("all_members")}</option>
-              ${memberNames.map((name) => `<option value="${name}" ${selectedMember === name ? "selected" : ""}>${name}</option>`).join("")}
+              ${memberNames.map((name) => `<option value="${this._escapeHtml(name)}" ${selectedMember === name ? "selected" : ""}>${this._escapeHtml(name)}</option>`).join("")}
             </select>
           </label>
         </div>
-        <div class="meta"><strong>${this._t("last_usage")}:</strong> ${lastUsage ? `${this._t(lastUsage.product)} ×${lastUsage.quantity} · ${lastUsage.member || this._t("unknown_member")} · ${this._formatTimestamp(lastUsage.timestamp)}` : this._t("no_usage")}</div>
-        ${this._errorMessage ? `<div class="error">${this._errorMessage}</div>` : ""}
+        <div class="meta"><strong>${this._t("last_usage")}:</strong> ${lastUsageText}</div>
+        ${this._errorMessage ? `<div class="error">${this._escapeHtml(this._errorMessage)}</div>` : ""}
         <div class="rows">${rows}</div>
         <div class="logs">
           <strong>${this._t("recent_usage")}</strong>
           ${recentLogs.length ? recentLogs.map((entry) => `
             <div class="log-item">
-              <span>${this._t(entry.product)} ×${entry.quantity} · ${entry.member || this._t("unknown_member")}</span>
-              <span>${this._formatTimestamp(entry.timestamp)}</span>
+              <span>${this._escapeHtml(this._t(entry.product))} ×${this._escapeHtml(entry.quantity)} · ${this._escapeHtml(entry.member || this._t("unknown_member"))}</span>
+              <span>${this._escapeHtml(this._formatTimestamp(entry.timestamp))}</span>
             </div>
           `).join("") : `<div class="empty">${this._t("no_logs")}</div>`}
         </div>
@@ -321,7 +346,9 @@ class MenstrualProductInventoryCard extends HTMLElement {
   }
 }
 
-customElements.define("menstrual-product-inventory-card", MenstrualProductInventoryCard);
+if (!customElements.get("menstrual-product-inventory-card")) {
+  customElements.define("menstrual-product-inventory-card", MenstrualProductInventoryCard);
+}
 
 window.customCards = window.customCards || [];
 window.customCards.push({
