@@ -117,7 +117,7 @@ def _load_manifest_version() -> str:
 
 def _build_card_static_url(filename: str) -> str:
     """Build the static path served by Home Assistant."""
-    return f"/{DOMAIN}/{filename}"
+    return f"/local/community/{DOMAIN}/{filename}"
 
 
 def _build_card_resource_url(filename: str) -> str:
@@ -487,74 +487,10 @@ async def _async_refresh_cycle_model(hass: HomeAssistant, entry_ids: set[str] | 
         )
 
 
-_STATIC_PATHS_REGISTERED = False
-
-
-async def _async_register_card_static_path(hass: HomeAssistant) -> None:
-    """Register static HTTP paths so Lovelace can load the custom JS cards.
-
-    Registers each JS file individually at ``/{DOMAIN}/<filename>`` using
-    Home Assistant's ``async_register_static_path`` API (current HA versions).
-    """
-    global _STATIC_PATHS_REGISTERED  # noqa: PLW0603
-    if _STATIC_PATHS_REGISTERED:
-        return
-
-    www_dir = Path(__file__).parent / "www"
-
-    if not www_dir.is_dir():
-        _LOGGER.error(
-            "Custom card www/ directory not found at %s – JS files cannot be served",
-            www_dir,
-        )
-        return
-
-    js_files = sorted(www_dir.glob("*.js"))
-    if not js_files:
-        _LOGGER.error("No JS files found in %s – custom cards cannot be loaded", www_dir)
-        return
-
-    _LOGGER.debug(
-        "Registering %d static path(s) under /%s from %s: %s",
-        len(js_files),
-        DOMAIN,
-        www_dir,
-        ", ".join(f.name for f in js_files),
-    )
-
-    registered = 0
-    for js_file in js_files:
-        url_path = f"/{DOMAIN}/{js_file.name}"
-        file_path = str(js_file)
-        try:
-            await hass.http.async_register_static_path(url_path, file_path, cache_headers=False)
-            _LOGGER.info("Registered static path %s → %s", url_path, file_path)
-            registered += 1
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.error(
-                "Failed to register custom path %s for custom Lovelace cards: %s",
-                url_path,
-                err,
-            )
-
-    if registered:
-        _LOGGER.info(
-            "Static paths registered successfully – serving %d/%d custom card(s) from %s",
-            registered,
-            len(js_files),
-            www_dir,
-        )
-        _STATIC_PATHS_REGISTERED = True
-    else:
-        _LOGGER.error(
-            "Failed to register any static paths for custom Lovelace cards from %s",
-            www_dir,
-        )
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up integration from YAML (not used, config-entry only)."""
-    await _async_register_card_static_path(hass)
     return True
 
 
@@ -877,7 +813,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             }),
         )
 
-    await _async_register_card_static_path(hass)
     await _async_ensure_lovelace_resource(hass)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
