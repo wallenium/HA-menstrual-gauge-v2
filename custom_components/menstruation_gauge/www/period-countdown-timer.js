@@ -12,6 +12,7 @@ class PeriodCountdownTimer extends HTMLElement {
       reminderEnabled: true,
     };
     this.config = {};
+    this._lastEntityState = null;
   }
 
   connectedCallback() {
@@ -30,6 +31,7 @@ class PeriodCountdownTimer extends HTMLElement {
 
   setConfig(config) {
     this.config = config || {};
+    this._lastEntityState = null;
     if (this._hass) {
       this.updateStatus();
     }
@@ -38,7 +40,12 @@ class PeriodCountdownTimer extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     if (this.config && this.config.entity) {
-      this.updateStatus();
+      const stateObj = hass.states[this.config.entity];
+      const newState = stateObj ? JSON.stringify({ state: stateObj.state, attributes: stateObj.attributes }) : null;
+      if (newState !== this._lastEntityState) {
+        this._lastEntityState = newState;
+        this.updateStatus();
+      }
     }
   }
 
@@ -78,7 +85,6 @@ class PeriodCountdownTimer extends HTMLElement {
       }
 
       const status = stateObj.state;
-      console.log("Status updated:", status);
       this.timerState.currentStatus = status;
 
       // Update card meta
