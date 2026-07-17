@@ -487,8 +487,57 @@ async def _async_refresh_cycle_model(hass: HomeAssistant, entry_ids: set[str] | 
         )
 
 
+def _async_register_card_static_path(hass: HomeAssistant) -> None:
+    """Register static HTTP paths so Lovelace can load the custom JS cards.
+
+    Maps ``/{DOMAIN}/`` → ``custom_components/menstruation_gauge/www/``
+    so that URLs like ``/menstruation_gauge/menstruation-gauge-card.js``
+    are served by Home Assistant's built-in HTTP server.
+    """
+    www_dir = Path(__file__).parent / "www"
+
+    if not www_dir.is_dir():
+        _LOGGER.error(
+            "Custom card www/ directory not found at %s – JS files cannot be served",
+            www_dir,
+        )
+        return
+
+    js_files = sorted(www_dir.glob("*.js"))
+    if not js_files:
+        _LOGGER.error("No JS files found in %s – custom cards cannot be loaded", www_dir)
+        return
+
+    _LOGGER.debug(
+        "Registering static path /%s → %s (%d JS file(s): %s)",
+        DOMAIN,
+        www_dir,
+        len(js_files),
+        ", ".join(f.name for f in js_files),
+    )
+
+    try:
+        hass.http.register_static_path(
+            f"/{DOMAIN}",
+            str(www_dir),
+            cache_headers=True,
+        )
+        _LOGGER.info(
+            "Static path /%s registered successfully – serving %d custom card(s) from %s",
+            DOMAIN,
+            len(js_files),
+            www_dir,
+        )
+    except Exception as err:
+        _LOGGER.error(
+            "Failed to register static path for custom Lovelace cards: %s",
+            err,
+        )
+
+
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up integration from YAML (not used, config-entry only)."""
+    _async_register_card_static_path(hass)
     return True
 
 
