@@ -14,7 +14,7 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
+from homeassistant.const import CONF_TYPE, Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 
@@ -105,6 +105,8 @@ PLATFORMS: list[Platform] = [Platform.SENSOR]
 MANIFEST_PATH = Path(__file__).with_name("manifest.json")
 WWW_DIR = Path(__file__).parent / "www"
 _HTTP_ROUTES_REGISTERED_KEY = f"{DOMAIN}_http_routes_registered"
+_LOVELACE_RESOURCES_ENSURED_KEY = f"{DOMAIN}_lovelace_resources_ensured"
+_LOVELACE_RESOURCES_SCHEDULED_KEY = f"{DOMAIN}_lovelace_resources_scheduled"
 
 
 def _load_manifest_version() -> str:
@@ -816,7 +818,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
 
     await _async_register_http_handlers(hass)
-    await _async_ensure_lovelace_resource(hass)
+    _async_schedule_lovelace_resource_registration(hass)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
@@ -1214,43 +1216,167 @@ async def _async_register_http_handlers(hass: HomeAssistant) -> None:
         _LOGGER.warning("Failed to register HTTP routes for card files: %s", err)
 
 
-async def _async_ensure_lovelace_resource(hass: HomeAssistant) -> None:
-    """Auto-register Lovelace JS resources for storage dashboards."""
+def _async_schedule_lovelace_resource_registration(hass: HomeAssistant) -> None:
+    """Register Lovelace resources once the Lovelace component is ready."""
+    if hass.data.get(_LOVELACE_RESOURCES_SCHEDULED_KEY):
+        return
+
+    hass.data[_LOVELACE_RESOURCES_SCHEDULED_KEY] = True
+
+    async def _async_when_lovelace_ready(_hass: HomeAssistant, _component: str) -> None:
+        await _async_ensure_lovelace_resource(_hass)
+
+    try:
+        from homeassistant.setup import async_when_setup_or_start
+    except ImportError:
+        hass.async_create_task(_async_ensure_lovelace_resource(hass))
+        return
+
+    async_when_setup_or_start(hass, "lovelace", _async_when_lovelace_ready)
+
+
+def _normalize_resource_url(url: str | None) -> str | None:
+    """Normalize a resource URL for duplicate detection."""
+    if not url:
+        return None
+    return url.split("?", 1)[0]
+
+
+def _build_lovelace_resource_payloads(resource_url: str) -> list[dict[str, str]]:
+    """Build payloads for supported Lovelace resource schemas."""
+    payloads: list[dict[str, str]] = []
+    seen_type_keys: set[str] = set()
+
+    try:
+        from homeassistant.components.lovelace.const import CONF_RESOURCE_TYPE_WS
+
+        seen_type_keys.add(CONF_RESOURCE_TYPE_WS)
+        payloads.append({"url": resource_url, CONF_RESOURCE_TYPE_WS: CARD_RESOURCE_TYPE})
+    except Exception:
+        pass
+
+    for type_key in ("res_type", CONF_TYPE):
+        if type_key in seen_type_keys:
+            continue
+        seen_type_keys.add(type_key)
+        payloads.append({"url": resource_url, type_key: CARD_RESOURCE_TYPE})
+
+    return payloads
+
+
+async def _async_get_lovelace_resource_collection(hass: HomeAssistant) -> tuple[Any | None, str | None]:
+    """Return a Lovelace resource collection and its mode if available."""
     try:
         from homeassistant.components.lovelace.resources import async_get_resource_collection
+    except Exception:
+        async_get_resource_collection = None
+
+    if async_get_resource_collection is not None:
+        try:
+            collection = await _maybe_await(async_get_resource_collection(hass))
+        except Exception as err:
+            _LOGGER.debug("Legacy Lovelace resource helper failed: %s", err)
+        else:
+            if collection is not None:
+                return collection, None
+
+    try:
+        from homeassistant.components.lovelace.const import LOVELACE_DATA, MODE_STORAGE
     except Exception as err:
-        _LOGGER.debug("Lovelace resource API unavailable, skip auto registration: %s", err)
+        _LOGGER.debug("Unable to import Lovelace constants: %s", err)
+        LOVELACE_DATA = None  # type: ignore[assignment]
+        MODE_STORAGE = "storage"  # type: ignore[assignment]
+
+    lovelace_data = hass.data.get(LOVELACE_DATA) if LOVELACE_DATA is not None else None
+    resource_mode = getattr(lovelace_data, "resource_mode", None)
+    collection = getattr(lovelace_data, "resources", None)
+    if collection is not None:
+        return collection, resource_mode
+
+    if resource_mode not in (None, MODE_STORAGE):
+        return None, resource_mode
+
+    if "lovelace" not in hass.config.components:
+        return None, resource_mode
+
+    try:
+        from homeassistant.components.lovelace.dashboard import LovelaceStorage
+        from homeassistant.components.lovelace.resources import ResourceStorageCollection
+
+        return ResourceStorageCollection(hass, LovelaceStorage(hass, None)), MODE_STORAGE
+    except Exception as err:
+        _LOGGER.warning("Failed to create Lovelace resource storage collection: %s", err)
+        return None, resource_mode
+
+
+async def _async_ensure_lovelace_resource(hass: HomeAssistant) -> None:
+    """Auto-register Lovelace JS resources for storage dashboards."""
+    if hass.data.get(_LOVELACE_RESOURCES_ENSURED_KEY):
+        return
+
+    collection, resource_mode = await _async_get_lovelace_resource_collection(hass)
+    if collection is None:
+        if "lovelace" not in hass.config.components:
+            _LOGGER.warning("Lovelace component is unavailable; cannot auto-register card resources")
+        elif resource_mode and resource_mode != "storage":
+            _LOGGER.warning(
+                "Lovelace resources use %s mode; automatic resource registration requires storage mode",
+                resource_mode,
+            )
+        else:
+            _LOGGER.warning("Lovelace resource collection is unavailable; card resources were not registered")
+        return
+
+    if not hasattr(collection, "async_create_item"):
+        _LOGGER.warning(
+            "Lovelace resource collection does not support automatic creation%s",
+            f" in {resource_mode} mode" if resource_mode else "",
+        )
         return
 
     try:
-        collection = await _maybe_await(async_get_resource_collection(hass))
         items = await _maybe_await(collection.async_items())
         existing_urls = {
-            item.get("url")
+            _normalize_resource_url(item.get("url"))
             for item in items or []
             if isinstance(item, dict) and item.get("url")
         }
 
-        for resource_url, _static_url, _filename in LOVELACE_RESOURCES:
-            if resource_url in existing_urls:
+        added_count = 0
+        failed_urls: list[str] = []
+        for resource_url, _static_url, filename in LOVELACE_RESOURCES:
+            normalized_resource_url = _normalize_resource_url(resource_url)
+            if normalized_resource_url in existing_urls:
+                _LOGGER.debug("Lovelace resource already registered: %s", resource_url)
                 continue
 
-            created = False
-            for payload in (
-                {"url": resource_url, "res_type": CARD_RESOURCE_TYPE},
-                {"url": resource_url, "type": CARD_RESOURCE_TYPE},
-            ):
+            create_errors: list[str] = []
+            for payload in _build_lovelace_resource_payloads(resource_url):
                 try:
                     await _maybe_await(collection.async_create_item(payload))
-                    created = True
+                    added_count += 1
+                    existing_urls.add(normalized_resource_url)
+                    _LOGGER.info("Registered Lovelace resource automatically: %s", resource_url)
                     break
-                except Exception:
-                    continue
-
-            if created:
-                _LOGGER.info("Registered Lovelace resource automatically: %s", resource_url)
+                except Exception as err:
+                    create_errors.append(f"{payload!r} -> {err}")
             else:
-                _LOGGER.warning("Could not auto-register Lovelace resource. Add manually: %s", resource_url)
-    except Exception as err:
-        _LOGGER.warning("Auto-registration of Lovelace resources failed, add them manually (%s)", err)
+                failed_urls.append(resource_url)
+                _LOGGER.error(
+                    "Failed to auto-register Lovelace resource %s (%s). Attempts: %s",
+                    resource_url,
+                    filename,
+                    " | ".join(create_errors),
+                )
 
+        if failed_urls:
+            _LOGGER.warning(
+                "Lovelace resource registration incomplete; %s resources still missing",
+                len(failed_urls),
+            )
+            return
+
+        hass.data[_LOVELACE_RESOURCES_ENSURED_KEY] = True
+        _LOGGER.info("Lovelace resource registration complete; %s new resources added", added_count)
+    except Exception as err:
+        _LOGGER.exception("Auto-registration of Lovelace resources failed: %s", err)
