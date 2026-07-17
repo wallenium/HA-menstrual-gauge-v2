@@ -185,6 +185,36 @@ class MenstrualProductInventoryCard extends HTMLElement {
     }[char]));
   }
 
+  _getProductIconSvg(productKey) {
+    const icons = {
+      tampon: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <rect x="9" y="2" width="6" height="15" rx="3" stroke="currentColor" stroke-width="1.8" fill="none"/>
+        <line x1="12" y1="17" x2="12" y2="22" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>`,
+      pad: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 6 Q8 4 10 4 L14 4 Q16 4 16 6 L16 16 Q16 18 14 18 L10 18 Q8 18 8 16 Z" stroke="currentColor" stroke-width="1.8" fill="none"/>
+        <path d="M8 9 Q4 9 4 12 Q4 13 8 13" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+        <path d="M16 9 Q20 9 20 12 Q20 13 16 13" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+      </svg>`,
+      cup: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 3 L8 14 Q8 17 12 19 Q16 17 16 14 L16 3" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+        <line x1="8" y1="3" x2="16" y2="3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="12" y1="19" x2="12" y2="22" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>`,
+      liner: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <rect x="7" y="8" width="10" height="8" rx="2" stroke="currentColor" stroke-width="1.8" fill="none"/>
+        <line x1="7" y1="15" x2="17" y2="15" stroke="currentColor" stroke-width="1" opacity="0.6" stroke-linecap="round"/>
+      </svg>`,
+      underwear: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="12" cy="6" rx="8" ry="3" stroke="currentColor" stroke-width="1.8" fill="none"/>
+        <path d="M6 8 Q4 12 4 16 Q4 18 6 18" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+        <path d="M18 8 Q20 12 20 16 Q20 18 18 18" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+        <line x1="12" y1="8" x2="12" y2="18" stroke="currentColor" stroke-width="1" opacity="0.5" stroke-linecap="round"/>
+      </svg>`,
+    };
+    return icons[productKey] || "";
+  }
+
   _formatTimestamp(ts) {
     if (!ts) return "";
     const date = new Date(ts);
@@ -243,7 +273,10 @@ class MenstrualProductInventoryCard extends HTMLElement {
 
         return `
           <div class="row">
-            <div class="product">${this._t(product)}</div>
+            <div class="product-header">
+              <div class="product-name">${this._t(product)}</div>
+              <div class="product-icon">${this._getProductIconSvg(product)}</div>
+            </div>
             <div class="stock ${status}">${quantity}<span>${this._t(`status_${status}`)}</span></div>
             <div class="controls">
               <button class="btn" data-action="consume" data-product="${product}" data-quantity="1">${this._t("quick_minus")}</button>
@@ -282,7 +315,10 @@ class MenstrualProductInventoryCard extends HTMLElement {
         .error { color: var(--error-color); margin-bottom: 10px; font-size: 0.9rem; }
         .rows { display: grid; gap: 12px; }
         .row { border: 1px solid var(--mg-border); border-radius: 12px; padding: 10px; background: linear-gradient(135deg, var(--mg-surface-accent), transparent); }
-        .product { font-weight: 600; margin-bottom: 8px; }
+        .product-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
+        .product-name { flex: 1; font-weight: 600; color: var(--primary-text-color); }
+        .product-icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--primary-color, #8e44ad); opacity: 0.85; }
+        .product-icon svg { width: 100%; height: 100%; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
         .stock { font-size: 1.5rem; font-weight: 700; display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
         .stock span { font-size: 0.8rem; font-weight: 500; }
         .stock.good { color: var(--mg-status-success); }
@@ -298,6 +334,9 @@ class MenstrualProductInventoryCard extends HTMLElement {
         @media (prefers-color-scheme: dark) {
           :host { --mg-surface-accent: color-mix(in srgb, var(--mg-status-error) 20%, transparent); }
           button, select, input { background: color-mix(in srgb, var(--mg-card-bg) 88%, #000 12%); }
+        }
+        @media (max-width: 600px) {
+          .product-icon { width: 32px; height: 32px; }
         }
       </style>
       <ha-card>
