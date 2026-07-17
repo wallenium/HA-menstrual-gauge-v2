@@ -103,6 +103,8 @@ from .storage import MenstruationStorage
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 MANIFEST_PATH = Path(__file__).with_name("manifest.json")
+WWW_DIR = Path(__file__).parent / "www"
+_HTTP_ROUTES_REGISTERED_KEY = f"{DOMAIN}_http_routes_registered"
 
 
 def _load_manifest_version() -> str:
@@ -116,8 +118,8 @@ def _load_manifest_version() -> str:
 
 
 def _build_card_static_url(filename: str) -> str:
-    """Build the static path served by Home Assistant."""
-    return f"/local/community/{DOMAIN}/{filename}"
+    """Build the HTTP handler path for a card JS file."""
+    return f"/{DOMAIN}/{filename}"
 
 
 def _build_card_resource_url(filename: str) -> str:
@@ -813,6 +815,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             }),
         )
 
+    await _async_register_http_handlers(hass)
     await _async_ensure_lovelace_resource(hass)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -1176,6 +1179,39 @@ async def _maybe_await(result: Any) -> Any:
     if inspect.isawaitable(result):
         return await result
     return result
+
+
+async def _async_register_http_handlers(hass: HomeAssistant) -> None:
+    """Register HTTP routes to serve card JS files from www/ directory."""
+    if hass.data.get(_HTTP_ROUTES_REGISTERED_KEY):
+        return
+
+    async def _serve_card_file(request):  # type: ignore[no-untyped-def]
+        from aiohttp.web import HTTPBadRequest, HTTPNotFound, Response
+
+        filename = request.match_info["filename"]
+        if "/" in filename or "\\" in filename or filename.startswith("."):
+            raise HTTPBadRequest()
+
+        file_path = WWW_DIR / filename
+        if not file_path.is_file():
+            _LOGGER.debug("Card file not found: %s", file_path)
+            raise HTTPNotFound()
+
+        content = await hass.async_add_executor_job(file_path.read_bytes)
+        return Response(
+            body=content,
+            content_type="application/javascript",
+            headers={"Cache-Control": "public, max-age=3600, s-maxage=3600"},
+        )
+
+    try:
+        hass.http.app.router.add_get(f"/{DOMAIN}/{{filename}}", _serve_card_file)
+        hass.data[_HTTP_ROUTES_REGISTERED_KEY] = True
+        for _resource_url, _static_url, filename in LOVELACE_RESOURCES:
+            _LOGGER.info("Registered HTTP route: /%s/%s", DOMAIN, filename)
+    except Exception as err:
+        _LOGGER.warning("Failed to register HTTP routes for card files: %s", err)
 
 
 async def _async_ensure_lovelace_resource(hass: HomeAssistant) -> None:
