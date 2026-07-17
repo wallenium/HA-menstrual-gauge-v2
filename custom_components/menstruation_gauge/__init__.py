@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import json
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -101,27 +102,60 @@ from .model import normalize_history
 from .storage import MenstruationStorage
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
-CARD_RESOURCE_URL = "/menstruation_gauge/menstruation-gauge-card.js"
-HEATMAP_RESOURCE_URL = "/menstruation_gauge/menstruation-cycle-heatmap-card.js"
-TIMER_RESOURCE_URL = "/menstruation_gauge/period-countdown-timer.js"
-PRODUCT_STATS_RESOURCE_URL = "/menstruation_gauge/menstrual-product-stats-card.js"
-PRODUCT_INVENTORY_RESOURCE_URL = "/menstruation_gauge/menstrual-product-inventory-card.js"
-COMPACT_CARD_RESOURCE_URL = "/menstruation_gauge/menstrual-cycle-card-compact.js"
-HISTORY_ROW_RESOURCE_URL = "/menstruation_gauge/menstrual-cycle-history-card-row.js"
-HISTORY_ANALOG_RESOURCE_URL = "/menstruation_gauge/menstrual-cycle-history-card-analog.js"
-COMPACT_STATUS_RESOURCE_URL = "/menstruation_gauge/menstrual-cycle-compact-status-card.js"
+MANIFEST_PATH = Path(__file__).with_name("manifest.json")
+
+
+def _load_manifest_version() -> str:
+    """Read the integration version from manifest.json for cache busting."""
+    try:
+        with MANIFEST_PATH.open(encoding="utf-8") as manifest_file:
+            version = json.load(manifest_file).get("version")
+    except (OSError, TypeError, ValueError):
+        return "0.0.0"
+    return str(version or "0.0.0")
+
+
+def _build_card_static_url(filename: str) -> str:
+    """Build the static path served by Home Assistant."""
+    return f"/{DOMAIN}/{filename}"
+
+
+def _build_card_resource_url(filename: str) -> str:
+    """Build the Lovelace resource URL with version-based cache busting."""
+    return f"{_build_card_static_url(filename)}?v={RESOURCE_VERSION}"
+
+
+RESOURCE_VERSION = _load_manifest_version()
+CARD_STATIC_URL = _build_card_static_url("menstruation-gauge-card.js")
+HEATMAP_STATIC_URL = _build_card_static_url("menstruation-cycle-heatmap-card.js")
+TIMER_STATIC_URL = _build_card_static_url("period-countdown-timer.js")
+PRODUCT_STATS_STATIC_URL = _build_card_static_url("menstrual-product-stats-card.js")
+PRODUCT_INVENTORY_STATIC_URL = _build_card_static_url("menstrual-product-inventory-card.js")
+COMPACT_CARD_STATIC_URL = _build_card_static_url("menstrual-cycle-card-compact.js")
+HISTORY_ROW_STATIC_URL = _build_card_static_url("menstrual-cycle-history-card-row.js")
+HISTORY_ANALOG_STATIC_URL = _build_card_static_url("menstrual-cycle-history-card-analog.js")
+COMPACT_STATUS_STATIC_URL = _build_card_static_url("menstrual-cycle-compact-status-card.js")
+CARD_RESOURCE_URL = _build_card_resource_url("menstruation-gauge-card.js")
+HEATMAP_RESOURCE_URL = _build_card_resource_url("menstruation-cycle-heatmap-card.js")
+TIMER_RESOURCE_URL = _build_card_resource_url("period-countdown-timer.js")
+PRODUCT_STATS_RESOURCE_URL = _build_card_resource_url("menstrual-product-stats-card.js")
+PRODUCT_INVENTORY_RESOURCE_URL = _build_card_resource_url("menstrual-product-inventory-card.js")
+COMPACT_CARD_RESOURCE_URL = _build_card_resource_url("menstrual-cycle-card-compact.js")
+HISTORY_ROW_RESOURCE_URL = _build_card_resource_url("menstrual-cycle-history-card-row.js")
+HISTORY_ANALOG_RESOURCE_URL = _build_card_resource_url("menstrual-cycle-history-card-analog.js")
+COMPACT_STATUS_RESOURCE_URL = _build_card_resource_url("menstrual-cycle-compact-status-card.js")
 CARD_RESOURCE_TYPE = "module"
 EXPORT_DIR_NAME = "menstruation_gauge_exports"
 LOVELACE_RESOURCES = (
-    (CARD_RESOURCE_URL, "menstruation-gauge-card.js"),
-    (HEATMAP_RESOURCE_URL, "menstruation-cycle-heatmap-card.js"),
-    (TIMER_RESOURCE_URL, "period-countdown-timer.js"),
-    (PRODUCT_STATS_RESOURCE_URL, "menstrual-product-stats-card.js"),
-    (PRODUCT_INVENTORY_RESOURCE_URL, "menstrual-product-inventory-card.js"),
-    (COMPACT_CARD_RESOURCE_URL, "menstrual-cycle-card-compact.js"),
-    (COMPACT_STATUS_RESOURCE_URL, "menstrual-cycle-compact-status-card.js"),
-    (HISTORY_ROW_RESOURCE_URL, "menstrual-cycle-history-card-row.js"),
-    (HISTORY_ANALOG_RESOURCE_URL, "menstrual-cycle-history-card-analog.js"),
+    (CARD_RESOURCE_URL, CARD_STATIC_URL, "menstruation-gauge-card.js"),
+    (HEATMAP_RESOURCE_URL, HEATMAP_STATIC_URL, "menstruation-cycle-heatmap-card.js"),
+    (TIMER_RESOURCE_URL, TIMER_STATIC_URL, "period-countdown-timer.js"),
+    (PRODUCT_STATS_RESOURCE_URL, PRODUCT_STATS_STATIC_URL, "menstrual-product-stats-card.js"),
+    (PRODUCT_INVENTORY_RESOURCE_URL, PRODUCT_INVENTORY_STATIC_URL, "menstrual-product-inventory-card.js"),
+    (COMPACT_CARD_RESOURCE_URL, COMPACT_CARD_STATIC_URL, "menstrual-cycle-card-compact.js"),
+    (COMPACT_STATUS_RESOURCE_URL, COMPACT_STATUS_STATIC_URL, "menstrual-cycle-compact-status-card.js"),
+    (HISTORY_ROW_RESOURCE_URL, HISTORY_ROW_STATIC_URL, "menstrual-cycle-history-card-row.js"),
+    (HISTORY_ANALOG_RESOURCE_URL, HISTORY_ANALOG_STATIC_URL, "menstrual-cycle-history-card-analog.js"),
 )
 VALID_PRODUCT_USAGE_PRODUCTS = {"tampon", "pad", "cup", "underwear", "liner"}
 VALID_PRODUCT_USAGE_ACTIONS = {"used", "emptied"}
@@ -1160,7 +1194,7 @@ async def _async_ensure_lovelace_resource(hass: HomeAssistant) -> None:
             if isinstance(item, dict) and item.get("url")
         }
 
-        for resource_url, _filename in LOVELACE_RESOURCES:
+        for resource_url, _static_url, _filename in LOVELACE_RESOURCES:
             if resource_url in existing_urls:
                 continue
 
@@ -1187,8 +1221,8 @@ async def _async_ensure_lovelace_resource(hass: HomeAssistant) -> None:
 async def _async_register_card_static_path(hass: HomeAssistant) -> None:
     """Register card JS files as static paths across HA core API variants."""
     static_files = [
-        (url, str(Path(__file__).parent / "www" / filename))
-        for url, filename in LOVELACE_RESOURCES
+        (static_url, str(Path(__file__).parent / "www" / filename))
+        for _resource_url, static_url, filename in LOVELACE_RESOURCES
     ]
     if hasattr(hass.http, "async_register_static_paths"):
         try:
