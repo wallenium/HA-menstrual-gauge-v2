@@ -136,6 +136,7 @@ HEATMAP_STATIC_URL = _build_card_static_url("menstruation-cycle-heatmap-card.js"
 TIMER_STATIC_URL = _build_card_static_url("period-countdown-timer.js")
 PRODUCT_STATS_STATIC_URL = _build_card_static_url("menstrual-product-stats-card.js")
 PRODUCT_INVENTORY_STATIC_URL = _build_card_static_url("menstrual-product-inventory-card.js")
+PRODUCT_INVENTORY_EDITOR_STATIC_URL = _build_card_static_url("menstrual-product-inventory-card-editor.js")
 COMPACT_CARD_STATIC_URL = _build_card_static_url("menstrual-cycle-card-compact.js")
 HISTORY_ROW_STATIC_URL = _build_card_static_url("menstrual-cycle-history-card-row.js")
 HISTORY_ANALOG_STATIC_URL = _build_card_static_url("menstrual-cycle-history-card-analog.js")
@@ -145,6 +146,7 @@ HEATMAP_RESOURCE_URL = _build_card_resource_url("menstruation-cycle-heatmap-card
 TIMER_RESOURCE_URL = _build_card_resource_url("period-countdown-timer.js")
 PRODUCT_STATS_RESOURCE_URL = _build_card_resource_url("menstrual-product-stats-card.js")
 PRODUCT_INVENTORY_RESOURCE_URL = _build_card_resource_url("menstrual-product-inventory-card.js")
+PRODUCT_INVENTORY_EDITOR_RESOURCE_URL = _build_card_resource_url("menstrual-product-inventory-card-editor.js")
 COMPACT_CARD_RESOURCE_URL = _build_card_resource_url("menstrual-cycle-card-compact.js")
 HISTORY_ROW_RESOURCE_URL = _build_card_resource_url("menstrual-cycle-history-card-row.js")
 HISTORY_ANALOG_RESOURCE_URL = _build_card_resource_url("menstrual-cycle-history-card-analog.js")
@@ -157,6 +159,7 @@ LOVELACE_RESOURCES = (
     (TIMER_RESOURCE_URL, TIMER_STATIC_URL, "period-countdown-timer.js"),
     (PRODUCT_STATS_RESOURCE_URL, PRODUCT_STATS_STATIC_URL, "menstrual-product-stats-card.js"),
     (PRODUCT_INVENTORY_RESOURCE_URL, PRODUCT_INVENTORY_STATIC_URL, "menstrual-product-inventory-card.js"),
+    (PRODUCT_INVENTORY_EDITOR_RESOURCE_URL, PRODUCT_INVENTORY_EDITOR_STATIC_URL, "menstrual-product-inventory-card-editor.js"),
     (COMPACT_CARD_RESOURCE_URL, COMPACT_CARD_STATIC_URL, "menstrual-cycle-card-compact.js"),
     (COMPACT_STATUS_RESOURCE_URL, COMPACT_STATUS_STATIC_URL, "menstrual-cycle-compact-status-card.js"),
     (HISTORY_ROW_RESOURCE_URL, HISTORY_ROW_STATIC_URL, "menstrual-cycle-history-card-row.js"),
