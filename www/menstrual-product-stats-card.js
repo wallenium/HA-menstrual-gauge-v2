@@ -21,9 +21,9 @@ class MenstrualProductStatsCard extends HTMLElement {
 
   static getStubConfig() {
     return {
-      type: "menstrual-product-stats-card",
-      entity: "sensor.menstruation_gauge",
-      title: "Product usage"
+      type: 'custom:menstrual-product-stats-card',
+      entity: 'sensor.menstruation_gauge',
+      title: 'Product usage'
     };
   }
 
@@ -34,7 +34,7 @@ class MenstrualProductStatsCard extends HTMLElement {
 
     const stateObj = this._hass.states[this.config.entity];
     if (!stateObj) {
-      this.innerHTML = `<ha-card><div class="empty-state">Entity not found: ${this.config.entity}</div></ha-card>`;
+      this.innerHTML = `<ha-card><div class="empty-state">Entity not found: ${this.escapeHtml(this.config.entity)}</div></ha-card>`;
       return;
     }
 
@@ -180,6 +180,15 @@ class MenstrualProductStatsCard extends HTMLElement {
           font-size: 0.85rem;
           font-weight: 600;
           border: 1px solid transparent;
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+        }
+
+        .chip svg {
+          width: 14px;
+          height: 14px;
+          flex-shrink: 0;
         }
 
         .chip.tampon {
@@ -233,8 +242,8 @@ class MenstrualProductStatsCard extends HTMLElement {
       </style>
       <ha-card>
         <div class="header">
-          <h2 class="title">${this.config.title || this._t("title")}</h2>
-          <p class="subtitle">${attrs.friendly_name || this.config.entity}</p>
+          <h2 class="title">${this.escapeHtml(this.config.title || this._t("title"))}</h2>
+          <p class="subtitle">${this.escapeHtml(attrs.friendly_name || this.config.entity)}</p>
         </div>
         <div class="stats-grid">
           <div class="stat-card tampon">
@@ -313,8 +322,8 @@ class MenstrualProductStatsCard extends HTMLElement {
             <div class="timeline-date">${this.formatDate(dateKey)}</div>
             <div class="timeline-items">
               ${usageByDate.get(dateKey).map((entry) => `
-                <span class="chip ${entry.product}">
-                  ${this.productLabel(entry)} ×${this.normalizeQuantity(entry.quantity)}
+                <span class="chip ${this.escapeClassName(entry.product)}">
+                  ${this._getSvgIcon(entry.product)}${this.escapeHtml(this.productLabel(entry))} ×${this.normalizeQuantity(entry.quantity)}
                 </span>
               `).join("")}
             </div>
@@ -348,12 +357,61 @@ class MenstrualProductStatsCard extends HTMLElement {
     return Number(value || 0).toFixed(1).replace(/\.0$/, "");
   }
 
+  _lang() {
+    const language = String(this._hass?.locale?.language || "en").toLowerCase();
+    return language.startsWith("de") ? "de" : "en";
+  }
+
+  escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  escapeClassName(value) {
+    const sanitized = String(value ?? "")
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, "");
+    return sanitized || "unknown";
+  }
+
+  dateLocale() {
+    const locale = this._hass?.locale?.language || this._hass?.language;
+    if (!locale) {
+      return this._lang();
+    }
+
+    try {
+      return Intl.getCanonicalLocales(locale)[0] || this._lang();
+    } catch (_error) {
+      return this._lang();
+    }
+  }
+
   formatDate(value) {
     const date = new Date(`${value}T00:00:00`);
-    return new Intl.DateTimeFormat(this._hass?.language || "en", {
-      month: "short",
-      day: "numeric",
-    }).format(date);
+    try {
+      return new Intl.DateTimeFormat(this.dateLocale(), {
+        month: "short",
+        day: "numeric",
+      }).format(date);
+    } catch (_error) {
+      return value;
+    }
+  }
+
+  _getSvgIcon(product) {
+    const icons = {
+      tampon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="9" y="2" width="6" height="15" rx="3"/><line x1="12" y1="17" x2="12" y2="22"/></svg>`,
+      pad: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="8" y="4" width="8" height="16" rx="4"/><path d="M8 8C5 8 4 11 4 12C4 13 5 16 8 16"/><path d="M16 8C19 8 20 11 20 12C20 13 19 16 16 16"/></svg>`,
+      cup: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 3L8 14C8 17.3 9.8 19 12 19C14.2 19 16 17.3 16 14L16 3"/><line x1="8" y1="3" x2="16" y2="3"/><line x1="12" y1="19" x2="12" y2="22"/></svg>`,
+      liner: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="5" y="9" width="14" height="6" rx="3"/></svg>`,
+      underwear: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 6L3 10C3 14 6 17 12 17C18 17 21 14 21 10L21 6"/><path d="M3 6L9 6C9 6 10 11 12 11C14 11 15 6 15 6L21 6"/></svg>`,
+    };
+    return icons[product] || '';
   }
 
   _t(key, placeholders = {}) {
@@ -396,18 +454,18 @@ class MenstrualProductStatsCard extends HTMLElement {
       },
     };
 
-    const lang = this._hass?.language || "de";
+    const lang = this._lang();
     return translations[lang]?.[key] || translations.en[key] || key;
   }
 }
 
-customElements.define("menstrual-product-stats-card", MenstrualProductStatsCard);
+if (!customElements.get("menstrual-product-stats-card")) {
+  customElements.define("menstrual-product-stats-card", MenstrualProductStatsCard);
+}
 
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "menstrual-product-stats-card",
   name: "Menstrual Product Stats Card",
   description: "Shows per-cycle product usage KPIs and a 30-day usage timeline.",
-  preview: false,
-  documentationURL: "https://github.com/wallenium/HA-menstrual-gauge-v2"
 });
