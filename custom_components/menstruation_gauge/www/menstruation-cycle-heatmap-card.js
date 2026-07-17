@@ -1,4 +1,8 @@
 class MenstruationCycleHeatmapCard extends HTMLElement {
+  static getConfigElement() {
+    return document.createElement('menstruation-cycle-heatmap-card-editor');
+  }
+
   static getStubConfig() {
     return {
       type: 'custom:menstruation-cycle-heatmap-card',
