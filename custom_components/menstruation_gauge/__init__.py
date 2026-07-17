@@ -493,8 +493,257 @@ async def _async_refresh_cycle_model(hass: HomeAssistant, entry_ids: set[str] | 
 
 
 
+def _register_domain_services(hass: HomeAssistant) -> None:
+    """Register all domain services globally (once per domain load)."""
+
+    common_profile_field = {
+        vol.Optional(SERVICE_FIELD_ENTITY_ID): cv.entity_id,
+        vol.Optional(SERVICE_FIELD_PROFILE): cv.string,
+        vol.Optional(SERVICE_FIELD_ENTRY_ID): cv.string,
+    }
+
+    async def async_add(call: ServiceCall) -> None:
+        await _async_handle_add(hass, call)
+
+    async def async_remove(call: ServiceCall) -> None:
+        await _async_handle_remove(hass, call)
+
+    async def async_set_history(call: ServiceCall) -> None:
+        await _async_handle_set_history(hass, call)
+
+    async def async_set_period_duration(call: ServiceCall) -> None:
+        await _async_handle_set_period_duration(hass, call)
+
+    async def async_erase_all_history(call: ServiceCall) -> None:
+        await _async_handle_erase_all_history(hass, call)
+
+    async def async_export_history(call: ServiceCall) -> None:
+        await _async_handle_export_history(hass, call)
+
+    async def async_refresh_cycle_model(call: ServiceCall) -> None:
+        await _async_handle_refresh_cycle_model(hass, call)
+
+    async def async_log_product_usage(call: ServiceCall) -> None:
+        await _async_handle_log_product_usage(hass, call)
+
+    async def async_manage_household_inventory(call: ServiceCall) -> None:
+        await _async_handle_manage_household_inventory(hass, call)
+
+    async def async_add_symptom(call: ServiceCall) -> None:
+        await _async_handle_add_symptom(hass, call)
+
+    async def async_remove_symptom(call: ServiceCall) -> None:
+        await _async_handle_remove_symptom(hass, call)
+
+    async def async_get_symptom(call: ServiceCall) -> dict[str, Any]:
+        return await _async_handle_get_symptom(hass, call)
+
+    async def async_set_pregnancy_mode(call: ServiceCall) -> None:
+        await _async_handle_set_pregnancy_mode(hass, call)
+
+    async def async_update_pregnancy_date(call: ServiceCall) -> None:
+        await _async_handle_update_pregnancy_date(hass, call)
+
+    async def async_set_menarche_mode(call: ServiceCall) -> None:
+        await _async_handle_set_menarche_mode(hass, call)
+
+    async def async_update_menarche_date(call: ServiceCall) -> None:
+        await _async_handle_update_menarche_date(hass, call)
+
+    async def async_get_menarche_info(call: ServiceCall) -> dict[str, Any]:
+        return await _async_handle_get_menarche_info(hass, call)
+
+    async def async_add_pre_menarche_sign(call: ServiceCall) -> None:
+        await _async_handle_add_pre_menarche_sign(hass, call)
+
+    async def async_remove_pre_menarche_sign(call: ServiceCall) -> None:
+        await _async_handle_remove_pre_menarche_sign(hass, call)
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_ADD_CYCLE_START,
+        async_add,
+        schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_DATE): cv.string}),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_REMOVE_CYCLE_START,
+        async_remove,
+        schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_DATE): cv.string}),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_CYCLE_HISTORY,
+        async_set_history,
+        schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_DATES): [cv.string]}),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_PERIOD_DURATION,
+        async_set_period_duration,
+        schema=vol.Schema(
+            {
+                **common_profile_field,
+                vol.Required(SERVICE_FIELD_DAYS): vol.All(vol.Coerce(int), vol.Range(min=1, max=14)),
+            }
+        ),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_ERASE_ALL_HISTORY,
+        async_erase_all_history,
+        schema=vol.Schema(
+            {
+                **common_profile_field,
+                vol.Required(SERVICE_FIELD_ENTITY_ID): cv.entity_id,
+                vol.Required(SERVICE_FIELD_ERASE_ALL): vol.Equal(True),
+            }
+        ),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_EXPORT_HISTORY,
+        async_export_history,
+        schema=vol.Schema(
+            {
+                **common_profile_field,
+                vol.Optional(SERVICE_FIELD_FORMAT, default="csv"): vol.In(["csv", "txt"]),
+                vol.Optional(SERVICE_FIELD_FILENAME): cv.string,
+            }
+        ),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_REFRESH_CYCLE_MODEL,
+        async_refresh_cycle_model,
+        schema=vol.Schema(common_profile_field),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_LOG_PRODUCT_USAGE,
+        async_log_product_usage,
+        schema=vol.Schema(
+            {
+                **common_profile_field,
+                vol.Required(SERVICE_FIELD_PRODUCT): cv.string,
+                vol.Optional(SERVICE_FIELD_ACTION, default="used"): vol.In(VALID_PRODUCT_USAGE_ACTIONS),
+                vol.Optional(SERVICE_FIELD_QUANTITY, default=1): vol.All(vol.Coerce(int), vol.Range(min=1, max=50)),
+                vol.Optional(SERVICE_FIELD_DATE): cv.string,
+            }
+        ),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_MANAGE_HOUSEHOLD_INVENTORY,
+        async_manage_household_inventory,
+        schema=vol.Schema(
+            {
+                **common_profile_field,
+                vol.Required(SERVICE_FIELD_INVENTORY_ACTION): vol.In(["set", "add", "consume", "set_thresholds", "reset"]),
+                vol.Optional(SERVICE_FIELD_PRODUCT): vol.In(HOUSEHOLD_PRODUCTS),
+                vol.Optional(SERVICE_FIELD_QUANTITY, default=1): vol.All(vol.Coerce(int), vol.Range(min=0, max=5000)),
+                vol.Optional(SERVICE_FIELD_WARNING_THRESHOLD): vol.All(vol.Coerce(int), vol.Range(min=0, max=5000)),
+                vol.Optional(SERVICE_FIELD_CRITICAL_THRESHOLD): vol.All(vol.Coerce(int), vol.Range(min=0, max=5000)),
+                vol.Optional(SERVICE_FIELD_MEMBER): cv.string,
+            }
+        ),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_ADD_SYMPTOM,
+        async_add_symptom,
+        schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_DATE): cv.string, vol.Required(SERVICE_FIELD_SYMPTOM_DATA): dict}),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_REMOVE_SYMPTOM,
+        async_remove_symptom,
+        schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_DATE): cv.string}),
+    )
+
+    _register_kwargs: dict[str, Any] = {
+        "schema": vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_DATE): cv.string}),
+    }
+    if SupportsResponse is not None:
+        _register_kwargs["supports_response"] = SupportsResponse.OPTIONAL
+    hass.services.async_register(DOMAIN, SERVICE_GET_SYMPTOM, async_get_symptom, **_register_kwargs)
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_PREGNANCY_MODE,
+        async_set_pregnancy_mode,
+        schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_IS_PREGNANT): cv.boolean, vol.Optional(SERVICE_FIELD_PREGNANCY_START_DATE): cv.string}),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_UPDATE_PREGNANCY_DATE,
+        async_update_pregnancy_date,
+        schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_PREGNANCY_START_DATE): cv.string}),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_MENARCHE_MODE,
+        async_set_menarche_mode,
+        schema=vol.Schema({
+            **common_profile_field,
+            vol.Required("is_menarche"): cv.boolean,
+            vol.Optional(SERVICE_FIELD_ESTIMATED_MENARCHE_DATE): cv.string,
+            vol.Optional(SERVICE_FIELD_FAMILY_MENARCHE_AGE): vol.All(vol.Coerce(int), vol.Range(min=DEFAULT_MENARCHE_AGE_MIN, max=DEFAULT_MENARCHE_AGE_MAX)),
+        }),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_UPDATE_MENARCHE_DATE,
+        async_update_menarche_date,
+        schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_DATE): cv.string}),
+    )
+
+    _menarche_info_kwargs: dict[str, Any] = {
+        "schema": vol.Schema(common_profile_field),
+    }
+    if SupportsResponse is not None:
+        _menarche_info_kwargs["supports_response"] = SupportsResponse.OPTIONAL
+    hass.services.async_register(DOMAIN, SERVICE_GET_MENARCHE_INFO, async_get_menarche_info, **_menarche_info_kwargs)
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_ADD_PRE_MENARCHE_SIGN,
+        async_add_pre_menarche_sign,
+        schema=vol.Schema({
+            **common_profile_field,
+            vol.Required(SERVICE_FIELD_PRE_MENARCHE_SIGN): vol.In(list(PRE_MENARCHE_SIGN_OPTIONS.keys())),
+            vol.Required(SERVICE_FIELD_TANNER_STAGE): cv.string,
+        }),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_REMOVE_PRE_MENARCHE_SIGN,
+        async_remove_pre_menarche_sign,
+        schema=vol.Schema({
+            **common_profile_field,
+            vol.Required(SERVICE_FIELD_PRE_MENARCHE_SIGN): vol.In(list(PRE_MENARCHE_SIGN_OPTIONS.keys())),
+        }),
+    )
+
+
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up integration from YAML (not used, config-entry only)."""
+    hass.data.setdefault(DOMAIN, {})
+    _register_domain_services(hass)
     return True
 
 
@@ -555,267 +804,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = runtime
     await _async_update_household_inventory_state(hass)
 
-    async def async_add(call: ServiceCall) -> None:
-        await _async_handle_add(hass, call)
-
-    async def async_remove(call: ServiceCall) -> None:
-        await _async_handle_remove(hass, call)
-
-    async def async_set_history(call: ServiceCall) -> None:
-        await _async_handle_set_history(hass, call)
-
-    async def async_set_period_duration(call: ServiceCall) -> None:
-        await _async_handle_set_period_duration(hass, call)
-
-    async def async_erase_all_history(call: ServiceCall) -> None:
-        await _async_handle_erase_all_history(hass, call)
-
-    async def async_export_history(call: ServiceCall) -> None:
-        await _async_handle_export_history(hass, call)
-
-    async def async_refresh_cycle_model(call: ServiceCall) -> None:
-        await _async_handle_refresh_cycle_model(hass, call)
-
-    async def async_log_product_usage(call: ServiceCall) -> None:
-        await _async_handle_log_product_usage(hass, call)
-
-    async def async_manage_household_inventory(call: ServiceCall) -> None:
-        await _async_handle_manage_household_inventory(hass, call)
-
-    async def async_add_symptom(call: ServiceCall) -> None:
-        await _async_handle_add_symptom(hass, call)
-
-    async def async_remove_symptom(call: ServiceCall) -> None:
-        await _async_handle_remove_symptom(hass, call)
-
-    async def async_get_symptom(call: ServiceCall) -> dict[str, Any]:
-        return await _async_handle_get_symptom(hass, call)
-
-    async def async_set_pregnancy_mode(call: ServiceCall) -> None:
-        await _async_handle_set_pregnancy_mode(hass, call)
-
-    async def async_update_pregnancy_date(call: ServiceCall) -> None:
-        await _async_handle_update_pregnancy_date(hass, call)
-
-    async def async_set_menarche_mode(call: ServiceCall) -> None:
-        await _async_handle_set_menarche_mode(hass, call)
-
-    async def async_update_menarche_date(call: ServiceCall) -> None:
-        await _async_handle_update_menarche_date(hass, call)
-
-    async def async_get_menarche_info(call: ServiceCall) -> dict[str, Any]:
-        return await _async_handle_get_menarche_info(hass, call)
-
-    async def async_add_pre_menarche_sign(call: ServiceCall) -> None:
-        await _async_handle_add_pre_menarche_sign(hass, call)
-
-    async def async_remove_pre_menarche_sign(call: ServiceCall) -> None:
-        await _async_handle_remove_pre_menarche_sign(hass, call)
-
-    common_profile_field = {
-        vol.Optional(SERVICE_FIELD_ENTITY_ID): cv.entity_id,
-        vol.Optional(SERVICE_FIELD_PROFILE): cv.string,
-        vol.Optional(SERVICE_FIELD_ENTRY_ID): cv.string,
-    }
-
+    # Re-register services if they were removed when the last entry was unloaded.
+    # Normally services are registered once in async_setup(); this handles the
+    # edge case where all entries were removed (services cleaned up) and a new
+    # entry is being added in the same HA session.
     if not hass.services.has_service(DOMAIN, SERVICE_ADD_CYCLE_START):
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_ADD_CYCLE_START,
-            async_add,
-            schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_DATE): cv.string}),
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_REMOVE_CYCLE_START):
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_REMOVE_CYCLE_START,
-            async_remove,
-            schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_DATE): cv.string}),
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_SET_CYCLE_HISTORY):
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_SET_CYCLE_HISTORY,
-            async_set_history,
-            schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_DATES): [cv.string]}),
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_SET_PERIOD_DURATION):
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_SET_PERIOD_DURATION,
-            async_set_period_duration,
-            schema=vol.Schema(
-                {
-                    **common_profile_field,
-                    vol.Required(SERVICE_FIELD_DAYS): vol.All(vol.Coerce(int), vol.Range(min=1, max=14)),
-                }
-            ),
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_ERASE_ALL_HISTORY):
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_ERASE_ALL_HISTORY,
-            async_erase_all_history,
-            schema=vol.Schema(
-                {
-                    **common_profile_field,
-                    vol.Required(SERVICE_FIELD_ENTITY_ID): cv.entity_id,
-                    vol.Required(SERVICE_FIELD_ERASE_ALL): vol.Equal(True),
-                }
-            ),
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_EXPORT_HISTORY):
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_EXPORT_HISTORY,
-            async_export_history,
-            schema=vol.Schema(
-                {
-                    **common_profile_field,
-                    vol.Optional(SERVICE_FIELD_FORMAT, default="csv"): vol.In(["csv", "txt"]),
-                    vol.Optional(SERVICE_FIELD_FILENAME): cv.string,
-                }
-            ),
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_REFRESH_CYCLE_MODEL):
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_REFRESH_CYCLE_MODEL,
-            async_refresh_cycle_model,
-            schema=vol.Schema(common_profile_field),
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_LOG_PRODUCT_USAGE):
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_LOG_PRODUCT_USAGE,
-            async_log_product_usage,
-            schema=vol.Schema(
-                {
-                    **common_profile_field,
-                    vol.Required(SERVICE_FIELD_PRODUCT): cv.string,
-                    vol.Optional(SERVICE_FIELD_ACTION, default="used"): vol.In(VALID_PRODUCT_USAGE_ACTIONS),
-                    vol.Optional(SERVICE_FIELD_QUANTITY, default=1): vol.All(vol.Coerce(int), vol.Range(min=1, max=50)),
-                    vol.Optional(SERVICE_FIELD_DATE): cv.string,
-                }
-            ),
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_MANAGE_HOUSEHOLD_INVENTORY):
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_MANAGE_HOUSEHOLD_INVENTORY,
-            async_manage_household_inventory,
-            schema=vol.Schema(
-                {
-                    **common_profile_field,
-                    vol.Required(SERVICE_FIELD_INVENTORY_ACTION): vol.In(["set", "add", "consume", "set_thresholds", "reset"]),
-                    vol.Optional(SERVICE_FIELD_PRODUCT): vol.In(HOUSEHOLD_PRODUCTS),
-                    vol.Optional(SERVICE_FIELD_QUANTITY, default=1): vol.All(vol.Coerce(int), vol.Range(min=0, max=5000)),
-                    vol.Optional(SERVICE_FIELD_WARNING_THRESHOLD): vol.All(vol.Coerce(int), vol.Range(min=0, max=5000)),
-                    vol.Optional(SERVICE_FIELD_CRITICAL_THRESHOLD): vol.All(vol.Coerce(int), vol.Range(min=0, max=5000)),
-                    vol.Optional(SERVICE_FIELD_MEMBER): cv.string,
-                }
-            ),
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_ADD_SYMPTOM):
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_ADD_SYMPTOM,
-            async_add_symptom,
-            schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_DATE): cv.string, vol.Required(SERVICE_FIELD_SYMPTOM_DATA): dict}),
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_REMOVE_SYMPTOM):
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_REMOVE_SYMPTOM,
-            async_remove_symptom,
-            schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_DATE): cv.string}),
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_GET_SYMPTOM):
-        _register_kwargs: dict[str, Any] = {
-            "schema": vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_DATE): cv.string}),
-        }
-        if SupportsResponse is not None:
-            _register_kwargs["supports_response"] = SupportsResponse.OPTIONAL
-        hass.services.async_register(DOMAIN, SERVICE_GET_SYMPTOM, async_get_symptom, **_register_kwargs)
-
-    if not hass.services.has_service(DOMAIN, SERVICE_SET_PREGNANCY_MODE):
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_SET_PREGNANCY_MODE,
-            async_set_pregnancy_mode,
-            schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_IS_PREGNANT): cv.boolean, vol.Optional(SERVICE_FIELD_PREGNANCY_START_DATE): cv.string}),
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_UPDATE_PREGNANCY_DATE):
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_UPDATE_PREGNANCY_DATE,
-            async_update_pregnancy_date,
-            schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_PREGNANCY_START_DATE): cv.string}),
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_SET_MENARCHE_MODE):
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_SET_MENARCHE_MODE,
-            async_set_menarche_mode,
-            schema=vol.Schema({
-                **common_profile_field,
-                vol.Required("is_menarche"): cv.boolean,
-                vol.Optional(SERVICE_FIELD_ESTIMATED_MENARCHE_DATE): cv.string,
-                vol.Optional(SERVICE_FIELD_FAMILY_MENARCHE_AGE): vol.All(vol.Coerce(int), vol.Range(min=DEFAULT_MENARCHE_AGE_MIN, max=DEFAULT_MENARCHE_AGE_MAX)),
-            }),
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_UPDATE_MENARCHE_DATE):
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_UPDATE_MENARCHE_DATE,
-            async_update_menarche_date,
-            schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_DATE): cv.string}),
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_GET_MENARCHE_INFO):
-        _menarche_info_kwargs: dict[str, Any] = {
-            "schema": vol.Schema(common_profile_field),
-        }
-        if SupportsResponse is not None:
-            _menarche_info_kwargs["supports_response"] = SupportsResponse.OPTIONAL
-        hass.services.async_register(DOMAIN, SERVICE_GET_MENARCHE_INFO, async_get_menarche_info, **_menarche_info_kwargs)
-
-    if not hass.services.has_service(DOMAIN, SERVICE_ADD_PRE_MENARCHE_SIGN):
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_ADD_PRE_MENARCHE_SIGN,
-            async_add_pre_menarche_sign,
-            schema=vol.Schema({
-                **common_profile_field,
-                vol.Required(SERVICE_FIELD_PRE_MENARCHE_SIGN): vol.In(list(PRE_MENARCHE_SIGN_OPTIONS.keys())),
-                vol.Required(SERVICE_FIELD_TANNER_STAGE): cv.string,
-            }),
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_REMOVE_PRE_MENARCHE_SIGN):
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_REMOVE_PRE_MENARCHE_SIGN,
-            async_remove_pre_menarche_sign,
-            schema=vol.Schema({
-                **common_profile_field,
-                vol.Required(SERVICE_FIELD_PRE_MENARCHE_SIGN): vol.In(list(PRE_MENARCHE_SIGN_OPTIONS.keys())),
-            }),
-        )
+        _register_domain_services(hass)
 
     await _async_register_http_handlers(hass)
     _async_schedule_lovelace_resource_registration(hass)
