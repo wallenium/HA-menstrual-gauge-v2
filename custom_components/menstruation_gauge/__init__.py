@@ -777,8 +777,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             }),
         )
 
+    # The frontend loads card modules via manifest.json `frontend_extra_module_url`.
+    # Keep the HTTP static-path registration so both the new versioned module URLs
+    # and older manually configured resource URLs can still resolve to these files.
     await _async_register_card_static_path(hass)
-    await _async_ensure_lovelace_resource(hass)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
@@ -1185,7 +1187,7 @@ async def _async_ensure_lovelace_resource(hass: HomeAssistant) -> None:
 
 
 async def _async_register_card_static_path(hass: HomeAssistant) -> None:
-    """Register card JS files as static paths across HA core API variants."""
+    """Expose card JS files at stable URLs across HA core API variants."""
     static_files = [
         (url, str(Path(__file__).parent / "www" / filename))
         for url, filename in LOVELACE_RESOURCES
