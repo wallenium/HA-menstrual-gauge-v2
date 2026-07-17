@@ -39,9 +39,16 @@ class MenstrualProductStatsCard extends HTMLElement {
     }
 
     const attrs = stateObj.attributes || {};
-    const productUsage = Array.isArray(attrs.product_usage) ? attrs.product_usage : [];
-    const bleedingBlocks = Array.isArray(attrs.bleeding_blocks) ? attrs.bleeding_blocks : [];
-    const stats = this.calculateStats(productUsage, bleedingBlocks, attrs.days_until_next_start);
+    const productUsageTimeline = Array.isArray(attrs.product_usage_timeline)
+      ? attrs.product_usage_timeline
+      : (Array.isArray(attrs.product_usage) ? attrs.product_usage : []);
+    const productUsageThisCycle = attrs.product_usage_this_cycle && typeof attrs.product_usage_this_cycle === "object"
+      ? attrs.product_usage_this_cycle
+      : {};
+    const productUsageStats = attrs.product_usage_stats && typeof attrs.product_usage_stats === "object"
+      ? attrs.product_usage_stats
+      : {};
+    const stats = this.calculateStats(productUsageThisCycle, productUsageStats, attrs.days_until_next_start);
 
     this.innerHTML = `
       <style>
@@ -253,39 +260,26 @@ class MenstrualProductStatsCard extends HTMLElement {
         </div>
         <div class="timeline">
           <h3 class="timeline-title">${this._t("last_30_days")}</h3>
-          ${this.renderTimeline(productUsage)}
+          ${this.renderTimeline(productUsageTimeline)}
         </div>
       </ha-card>
     `;
   }
 
-  calculateStats(productUsage, bleedingBlocks, daysUntilNextStart) {
-    const blocks = bleedingBlocks.slice(-3).filter((block) => block?.start && block?.end);
-    const countInRange = (product, start, end, action) =>
-      productUsage.reduce((total, entry) => {
-        if (entry?.product !== product) return total;
-        if (action && entry?.action !== action) return total;
-        if (entry?.date < start || entry?.date > end) return total;
-        return total + this.normalizeQuantity(entry?.quantity);
-      }, 0);
-
-    const averageForBlocks = (product, action) => {
-      if (!blocks.length) return 0;
-      const total = blocks.reduce((sum, block) => sum + countInRange(product, block.start, block.end, action), 0);
-      return total / blocks.length;
-    };
-
-    const lastBlock = bleedingBlocks.length ? bleedingBlocks[bleedingBlocks.length - 1] : null;
-    const lastBlockDays = Math.max(1, Number(lastBlock?.length || 1));
-    const lastBlockCupEmpties = lastBlock?.start && lastBlock?.end
-      ? countInRange("cup", lastBlock.start, lastBlock.end, "emptied")
-      : 0;
+  calculateStats(productUsageThisCycle, productUsageStats, daysUntilNextStart) {
+    const averagePerCycle = productUsageStats.average_per_cycle || productUsageStats.averages_per_cycle || {};
+    const cyclesConsidered = Number(
+      productUsageStats.cycles_considered
+      || averagePerCycle.cycles_considered
+      || 0
+    );
+    const thisCycleCup = Number(productUsageThisCycle.cup || 0);
 
     return {
-      cyclesConsidered: blocks.length,
-      tamponsPerCycle: averageForBlocks("tampon"),
-      padsPerCycle: averageForBlocks("pad"),
-      cupEmptiesPerDay: lastBlockCupEmpties / lastBlockDays,
+      cyclesConsidered: Math.max(0, cyclesConsidered),
+      tamponsPerCycle: Number(averagePerCycle.tampon || 0),
+      padsPerCycle: Number(averagePerCycle.pad || 0),
+      cupEmptiesPerDay: Number(averagePerCycle.cup ?? averagePerCycle.cup_empties ?? thisCycleCup),
       planningDays: Math.max(0, Number(daysUntilNextStart || 0)),
     };
   }

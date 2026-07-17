@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from statistics import mean
 from typing import Any
 
@@ -54,13 +54,15 @@ async def async_setup_entry(
     async_add_entities(
         [
             MenstruationGaugeSensor(hass, entry),
-            ProductUsageTodaySensor(hass, entry, "tampon"),
-            ProductUsageTodaySensor(hass, entry, "pad"),
-            CupEmptiesTodaySensor(hass, entry),
-            ProductUsageAverageCycleSensor(hass, entry),
+            ProductUsageStatsConsolidatedSensor(hass, entry),
         ],
         True,
     )
+
+
+PRODUCT_USAGE_PRODUCTS = ("tampon", "pad", "cup", "liner", "underwear")
+PRODUCT_USAGE_CYCLES_CONSIDERED = 3
+PRODUCT_USAGE_TIMELINE_DAYS = 30
 
 
 def _group_product_usage_by_date(product_usage: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
@@ -72,31 +74,39 @@ def _group_product_usage_by_date(product_usage: list[dict[str, Any]]) -> dict[st
     return grouped
 
 
-def _product_usage_for_range(
+def _empty_product_counts() -> dict[str, int]:
+    return {product: 0 for product in PRODUCT_USAGE_PRODUCTS}
+
+
+def _entry_quantity(entry: dict[str, Any]) -> int:
+    try:
+        return max(1, int(entry.get("quantity", 1) or 1))
+    except (TypeError, ValueError):
+        return 1
+
+
+def _count_products(entries: list[dict[str, Any]]) -> dict[str, int]:
+    counts = _empty_product_counts()
+    for entry in entries:
+        product = entry.get("product")
+        if product not in counts:
+            continue
+        counts[product] += _entry_quantity(entry)
+    return counts
+
+
+def _count_products_for_block(
     grouped_usage: dict[str, list[dict[str, Any]]],
-    start: str,
-    end: str,
-    *,
-    product: str | None = None,
-    action: str | None = None,
-) -> int:
-    start_date = date.fromisoformat(start)
-    end_date = date.fromisoformat(end)
-    count = 0
-    for day_entries_date, day_entries in grouped_usage.items():
-        try:
-            entry_date = date.fromisoformat(day_entries_date)
-        except ValueError:
-            continue
-        if entry_date < start_date or entry_date > end_date:
-            continue
-        for entry in day_entries:
-            if product and entry.get("product") != product:
+    block: list[str] | tuple[str, ...],
+) -> dict[str, int]:
+    counts = _empty_product_counts()
+    for day in block:
+        for entry in grouped_usage.get(day, []):
+            product = entry.get("product")
+            if product not in counts:
                 continue
-            if action and entry.get("action") != action:
-                continue
-            count += int(entry.get("quantity", 1) or 1)
-    return count
+            counts[product] += _entry_quantity(entry)
+    return counts
 
 
 def _build_product_usage_stats(
@@ -109,52 +119,42 @@ def _build_product_usage_stats(
     blocks = bleeding_blocks(usable_history)
     grouped_usage = _group_product_usage_by_date(product_usage)
 
-    today_iso = today.isoformat()
-    today_entries = grouped_usage.get(today_iso, [])
-    today_tampons = sum(int(entry.get("quantity", 1) or 1) for entry in today_entries if entry.get("product") == "tampon")
-    today_pads = sum(int(entry.get("quantity", 1) or 1) for entry in today_entries if entry.get("product") == "pad")
-    today_cup_empties = sum(
-        int(entry.get("quantity", 1) or 1)
-        for entry in today_entries
-        if entry.get("product") == "cup" and entry.get("action") == "emptied"
-    )
+    today_counts = _count_products(grouped_usage.get(today.isoformat(), []))
 
-    recent_blocks = blocks[-3:]
-    tampon_cycle_counts = [
-        _product_usage_for_range(grouped_usage, block[0], block[-1], product="tampon")
-        for block in recent_blocks
-        if block
-    ]
-    pad_cycle_counts = [
-        _product_usage_for_range(grouped_usage, block[0], block[-1], product="pad")
-        for block in recent_blocks
-        if block
-    ]
-    cup_cycle_counts = [
-        _product_usage_for_range(grouped_usage, block[0], block[-1], product="cup", action="emptied")
-        for block in recent_blocks
-        if block
-    ]
+    recent_blocks = [block for block in blocks[-PRODUCT_USAGE_CYCLES_CONSIDERED:] if block]
+    cycle_totals = [_count_products_for_block(grouped_usage, block) for block in recent_blocks]
+    cycles_considered = len(cycle_totals)
 
-    overall_cycle_counts = [
-        _product_usage_for_range(grouped_usage, block[0], block[-1])
-        for block in recent_blocks
-        if block
-    ]
+    average_per_cycle = {
+        product: round(mean([cycle[product] for cycle in cycle_totals]), 1) if cycles_considered else 0.0
+        for product in PRODUCT_USAGE_PRODUCTS
+    }
+
+    this_cycle = _count_products_for_block(grouped_usage, blocks[-1]) if blocks else _empty_product_counts()
+
+    timeline_entries: list[dict[str, Any]] = []
+    for entry in reversed(product_usage):
+        date_str = entry.get("date")
+        if not isinstance(date_str, str):
+            continue
+        try:
+            entry_date = date.fromisoformat(date_str)
+        except ValueError:
+            continue
+        if entry_date > today:
+            continue
+        if (today - entry_date) >= timedelta(days=PRODUCT_USAGE_TIMELINE_DAYS):
+            continue
+        timeline_entries.append(entry)
 
     return {
-        "today": {
-            "tampon": today_tampons,
-            "pad": today_pads,
-            "cup_empties": today_cup_empties,
+        "today": today_counts,
+        "this_cycle": this_cycle,
+        "stats": {
+            "average_per_cycle": average_per_cycle,
+            "cycles_considered": cycles_considered,
         },
-        "averages_per_cycle": {
-            "overall": round(mean(overall_cycle_counts), 1) if overall_cycle_counts else 0.0,
-            "tampon": round(mean(tampon_cycle_counts), 1) if tampon_cycle_counts else 0.0,
-            "pad": round(mean(pad_cycle_counts), 1) if pad_cycle_counts else 0.0,
-            "cup_empties": round(mean(cup_cycle_counts), 1) if cup_cycle_counts else 0.0,
-            "cycles_considered": len(recent_blocks),
-        },
+        "timeline": timeline_entries,
     }
 
 
@@ -240,7 +240,10 @@ class MenstruationGaugeSensor(SensorEntity):
             "profile": runtime.profile,
             "entry_id": self._entry.entry_id,
             "friendly_name": runtime.friendly_name,
-            "product_usage_stats": usage_stats,
+            "product_usage_today": usage_stats["today"],
+            "product_usage_this_cycle": usage_stats["this_cycle"],
+            "product_usage_stats": usage_stats["stats"],
+            "product_usage_timeline": usage_stats["timeline"],
         }
 
     def _calculate_days_until_menarche(self, menarche_data: dict[str, Any]) -> int | None:
@@ -322,31 +325,19 @@ class MenstruationGaugeSensor(SensorEntity):
         self.async_schedule_update_ha_state(True)
 
 
-class ProductUsageTodaySensor(SensorEntity):
-    """Count logged tampon or pad usage for today with profile naming."""
+class ProductUsageStatsConsolidatedSensor(SensorEntity):
+    """Consolidated product usage sensor for today's total and per-product stats."""
 
     _attr_has_entity_name = True
-    _product_labels = {
-        "tampon": ("Tampon usage today", "mdi:water-opacity"),
-        "pad": ("Pad usage today", "mdi:medical-bag"),
-        "cup": ("Cup empties today", "mdi:cup-water"),
-    }
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, product: str) -> None:
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self.hass = hass
         self._entry = entry
-        self._product = product
         runtime = self.hass.data[DOMAIN][entry.entry_id]
-        self._profile = runtime.profile
         self._friendly_name = runtime.friendly_name
-        
-        # Create unique ID with profile to avoid duplicates
-        self._attr_unique_id = f"{entry.entry_id}_{product}_usage_today"
-        
-        # Create name with profile prefix for clarity
-        base_label, icon = self._product_labels[product]
-        self._attr_name = f"{self._friendly_name}: {base_label}"
-        self._icon = icon
+        self._attr_unique_id = f"{entry.entry_id}_period_products_today"
+        self._attr_name = f"{self._friendly_name}: Period products today"
+        self._icon = "mdi:chart-box"
         self._attr_native_unit_of_measurement = "items"
         self._attr_native_value = 0
         self._attrs: dict[str, StateType] = {}
@@ -368,121 +359,21 @@ class ProductUsageTodaySensor(SensorEntity):
     async def async_update(self) -> None:
         runtime = self.hass.data[DOMAIN][self._entry.entry_id]
         self._friendly_name = runtime.friendly_name
-        base_label, _ = self._product_labels[self._product]
-        self._attr_name = f"{self._friendly_name}: {base_label}"
-        
-        self._attr_native_value = _build_product_usage_stats(
-            runtime.history,
-            runtime.product_usage,
-            dt_util.now().date(),
-        )["today"][self._product]
-        self._attrs = {
-            "profile": runtime.profile,
-            "friendly_name": runtime.friendly_name,
-            "entry_id": self._entry.entry_id,
-        }
+        self._attr_name = f"{self._friendly_name}: Period products today"
 
-    @property
-    def native_value(self) -> StateType:
-        return self._attr_native_value
-
-    @property
-    def extra_state_attributes(self) -> dict[str, StateType]:
-        return self._attrs
-
-    @property
-    def icon(self) -> str | None:
-        return self._icon
-
-    @property
-    def should_poll(self) -> bool:
-        return False
-
-    @property
-    def available(self) -> bool:
-        return self._entry.entry_id in self.hass.data.get(DOMAIN, {})
-
-    def _handle_runtime_update(self) -> None:
-        self.async_schedule_update_ha_state(True)
-
-    def _handle_daily_refresh(self, _now: datetime) -> None:
-        self.async_schedule_update_ha_state(True)
-
-
-class CupEmptiesTodaySensor(ProductUsageTodaySensor):
-    """Count logged menstrual cup emptying events for today with profile naming."""
-
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
-        super().__init__(hass, entry, "cup")
-        runtime = self.hass.data[DOMAIN][entry.entry_id]
-        self._attr_unique_id = f"{entry.entry_id}_cup_empties_today"
-        self._attr_name = f"{runtime.friendly_name}: Cup empties today"
-        self._icon = "mdi:cup-water"
-        self._attr_native_unit_of_measurement = "empties"
-
-    async def async_update(self) -> None:
-        runtime = self.hass.data[DOMAIN][self._entry.entry_id]
-        self._attr_name = f"{runtime.friendly_name}: Cup empties today"
-        self._attr_native_value = _build_product_usage_stats(
-            runtime.history,
-            runtime.product_usage,
-            dt_util.now().date(),
-        )["today"]["cup_empties"]
-        self._attrs = {
-            "profile": runtime.profile,
-            "friendly_name": runtime.friendly_name,
-            "entry_id": self._entry.entry_id,
-        }
-
-
-class ProductUsageAverageCycleSensor(SensorEntity):
-    """Average logged product usage per recent cycle with profile naming."""
-
-    _attr_has_entity_name = True
-
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
-        self.hass = hass
-        self._entry = entry
-        runtime = self.hass.data[DOMAIN][entry.entry_id]
-        self._friendly_name = runtime.friendly_name
-        
-        self._attr_unique_id = f"{entry.entry_id}_product_usage_average_cycle"
-        self._attr_name = f"{self._friendly_name}: Product usage average cycle"
-        self._icon = "mdi:chart-line"
-        self._attr_native_unit_of_measurement = "items/cycle"
-        self._attr_native_value = 0.0
-        self._attrs: dict[str, StateType] = {}
-
-    async def async_added_to_hass(self) -> None:
-        self.async_on_remove(
-            async_dispatcher_connect(self.hass, SIGNAL_HISTORY_UPDATED, self._handle_runtime_update)
-        )
-        self.async_on_remove(
-            async_track_time_change(
-                self.hass,
-                self._handle_daily_refresh,
-                hour=0,
-                minute=0,
-                second=5,
-            )
-        )
-
-    async def async_update(self) -> None:
-        runtime = self.hass.data[DOMAIN][self._entry.entry_id]
-        self._friendly_name = runtime.friendly_name
-        self._attr_name = f"{self._friendly_name}: Product usage average cycle"
-        
         stats = _build_product_usage_stats(runtime.history, runtime.product_usage, dt_util.now().date())
-        averages = stats["averages_per_cycle"]
-        self._attr_native_value = averages["overall"]
+        today = stats["today"]
+        this_cycle = stats["this_cycle"]
+        averages = stats["stats"]["average_per_cycle"]
+        self._attr_native_value = sum(int(today.get(product, 0)) for product in PRODUCT_USAGE_PRODUCTS)
         self._attrs = {
             "profile": runtime.profile,
             "friendly_name": runtime.friendly_name,
             "entry_id": self._entry.entry_id,
-            "tampon_average_per_cycle": averages["tampon"],
-            "pad_average_per_cycle": averages["pad"],
-            "cup_empties_average_per_cycle": averages["cup_empties"],
-            "cycles_considered": averages["cycles_considered"],
+            "today": today,
+            "this_cycle": this_cycle,
+            "average_per_cycle": averages,
+            "cycles_considered": stats["stats"]["cycles_considered"],
         }
 
     @property
