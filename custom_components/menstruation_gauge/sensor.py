@@ -67,6 +67,9 @@ SYMPTOM_SENSOR_HISTORY_LIMIT = 60
 SYMPTOM_STATS_MAX_CYCLES = 6
 SYMPTOM_MULTI_VALUE_KEYS = ("pain", "hygiene", "test")
 BLEEDING_STRENGTH_PRIORITY = {"light": 1, "medium": 2, "heavy": 3, "very_heavy": 4}
+CYCLE_STATS_MAX_CYCLES = 12
+CYCLE_RECENT_LIMIT = 12
+CYCLE_HISTORY_LIMIT_MONTHS = 18
 
 
 def _group_product_usage_by_date(product_usage: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
@@ -363,6 +366,130 @@ def _compact_symptom_history(symptom_history: list[dict[str, Any]]) -> list[dict
     return symptom_history[-SYMPTOM_SENSOR_HISTORY_LIMIT:]
 
 
+def _compact_history_for_sensor(history: list[str], today: date, months: int = CYCLE_HISTORY_LIMIT_MONTHS) -> list[str]:
+    """Limit history to recent months for sensor broadcasting."""
+    if not history:
+        return history
+    cutoff = today - timedelta(days=int(months * 30.44))
+    cutoff_iso = cutoff.isoformat()
+    compact = [d for d in history if d >= cutoff_iso]
+    return compact if compact else history
+
+
+def _compact_grouped_starts_for_sensor(grouped_starts: list[str], today: date, months: int = CYCLE_HISTORY_LIMIT_MONTHS) -> list[str]:
+    """Limit grouped_starts to recent months for sensor broadcasting."""
+    if not grouped_starts:
+        return grouped_starts
+    cutoff = today - timedelta(days=int(months * 30.44))
+    cutoff_iso = cutoff.isoformat()
+    compact = [d for d in grouped_starts if d >= cutoff_iso]
+    # Always include at least the last 2 entries so cycle-length calculations still work in cards
+    if len(compact) < 2 and len(grouped_starts) >= 2:
+        compact = grouped_starts[-2:]
+    return compact if compact else grouped_starts
+
+
+def _build_cycle_statistics(
+    grouped_starts: list[str],
+    bleeding_blocks_payload: list[dict[str, str | int]],
+    today: date,
+) -> dict[str, Any]:
+    """Build pre-calculated cycle statistics for the sensor attribute."""
+    if not grouped_starts:
+        return {"cycles_analyzed": 0}
+
+    recent_starts = grouped_starts[-(CYCLE_STATS_MAX_CYCLES + 1):]
+
+    cycle_lengths: list[int] = []
+    recent_cycles: list[dict[str, Any]] = []
+
+    for idx in range(1, len(recent_starts)):
+        start_iso = recent_starts[idx - 1]
+        next_iso = recent_starts[idx]
+        start_d = _parse_iso_date(start_iso)
+        next_d = _parse_iso_date(next_iso)
+        if start_d is None or next_d is None:
+            continue
+        length = (next_d - start_d).days
+        if 10 < length < 80:
+            cycle_lengths.append(length)
+            recent_cycles.append({
+                "start": start_iso,
+                "end": (next_d - timedelta(days=1)).isoformat(),
+                "length": length,
+            })
+
+    current_start_iso = grouped_starts[-1]
+    current_start_d = _parse_iso_date(current_start_iso)
+    if current_start_d is not None:
+        days_in_current = (today - current_start_d).days + 1
+        recent_cycles.append({
+            "start": current_start_iso,
+            "end": None,
+            "length": days_in_current,
+        })
+
+    if not cycle_lengths:
+        return {
+            "cycles_analyzed": 0,
+            "recent_cycles": recent_cycles[-CYCLE_RECENT_LIMIT:],
+        }
+
+    avg_cycle = round(mean(cycle_lengths), 1)
+    min_cycle = min(cycle_lengths)
+    max_cycle = max(cycle_lengths)
+    regular_count = sum(1 for length in cycle_lengths if abs(length - avg_cycle) <= 3)
+    regularity = round((regular_count / len(cycle_lengths)) * 100)
+
+    avg_period_duration: float | None = None
+    if bleeding_blocks_payload:
+        recent_blocks = bleeding_blocks_payload[-CYCLE_STATS_MAX_CYCLES:]
+        durations = [
+            block["length"]
+            for block in recent_blocks
+            if isinstance(block.get("length"), int)
+        ]
+        if durations:
+            avg_period_duration = round(mean(durations), 1)
+
+    return {
+        "average_cycle_length": avg_cycle,
+        "average_period_duration": avg_period_duration,
+        "cycles_analyzed": len(cycle_lengths),
+        "min_cycle_length": min_cycle,
+        "max_cycle_length": max_cycle,
+        "cycle_regularity_percent": regularity,
+        "recent_cycles": recent_cycles[-CYCLE_RECENT_LIMIT:],
+    }
+
+
+def _get_current_bleeding_block(
+    bleeding_blocks_payload: list[dict[str, str | int]],
+    history: list[str],
+    today: date,
+) -> dict[str, Any] | None:
+    """Return the most recent bleeding block enriched with confirmed days."""
+    if not bleeding_blocks_payload:
+        return None
+
+    last_block = bleeding_blocks_payload[-1]
+    start_iso = last_block.get("start")
+    end_iso = last_block.get("end")
+
+    if not isinstance(start_iso, str):
+        return None
+
+    end_filter = end_iso if isinstance(end_iso, str) else today.isoformat()
+    confirmed_days = [d for d in history if isinstance(d, str) and start_iso <= d <= end_filter]
+
+    return {
+        "start": start_iso,
+        "end": end_iso,
+        "length": last_block.get("length"),
+        "confirmed_days": confirmed_days,
+    }
+
+
 class MenstruationGaugeSensor(SensorEntity):
     """Expose cycle state and computed attributes including symptoms and pregnancy."""
 
@@ -426,13 +553,28 @@ class MenstruationGaugeSensor(SensorEntity):
         symptom_statistics = _build_symptom_statistics(model.history, model.symptom_history, today)
         compact_symptom_history = _compact_symptom_history(model.symptom_history)
 
+        # Cycle start / day in current cycle
+        cycle_start_date: str | None = model.grouped_starts[-1] if model.grouped_starts else None
+        cycle_day: int | None = None
+        if cycle_start_date:
+            start_d = _parse_iso_date(cycle_start_date)
+            if start_d is not None:
+                cycle_day = (today - start_d).days + 1
+
+        cycle_statistics = _build_cycle_statistics(model.grouped_starts, model.bleeding_blocks, today)
+        current_bleeding_block = _get_current_bleeding_block(model.bleeding_blocks, model.history, today)
+
+        # Compact history/grouped_starts for sensor broadcasting (full data stays in storage)
+        sensor_history = _compact_history_for_sensor(model.history, today)
+        sensor_grouped_starts = _compact_grouped_starts_for_sensor(model.grouped_starts, today)
+
         self._state = model.state
         has_history = bool(model.history)
 
         self._attrs = {
-            ATTR_HISTORY: model.history,
+            ATTR_HISTORY: sensor_history,
             ATTR_SYMPTOM_HISTORY: compact_symptom_history,
-            ATTR_GROUPED_STARTS: model.grouped_starts,
+            ATTR_GROUPED_STARTS: sensor_grouped_starts,
             ATTR_BLEEDING_BLOCKS: model.bleeding_blocks,
             ATTR_NEXT_PREDICTED_START: model.next_predicted_start,
             ATTR_AVG_CYCLE_LENGTH: model.avg_cycle_length,
@@ -467,6 +609,10 @@ class MenstruationGaugeSensor(SensorEntity):
             "symptom_data_today": symptom_data_today,
             "symptom_data_this_cycle": symptom_data_this_cycle,
             "symptom_statistics": symptom_statistics,
+            "cycle_start_date": cycle_start_date,
+            "cycle_day": cycle_day,
+            "current_bleeding_block": current_bleeding_block,
+            "cycle_statistics": cycle_statistics,
         }
 
     def _calculate_days_until_menarche(self, menarche_data: dict[str, Any]) -> int | None:
