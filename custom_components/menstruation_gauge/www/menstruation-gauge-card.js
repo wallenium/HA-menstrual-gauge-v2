@@ -40,6 +40,24 @@ class MenstruationGaugeCard extends HTMLElement {
     this._render();
   }
 
+  connectedCallback() {
+    if (typeof ResizeObserver !== 'undefined' && !this._resizeObserver) {
+      this._resizeObserver = new ResizeObserver(() => {
+        const newWidth = this.getBoundingClientRect()?.width || 0;
+        if (newWidth !== this._lastCardWidth) {
+          this._lastCardWidth = newWidth;
+          if (this._config && this._hass) this._render();
+        }
+      });
+      this._resizeObserver.observe(this);
+    }
+  }
+
+  disconnectedCallback() {
+    this._resizeObserver?.disconnect();
+    this._resizeObserver = null;
+  }
+
   getCardSize() {
     return 4;
   }
@@ -220,7 +238,12 @@ class MenstruationGaugeCard extends HTMLElement {
     const entityId = this._resolveEntityId();
     const stateObj = entityId ? this._hass?.states?.[entityId] : undefined;
     const attrs = stateObj?.attributes || {};
-    const history = Array.isArray(attrs.history) ? attrs.history.map((x) => this._normalizeISO(x)).filter(Boolean) : [];
+    const historyRaw = JSON.stringify(attrs.history);
+    if (historyRaw !== this._lastHistoryRaw) {
+      this._lastHistoryRaw = historyRaw;
+      this._normalizedHistory = Array.isArray(attrs.history) ? attrs.history.map((x) => this._normalizeISO(x)).filter(Boolean) : [];
+    }
+    const history = this._normalizedHistory || [];
     const confirmedSet = new Set(history);
     const periodDuration = this._resolvePeriodDuration(attrs);
     const predicted = this._normalizeISO(attrs.next_predicted_start);
@@ -237,17 +260,25 @@ class MenstruationGaugeCard extends HTMLElement {
       : null;
 
     // Build a date-keyed symptom lookup
-    const symptomByDate = {};
-    const symptomHistory = Array.isArray(attrs.symptom_history) ? attrs.symptom_history : [];
-    if (symptomHistory.length) {
-      symptomHistory.forEach((entry) => {
-        const d = this._normalizeISO(entry?.date);
-        if (d) symptomByDate[d] = entry;
-      });
-    } else if (attrs.symptom_data_today && typeof attrs.symptom_data_today === 'object') {
-      const todayIso = this._isoFromDate(new Date());
-      symptomByDate[todayIso] = { date: todayIso, ...attrs.symptom_data_today };
+    const symptomHistoryRaw = JSON.stringify(attrs.symptom_history);
+    const symptomDataTodayRaw = JSON.stringify(attrs.symptom_data_today);
+    if (symptomHistoryRaw !== this._lastSymptomHistoryRaw || symptomDataTodayRaw !== this._lastSymptomDataTodayRaw) {
+      this._lastSymptomHistoryRaw = symptomHistoryRaw;
+      this._lastSymptomDataTodayRaw = symptomDataTodayRaw;
+      const symptomByDateBuilt = {};
+      const symptomHistory = Array.isArray(attrs.symptom_history) ? attrs.symptom_history : [];
+      if (symptomHistory.length) {
+        symptomHistory.forEach((entry) => {
+          const d = this._normalizeISO(entry?.date);
+          if (d) symptomByDateBuilt[d] = entry;
+        });
+      } else if (attrs.symptom_data_today && typeof attrs.symptom_data_today === 'object') {
+        const todayIso = this._isoFromDate(new Date());
+        symptomByDateBuilt[todayIso] = { date: todayIso, ...attrs.symptom_data_today };
+      }
+      this._normalizedSymptomByDate = symptomByDateBuilt;
     }
+    const symptomByDate = this._normalizedSymptomByDate || {};
 
     const viewDate = this._viewDate || new Date();
     const daysInMonth = this._monthDays(viewDate);
@@ -837,65 +868,63 @@ class MenstruationGaugeCard extends HTMLElement {
   }
 
   _attachHandlers() {
-    this.shadowRoot.querySelector('[data-nav="prev"]')?.addEventListener('click', () => {
-      this._viewDate = new Date(this._viewDate.getFullYear(), this._viewDate.getMonth() - 1, 1);
-      this._render();
-    });
-    this.shadowRoot.querySelector('[data-nav="next"]')?.addEventListener('click', () => {
-      this._viewDate = new Date(this._viewDate.getFullYear(), this._viewDate.getMonth() + 1, 1);
-      this._render();
-    });
-    if (this._config?.calendar_edit_enabled !== false) {
-      this.shadowRoot.querySelector('[data-action="toggle-editor"]')?.addEventListener('click', () => {
+    if (this._handlersAttached) return;
+    this._handlersAttached = true;
+
+    // Single delegated click listener on shadowRoot — survives innerHTML replacements
+    this.shadowRoot.addEventListener('click', (ev) => {
+      // Navigation: previous month
+      if (ev.target?.closest('[data-nav="prev"]')) {
+        this._viewDate = new Date(this._viewDate.getFullYear(), this._viewDate.getMonth() - 1, 1);
+        this._render();
+        return;
+      }
+      // Navigation: next month
+      if (ev.target?.closest('[data-nav="next"]')) {
+        this._viewDate = new Date(this._viewDate.getFullYear(), this._viewDate.getMonth() + 1, 1);
+        this._render();
+        return;
+      }
+      // Toggle editor button
+      if (this._config?.calendar_edit_enabled !== false && ev.target?.closest('[data-action="toggle-editor"]')) {
         this._editorOpen = !this._editorOpen;
         this._render();
-      });
-    }
-
-    if (this._config?.calendar_edit_enabled !== false) {
-      this.shadowRoot.querySelector('.grid')?.addEventListener('click', (ev) => {
-        const btn = ev.target?.closest?.('.day[data-iso]');
-        if (!btn) return;
-        ev.stopPropagation();
-        ev.preventDefault();
-        const iso = btn.getAttribute('data-iso');
-        if (!iso) return;
-        this._modalIso = iso;
-        this._render();
-      });
-    }
-
-    // Modal event handlers (only attached when modal is rendered)
-    const modal = this.shadowRoot.getElementById('sym-modal');
-    if (modal) {
-      // Close on backdrop click
-      modal.querySelector('.sym-backdrop')?.addEventListener('click', () => {
+        return;
+      }
+      // Calendar day cell — open symptom modal
+      if (this._config?.calendar_edit_enabled !== false) {
+        const dayBtn = ev.target?.closest?.('.day[data-iso]');
+        if (dayBtn) {
+          ev.stopPropagation();
+          ev.preventDefault();
+          const iso = dayBtn.getAttribute('data-iso');
+          if (iso) {
+            this._modalIso = iso;
+            this._render();
+          }
+          return;
+        }
+      }
+      // Modal: close on backdrop / close / cancel
+      if (ev.target?.closest('.sym-backdrop') || ev.target?.closest('.sym-close') || ev.target?.closest('.sym-cancel')) {
         this._modalIso = null;
         this._render();
-      });
-      // Close button
-      modal.querySelector('.sym-close')?.addEventListener('click', () => {
-        this._modalIso = null;
-        this._render();
-      });
-      // Cancel button
-      modal.querySelector('.sym-cancel')?.addEventListener('click', () => {
-        this._modalIso = null;
-        this._render();
-      });
-      // Save button
-      modal.querySelector('.sym-save')?.addEventListener('click', () => {
+        return;
+      }
+      // Modal: save
+      if (ev.target?.closest('.sym-save')) {
         this._handleModalSave();
-      });
-      // Single-select option buttons toggle
-      modal.querySelectorAll('.sym-opt-btn[data-cat]').forEach((btn) => {
-        btn.addEventListener('click', (ev) => {
-          const cat = ev.currentTarget.getAttribute('data-cat');
-          modal.querySelectorAll(`.sym-opt-btn[data-cat="${cat}"]`).forEach((b) => b.classList.remove('sym-selected'));
-          ev.currentTarget.classList.add('sym-selected');
-        });
-      });
-    }
+        return;
+      }
+      // Modal: single-select symptom option buttons (event delegation)
+      const optBtn = ev.target?.closest('.sym-opt-btn[data-cat]');
+      if (optBtn) {
+        const cat = optBtn.getAttribute('data-cat');
+        const modal = this.shadowRoot.getElementById('sym-modal');
+        modal?.querySelectorAll(`.sym-opt-btn[data-cat="${cat}"]`).forEach((b) => b.classList.remove('sym-selected'));
+        optBtn.classList.add('sym-selected');
+      }
+    });
   }
 
   _render() {
@@ -904,7 +933,10 @@ class MenstruationGaugeCard extends HTMLElement {
 
     const model = this._buildModel();
     const palette = this._palette(model.state);
-    this._lastCardWidth = this.getBoundingClientRect()?.width || 0;
+    // Use width from ResizeObserver; fall back to a direct measurement only if not yet available.
+    if (!this._lastCardWidth) {
+      this._lastCardWidth = this.getBoundingClientRect()?.width || 0;
+    }
     const locale = this._hass?.locale?.language || 'de';
     const monthYear = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(this._viewDate);
     const cardTitle = String(this._config.title || '').trim();
