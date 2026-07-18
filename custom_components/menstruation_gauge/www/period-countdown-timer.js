@@ -98,6 +98,7 @@ class PeriodCountdownTimer extends HTMLElement {
     this.config = null;
     this._lastEntityState = null;
     this._animator = null;
+    this._timerHandlersAttached = false;
   }
 
   connectedCallback() {
@@ -461,14 +462,14 @@ class PeriodCountdownTimer extends HTMLElement {
         </div>
 
         <div class="timer-controls">
-          <button id="startBtn" class="btn btn-start">Start</button>
-          <button id="pauseBtn" class="btn btn-pause" disabled>Pause</button>
-          <button id="resetBtn" class="btn btn-reset">Zurück</button>
+          <button id="startBtn" class="btn btn-start" data-action="start-timer">Start</button>
+          <button id="pauseBtn" class="btn btn-pause" data-action="pause-timer" disabled>Pause</button>
+          <button id="resetBtn" class="btn btn-reset" data-action="reset-timer">Zurück</button>
         </div>
 
         <div class="usage-controls">
-          <button id="logUsageBtn" class="btn btn-usage" disabled>${this._t('log_used')}</button>
-          <button id="logCupBtn" class="btn btn-cup" hidden disabled>${this._t('log_cup_emptied')}</button>
+          <button id="logUsageBtn" class="btn btn-usage" data-action="log-usage" disabled>${this._t('log_used')}</button>
+          <button id="logCupBtn" class="btn btn-cup" data-action="log-cup-usage" hidden disabled>${this._t('log_cup_emptied')}</button>
         </div>
 
         <div class="usage-feedback" id="usageFeedback" hidden></div>
@@ -649,25 +650,57 @@ class PeriodCountdownTimer extends HTMLElement {
   }
 
   attachTimerEventListeners() {
-    const startBtn = this.querySelector("#startBtn");
-    const pauseBtn = this.querySelector("#pauseBtn");
-    const resetBtn = this.querySelector("#resetBtn");
-    const logUsageBtn = this.querySelector("#logUsageBtn");
-    const logCupBtn = this.querySelector("#logCupBtn");
-    const reminderCheckbox = this.querySelector("#reminderCheckbox");
-
-    if (startBtn) startBtn.addEventListener("click", () => { this.startTimer(); this._updateTimerState(); });
-    if (pauseBtn) pauseBtn.addEventListener("click", () => { this.pauseTimer(); this._updateTimerState(); });
-    if (resetBtn) resetBtn.addEventListener("click", () => { this.resetTimer(); this._updateTimerState(); });
-    if (logUsageBtn) logUsageBtn.addEventListener("click", () => this.logProductUsage("used"));
-    if (logCupBtn) logCupBtn.addEventListener("click", () => this.logProductUsage("emptied"));
-
-    if (reminderCheckbox) {
-      reminderCheckbox.addEventListener("change", (e) => {
-        this.timerState.reminderEnabled = e.target.checked;
-      });
+    const root = this._ensureRoot();
+    if (this._timerHandlersAttached) {
+      return;
     }
+    this._timerHandlersAttached = true;
 
+    root.addEventListener("click", (event) => {
+      const button = event.target?.closest("button[data-action]");
+      if (!button || button.disabled) {
+        return;
+      }
+
+      switch (button.dataset.action) {
+        case "start-timer":
+          this.startTimer();
+          this._updateTimerState();
+          break;
+        case "pause-timer":
+          this.pauseTimer();
+          this._updateTimerState();
+          break;
+        case "reset-timer":
+          this.resetTimer();
+          this._updateTimerState();
+          break;
+        case "log-usage":
+          this.logProductUsage("used");
+          break;
+        case "log-cup-usage":
+          this.logProductUsage("emptied");
+          break;
+        default:
+          break;
+      }
+    });
+
+    root.addEventListener("change", (event) => {
+      const target = event.target;
+      if (!target) {
+        return;
+      }
+
+      if (target.id === "productSelect" && target.value) {
+        this.selectProductFromDropdown(target.value);
+        return;
+      }
+
+      if (target.id === "reminderCheckbox") {
+        this.timerState.reminderEnabled = target.checked;
+      }
+    });
   }
 
   attachReminderListener() {
@@ -735,13 +768,6 @@ class PeriodCountdownTimer extends HTMLElement {
         option.dataset.seconds = product.seconds;
         productSelect.appendChild(option);
       });
-      if (productSelect) {
-        productSelect.addEventListener("change", (e) => {
-          if (e.target.value) {
-            this.selectProductFromDropdown(e.target.value);
-          }
-        });
-      }
       this.updateDisplay();
       this.updateButtonStates();
       this.updateUsageButtons();
