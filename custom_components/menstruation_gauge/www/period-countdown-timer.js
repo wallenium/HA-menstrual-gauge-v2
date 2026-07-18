@@ -91,6 +91,7 @@ class PeriodCountdownTimer extends HTMLElement {
       remainingSeconds: 0,
       intervalId: null,
       feedbackTimeoutId: null,
+      completionTimeoutId: null,
       selectedProduct: null,
       currentStatus: null,
       reminderEnabled: true,
@@ -99,6 +100,8 @@ class PeriodCountdownTimer extends HTMLElement {
     this._lastEntityState = null;
     this._animator = null;
     this._timerHandlersAttached = false;
+    this._onRootClick = null;
+    this._onRootChange = null;
   }
 
   connectedCallback() {
@@ -111,6 +114,21 @@ class PeriodCountdownTimer extends HTMLElement {
     } catch (error) {
       console.error("PeriodCountdownTimer Error:", error);
       this.innerHTML = `<ha-card><div style="padding: 16px; color: red;">⚠️ Fehler beim Laden</div></ha-card>`;
+    }
+  }
+
+  disconnectedCallback() {
+    this._detachTimerEventListeners();
+    clearInterval(this.timerState.intervalId);
+    this.timerState.intervalId = null;
+    clearTimeout(this.timerState.feedbackTimeoutId);
+    this.timerState.feedbackTimeoutId = null;
+    clearTimeout(this.timerState.completionTimeoutId);
+    this.timerState.completionTimeoutId = null;
+    this.timerState.isRunning = false;
+    if (this._animator) {
+      this._animator.reset();
+      this._animator = null;
     }
   }
 
@@ -656,7 +674,7 @@ class PeriodCountdownTimer extends HTMLElement {
     }
     this._timerHandlersAttached = true;
 
-    root.addEventListener("click", (event) => {
+    this._onRootClick = (event) => {
       const button = event.target?.closest("button[data-action]");
       if (!button || button.disabled) {
         return;
@@ -684,9 +702,9 @@ class PeriodCountdownTimer extends HTMLElement {
         default:
           break;
       }
-    });
+    };
 
-    root.addEventListener("change", (event) => {
+    this._onRootChange = (event) => {
       const target = event.target;
       if (!target) {
         return;
@@ -700,16 +718,31 @@ class PeriodCountdownTimer extends HTMLElement {
       if (target.id === "reminderCheckbox") {
         this.timerState.reminderEnabled = target.checked;
       }
-    });
+    };
+
+    root.addEventListener("click", this._onRootClick);
+    root.addEventListener("change", this._onRootChange);
+  }
+
+  _detachTimerEventListeners() {
+    const root = this.shadowRoot;
+    if (!root) {
+      this._timerHandlersAttached = false;
+      return;
+    }
+    if (this._onRootClick) {
+      root.removeEventListener("click", this._onRootClick);
+      this._onRootClick = null;
+    }
+    if (this._onRootChange) {
+      root.removeEventListener("change", this._onRootChange);
+      this._onRootChange = null;
+    }
+    this._timerHandlersAttached = false;
   }
 
   attachReminderListener() {
-    const reminderCheckbox = this.querySelector("#reminderCheckbox");
-    if (reminderCheckbox) {
-      reminderCheckbox.addEventListener("change", (e) => {
-        this.timerState.reminderEnabled = e.target.checked;
-      });
-    }
+    // Handled by delegated "change" listener on shadow root.
   }
 
   updateProductDropdown(status) {
@@ -886,6 +919,8 @@ class PeriodCountdownTimer extends HTMLElement {
       this.timerState.remainingSeconds = 0;
       clearInterval(this.timerState.intervalId);
       this.timerState.intervalId = null;
+      clearTimeout(this.timerState.completionTimeoutId);
+      this.timerState.completionTimeoutId = null;
       if (this._animator) {
         this._animator.reset();
       }
@@ -1030,7 +1065,7 @@ class PeriodCountdownTimer extends HTMLElement {
 
       this.playAlert();
 
-      setTimeout(() => {
+      this.timerState.completionTimeoutId = window.setTimeout(() => {
         this.resetTimer();
         this._updateTimerState();
         timerDisplay?.classList.remove("timer-complete");

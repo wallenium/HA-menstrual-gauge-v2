@@ -1044,6 +1044,17 @@ class MenstruationGaugeCard extends HTMLElement {
 }
 
 class MenstruationGaugeCardEditor extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+    this._handlersAttached = false;
+    this._onEditorChange = null;
+    this._onEditorClick = null;
+    this._onEditorInput = null;
+    this._onEditorKeydown = null;
+    this._editorEntities = [];
+  }
+
   setConfig(config) {
     this._config = {
       theme_mode: 'auto',
@@ -1060,6 +1071,10 @@ class MenstruationGaugeCardEditor extends HTMLElement {
     // Avoid stealing focus while user is typing in the editor.
     if (this.shadowRoot?.activeElement) return;
     this._render();
+  }
+
+  disconnectedCallback() {
+    this._detachHandlers();
   }
 
   _lang() {
@@ -1143,10 +1158,116 @@ class MenstruationGaugeCardEditor extends HTMLElement {
     this._emit(next);
   }
 
+  _applySelectedEntity(valueRaw) {
+    const value = String(valueRaw || '').trim();
+    if (!value) return;
+    const next = { ...this._config, entity: value };
+    delete next.entry_id;
+    if (!String(next.friendly_name || '').trim()) next.friendly_name = this._sensorLabelFromEntity(value);
+    this._emit(next);
+  }
+
+  _handlePeriodDurationChange(valueRaw) {
+    const raw = String(valueRaw || '').trim();
+    if (!raw) {
+      const next = { ...this._config };
+      delete next.period_duration_days;
+      this._emit(next);
+      return;
+    }
+    const lowered = raw.toLowerCase();
+    if (lowered === 'learnt' || lowered === 'learned') {
+      this._handleInput('period_duration_days', 'learnt');
+      return;
+    }
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) return;
+    const clamped = Math.max(1, Math.min(14, Math.round(parsed)));
+    this._handleInput('period_duration_days', clamped);
+  }
+
+  _handleEntitySearchInput(valueRaw) {
+    const entitySelect = this.shadowRoot?.getElementById('entity_select');
+    if (!entitySelect) return;
+    const needle = String(valueRaw || '').trim().toLowerCase();
+    const filtered = needle
+      ? this._editorEntities.filter((row) => `${row.label} ${row.entity_id}`.toLowerCase().includes(needle))
+      : this._editorEntities;
+    entitySelect.innerHTML = this._entityOptionsHtml(filtered, String(this._config.entity || ''));
+    if (!entitySelect.value && filtered.length) entitySelect.value = filtered[0].entity_id;
+  }
+
+  _attachHandlers() {
+    if (this._handlersAttached || !this.shadowRoot) return;
+    this._handlersAttached = true;
+
+    this._onEditorChange = (ev) => {
+      const target = ev.target;
+      if (!target?.id) return;
+      if (target.id === 'entity_selector' || target.id === 'entity_picker') {
+        this._applySelectedEntity(ev?.detail?.value ?? target.value);
+        return;
+      }
+      if (target.id === 'entity_select') {
+        this._applySelectedEntity(target.value);
+        return;
+      }
+      if (target.id === 'friendly_name') return this._handleInput('friendly_name', target.value);
+      if (target.id === 'period_duration_days') return this._handlePeriodDurationChange(target.value);
+      if (target.id === 'title') return this._handleInput('title', target.value);
+      if (target.id === 'theme_mode') return this._handleInput('theme_mode', target.value);
+      if (target.id === 'show_fertile_period') return this._handleInput('show_fertile_period', !!target.checked);
+      if (target.id === 'calendar_edit_enabled') return this._handleInput('calendar_edit_enabled', !!target.checked);
+    };
+
+    this._onEditorClick = (ev) => {
+      if (!ev.target?.closest('#use_sensor_name')) return;
+      const entitySelector = this.shadowRoot.getElementById('entity_selector');
+      const entityPicker = this.shadowRoot.getElementById('entity_picker');
+      const entitySelect = this.shadowRoot.getElementById('entity_select');
+      const selected = entitySelector?.value || entityPicker?.value || entitySelect?.value || String(this._config.entity || '');
+      const fromSensor = this._sensorLabelFromEntity(selected);
+      this._emit({ ...this._config, friendly_name: fromSensor || '' });
+    };
+
+    this._onEditorInput = (ev) => {
+      if (ev.target?.id === 'entity_search') {
+        this._handleEntitySearchInput(ev.target.value);
+      }
+    };
+
+    this._onEditorKeydown = (ev) => {
+      if (ev.target?.id !== 'entity_search' || ev.key !== 'Enter') return;
+      ev.preventDefault();
+      const entitySelect = this.shadowRoot?.getElementById('entity_select');
+      this._applySelectedEntity(entitySelect?.value);
+    };
+
+    this.shadowRoot.addEventListener('change', this._onEditorChange);
+    this.shadowRoot.addEventListener('value-changed', this._onEditorChange);
+    this.shadowRoot.addEventListener('click', this._onEditorClick);
+    this.shadowRoot.addEventListener('input', this._onEditorInput);
+    this.shadowRoot.addEventListener('keydown', this._onEditorKeydown);
+  }
+
+  _detachHandlers() {
+    if (!this.shadowRoot || !this._handlersAttached) return;
+    this.shadowRoot.removeEventListener('change', this._onEditorChange);
+    this.shadowRoot.removeEventListener('value-changed', this._onEditorChange);
+    this.shadowRoot.removeEventListener('click', this._onEditorClick);
+    this.shadowRoot.removeEventListener('input', this._onEditorInput);
+    this.shadowRoot.removeEventListener('keydown', this._onEditorKeydown);
+    this._onEditorChange = null;
+    this._onEditorClick = null;
+    this._onEditorInput = null;
+    this._onEditorKeydown = null;
+    this._handlersAttached = false;
+  }
+
   _render() {
     if (!this._config) return;
-    if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
     const entities = this._entityOptions();
+    this._editorEntities = entities;
     const selectedEntity = String(this._config.entity || '');
     const hasHaSelector = Boolean(customElements.get('ha-selector'));
     const hasHaEntityPicker = Boolean(customElements.get('ha-entity-picker'));
@@ -1214,81 +1335,19 @@ class MenstruationGaugeCardEditor extends HTMLElement {
 
     const entitySelector = this.shadowRoot.getElementById('entity_selector');
     const entityPicker = this.shadowRoot.getElementById('entity_picker');
-    const entitySelect = this.shadowRoot.getElementById('entity_select');
-    const entitySearch = this.shadowRoot.getElementById('entity_search');
-    const applySelectedEntity = (valueRaw) => {
-      const value = String(valueRaw || '').trim();
-      if (!value) return;
-      const next = { ...this._config, entity: value };
-      delete next.entry_id;
-      if (!String(next.friendly_name || '').trim()) next.friendly_name = this._sensorLabelFromEntity(value);
-      this._emit(next);
-    };
 
     if (entitySelector) {
       entitySelector.hass = this._hass;
       entitySelector.selector = { entity: { domain: 'sensor' } };
       entitySelector.value = String(this._config.entity || '');
-      const onSelect = (ev) => applySelectedEntity(ev?.detail?.value);
-      entitySelector.addEventListener('value-changed', onSelect);
-      entitySelector.addEventListener('change', onSelect);
     }
     if (entityPicker) {
       entityPicker.hass = this._hass;
       entityPicker.value = String(this._config.entity || '');
       entityPicker.includeDomains = ['sensor'];
       entityPicker.allowCustomEntity = false;
-      const onEntityPick = (ev) => applySelectedEntity(ev?.detail?.value);
-      entityPicker.addEventListener('value-changed', onEntityPick);
-      entityPicker.addEventListener('change', onEntityPick);
     }
-    if (entitySelect) {
-      entitySelect.addEventListener('change', (ev) => applySelectedEntity(ev?.target?.value));
-      entitySearch?.addEventListener('input', (ev) => {
-        const needle = String(ev?.target?.value || '').trim().toLowerCase();
-        const filtered = needle
-          ? entities.filter((row) => `${row.label} ${row.entity_id}`.toLowerCase().includes(needle))
-          : entities;
-        entitySelect.innerHTML = this._entityOptionsHtml(filtered, String(this._config.entity || ''));
-        if (!entitySelect.value && filtered.length) entitySelect.value = filtered[0].entity_id;
-      });
-      entitySearch?.addEventListener('keydown', (ev) => {
-        if (ev.key === 'Enter') {
-          ev.preventDefault();
-          applySelectedEntity(entitySelect?.value);
-        }
-      });
-    }
-
-    this.shadowRoot.getElementById('friendly_name')?.addEventListener('change', (ev) => this._handleInput('friendly_name', ev.target.value));
-    this.shadowRoot.getElementById('use_sensor_name')?.addEventListener('click', () => {
-      const selected = entitySelector?.value || entityPicker?.value || entitySelect?.value || String(this._config.entity || '');
-      const fromSensor = this._sensorLabelFromEntity(selected);
-      const next = { ...this._config, friendly_name: fromSensor || '' };
-      this._emit(next);
-    });
-    this.shadowRoot.getElementById('period_duration_days')?.addEventListener('change', (ev) => {
-      const raw = String(ev.target.value || '').trim();
-      if (!raw) {
-        const next = { ...this._config };
-        delete next.period_duration_days;
-        this._emit(next);
-        return;
-      }
-      const lowered = raw.toLowerCase();
-      if (lowered === 'learnt' || lowered === 'learned') {
-        this._handleInput('period_duration_days', 'learnt');
-        return;
-      }
-      const parsed = Number(raw);
-      if (!Number.isFinite(parsed)) return;
-      const clamped = Math.max(1, Math.min(14, Math.round(parsed)));
-      this._handleInput('period_duration_days', clamped);
-    });
-    this.shadowRoot.getElementById('title')?.addEventListener('change', (ev) => this._handleInput('title', ev.target.value));
-    this.shadowRoot.getElementById('theme_mode')?.addEventListener('change', (ev) => this._handleInput('theme_mode', ev.target.value));
-    this.shadowRoot.getElementById('show_fertile_period')?.addEventListener('change', (ev) => this._handleInput('show_fertile_period', !!ev.target.checked));
-    this.shadowRoot.getElementById('calendar_edit_enabled')?.addEventListener('change', (ev) => this._handleInput('calendar_edit_enabled', !!ev.target.checked));
+    this._attachHandlers();
   }
 }
 
