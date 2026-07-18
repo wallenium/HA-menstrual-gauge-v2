@@ -8,6 +8,13 @@ class MenstrualProductInventoryCardEditor extends HTMLElement {
     this.attachShadow({ mode: "open" });
     this._config = {};
     this._dragSrcIdx = null;
+    this._handlersAttached = false;
+    this._onRootChange = null;
+    this._onDragStart = null;
+    this._onDragEnd = null;
+    this._onDragOver = null;
+    this._onDragLeave = null;
+    this._onDrop = null;
   }
 
   setConfig(config) {
@@ -17,6 +24,16 @@ class MenstrualProductInventoryCardEditor extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+  }
+
+  connectedCallback() {
+    this._attachHandlers();
+  }
+
+  disconnectedCallback() {
+    this._detachHandlers();
+    this._dragSrcIdx = null;
+    this._dragItems = null;
   }
 
   _lang() {
@@ -219,73 +236,103 @@ class MenstrualProductInventoryCardEditor extends HTMLElement {
       </div>
     `;
 
-    this._attachVisibilityHandlers(ordered, visible);
-    this._attachOrderHandlers(ordered);
-    this._attachOptionsHandlers();
+    this._attachHandlers();
   }
 
-  _attachVisibilityHandlers(ordered, visible) {
-    this.shadowRoot.querySelectorAll("#visibility-list input[type='checkbox']").forEach((checkbox) => {
-      checkbox.addEventListener("change", () => {
-        const newVisible = ordered.filter((p) => {
+  _attachHandlers() {
+    if (this._handlersAttached || !this.shadowRoot) return;
+    this._handlersAttached = true;
+
+    this._onRootChange = (event) => {
+      const target = event.target;
+      if (!target) return;
+
+      if (target.matches("#visibility-list input[type='checkbox'][data-product]")) {
+        const ordered = this._getOrderedProducts();
+        const visible = ordered.filter((p) => {
           const cb = this.shadowRoot.querySelector(`#visibility-list input[data-product="${p}"]`);
-          return cb ? cb.checked : visible.has(p);
+          return !!cb?.checked;
         });
-        this._fireConfigChanged({ ...this._config, visible_products: newVisible });
-      });
-    });
+        this._fireConfigChanged({ ...this._config, visible_products: visible });
+        return;
+      }
+
+      if (target.id === "show-thresholds") {
+        this._fireConfigChanged({ ...this._config, show_thresholds: !!target.checked });
+      }
+    };
+
+    this._onDragStart = (e) => {
+      const item = e.target?.closest(".order-item");
+      if (!item) return;
+      this._dragSrcIdx = Number(item.dataset.idx);
+      this._dragItems = [...this.shadowRoot.querySelectorAll("#order-list .order-item")];
+      item.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", item.dataset.idx);
+    };
+
+    this._onDragEnd = (e) => {
+      const item = e.target?.closest(".order-item");
+      item?.classList.remove("dragging");
+      this._dragItems?.forEach((i) => i.classList.remove("drag-over"));
+      this._dragItems = null;
+      this._dragSrcIdx = null;
+    };
+
+    this._onDragOver = (e) => {
+      const item = e.target?.closest(".order-item");
+      if (!item) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      this._dragItems?.forEach((i) => i.classList.remove("drag-over"));
+      item.classList.add("drag-over");
+    };
+
+    this._onDragLeave = (e) => {
+      const item = e.target?.closest(".order-item");
+      item?.classList.remove("drag-over");
+    };
+
+    this._onDrop = (e) => {
+      const item = e.target?.closest(".order-item");
+      if (!item) return;
+      e.preventDefault();
+      const srcIdx = this._dragSrcIdx;
+      const dstIdx = Number(item.dataset.idx);
+      if (srcIdx === null || srcIdx === dstIdx) return;
+      const currentOrder = [...this.shadowRoot.querySelectorAll("#order-list .order-item")]
+        .map((el) => el.dataset.product)
+        .filter(Boolean);
+      const newOrder = [...currentOrder];
+      const [moved] = newOrder.splice(srcIdx, 1);
+      newOrder.splice(dstIdx, 0, moved);
+      this._fireConfigChanged({ ...this._config, product_order: newOrder });
+    };
+
+    this.shadowRoot.addEventListener("change", this._onRootChange);
+    this.shadowRoot.addEventListener("dragstart", this._onDragStart);
+    this.shadowRoot.addEventListener("dragend", this._onDragEnd);
+    this.shadowRoot.addEventListener("dragover", this._onDragOver);
+    this.shadowRoot.addEventListener("dragleave", this._onDragLeave);
+    this.shadowRoot.addEventListener("drop", this._onDrop);
   }
 
-  _attachOrderHandlers(ordered) {
-    const orderItems = this.shadowRoot.querySelectorAll("#order-list .order-item");
-
-    orderItems.forEach((item) => {
-      item.addEventListener("dragstart", (e) => {
-        this._dragSrcIdx = Number(item.dataset.idx);
-        this._dragItems = [...orderItems];
-        item.classList.add("dragging");
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", item.dataset.idx);
-      });
-
-      item.addEventListener("dragend", () => {
-        item.classList.remove("dragging");
-        this._dragItems?.forEach((i) => i.classList.remove("drag-over"));
-        this._dragItems = null;
-        this._dragSrcIdx = null;
-      });
-
-      item.addEventListener("dragover", (e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        this._dragItems?.forEach((i) => i.classList.remove("drag-over"));
-        item.classList.add("drag-over");
-      });
-
-      item.addEventListener("dragleave", () => {
-        item.classList.remove("drag-over");
-      });
-
-      item.addEventListener("drop", (e) => {
-        e.preventDefault();
-        const srcIdx = this._dragSrcIdx;
-        const dstIdx = Number(item.dataset.idx);
-        if (srcIdx === null || srcIdx === dstIdx) return;
-        const newOrder = [...ordered];
-        const [moved] = newOrder.splice(srcIdx, 1);
-        newOrder.splice(dstIdx, 0, moved);
-        this._fireConfigChanged({ ...this._config, product_order: newOrder });
-      });
-    });
-  }
-
-  _attachOptionsHandlers() {
-    const thresholdsCheckbox = this.shadowRoot.querySelector("#show-thresholds");
-    if (thresholdsCheckbox) {
-      thresholdsCheckbox.addEventListener("change", (e) => {
-        this._fireConfigChanged({ ...this._config, show_thresholds: e.target.checked });
-      });
-    }
+  _detachHandlers() {
+    if (!this.shadowRoot || !this._handlersAttached) return;
+    this.shadowRoot.removeEventListener("change", this._onRootChange);
+    this.shadowRoot.removeEventListener("dragstart", this._onDragStart);
+    this.shadowRoot.removeEventListener("dragend", this._onDragEnd);
+    this.shadowRoot.removeEventListener("dragover", this._onDragOver);
+    this.shadowRoot.removeEventListener("dragleave", this._onDragLeave);
+    this.shadowRoot.removeEventListener("drop", this._onDrop);
+    this._onRootChange = null;
+    this._onDragStart = null;
+    this._onDragEnd = null;
+    this._onDragOver = null;
+    this._onDragLeave = null;
+    this._onDrop = null;
+    this._handlersAttached = false;
   }
 }
 

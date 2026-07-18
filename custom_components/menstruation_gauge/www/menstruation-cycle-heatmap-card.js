@@ -1,4 +1,14 @@
 class MenstruationCycleHeatmapCard extends HTMLElement {
+  constructor() {
+    super();
+    this._heatmapCueObserver = null;
+    this._tooltipHeatmap = null;
+    this._tooltipMouseOverHandler = null;
+    this._tooltipMouseLeaveHandler = null;
+    this._scrollHeatmap = null;
+    this._scrollCueUpdateHandler = null;
+  }
+
   static getConfigElement() {
     return document.createElement('menstruation-cycle-heatmap-card-editor');
   }
@@ -41,6 +51,11 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
 
   getCardSize() {
     return 4;
+  }
+
+  disconnectedCallback() {
+    this._unbindTooltipEvents();
+    this._unbindHeatmapScrollCues();
   }
 
   _ensureRoot() {
@@ -437,6 +452,7 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
   }
 
   _bindTooltipEvents() {
+    this._unbindTooltipEvents();
     const root = this.shadowRoot;
     if (!root) return;
     const heatmap = root.querySelector('.heatmap');
@@ -463,14 +479,30 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
 
     const hide = () => { tooltip.style.display = 'none'; };
 
-    heatmap.addEventListener('mouseover', (e) => {
+    this._tooltipMouseOverHandler = (e) => {
       const cell = e.target.closest && e.target.closest('.cell:not(.spacer)');
       if (cell) show(cell);
-    });
-    heatmap.addEventListener('mouseleave', hide);
+    };
+    this._tooltipMouseLeaveHandler = hide;
+    this._tooltipHeatmap = heatmap;
+    heatmap.addEventListener('mouseover', this._tooltipMouseOverHandler);
+    heatmap.addEventListener('mouseleave', this._tooltipMouseLeaveHandler);
+  }
+
+  _unbindTooltipEvents() {
+    if (this._tooltipHeatmap && this._tooltipMouseOverHandler) {
+      this._tooltipHeatmap.removeEventListener('mouseover', this._tooltipMouseOverHandler);
+    }
+    if (this._tooltipHeatmap && this._tooltipMouseLeaveHandler) {
+      this._tooltipHeatmap.removeEventListener('mouseleave', this._tooltipMouseLeaveHandler);
+    }
+    this._tooltipHeatmap = null;
+    this._tooltipMouseOverHandler = null;
+    this._tooltipMouseLeaveHandler = null;
   }
 
   _bindHeatmapScrollCues() {
+    this._unbindHeatmapScrollCues();
     const root = this.shadowRoot;
     if (!root) return;
     const wrap = root.querySelector('.heatmap-wrap');
@@ -488,6 +520,8 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
       cueRight.classList.toggle('active', hasOverflow && canRight);
     };
 
+    this._scrollHeatmap = heatmap;
+    this._scrollCueUpdateHandler = update;
     heatmap.addEventListener('scroll', update, { passive: true });
     if (typeof ResizeObserver !== 'undefined') {
       const observer = new ResizeObserver(update);
@@ -497,11 +531,21 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
     requestAnimationFrame(update);
   }
 
-  _render() {
+  _unbindHeatmapScrollCues() {
+    if (this._scrollHeatmap && this._scrollCueUpdateHandler) {
+      this._scrollHeatmap.removeEventListener('scroll', this._scrollCueUpdateHandler);
+    }
+    this._scrollHeatmap = null;
+    this._scrollCueUpdateHandler = null;
     if (this._heatmapCueObserver) {
       this._heatmapCueObserver.disconnect();
       this._heatmapCueObserver = null;
     }
+  }
+
+  _render() {
+    this._unbindTooltipEvents();
+    this._unbindHeatmapScrollCues();
     this._ensureRoot();
     if (!this._config || !this.shadowRoot) return;
 
