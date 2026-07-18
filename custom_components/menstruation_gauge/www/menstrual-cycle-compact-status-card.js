@@ -347,9 +347,11 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
     let subtitleText = '';
 
     if (statusKey === 'pregnant') {
-      emoji = '🤰';
       const weeksRaw = attrs.weeks_pregnant !== undefined ? attrs.weeks_pregnant : attrs.pregnancy_week;
       const weeksPregnant = Math.max(0, parseInt(String(weeksRaw || '0'), 10) || 0);
+      emoji = (window.ProductIcons && window.ProductIcons.getPregnancyIcon)
+        ? window.ProductIcons.getPregnancyIcon(weeksPregnant)
+        : '🤰';
       const totalWeeks = 40;
       progressPercent = Math.min(100, Math.round((weeksPregnant / totalWeeks) * 100));
       titleText = `${this._t('pregnant')} – ${this._t('week')} ${weeksPregnant}/${totalWeeks}`;
