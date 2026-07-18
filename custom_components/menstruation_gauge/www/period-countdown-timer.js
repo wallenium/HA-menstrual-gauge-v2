@@ -240,10 +240,11 @@ class PeriodCountdownTimer extends HTMLElement {
   }
 
   renderPreMearcheMode(cardContent) {
+    const preMenarcheIcon = this._getStatusAnimatedIcon("pre_menarche");
     cardContent.innerHTML = `
       <div class="premenarche-container">
         <div class="premenarche-badge">
-          <div class="badge-emoji">🌸</div>
+          <div class="badge-emoji">${preMenarcheIcon}</div>
           <div class="badge-text">
             <h3>${this._t('pre_menarche')}</h3>
             <p>${this._t('pre_menarche_desc')}</p>
@@ -287,9 +288,7 @@ class PeriodCountdownTimer extends HTMLElement {
     const pregnancyWeek = attributes?.pregnancy_week || 0;
     const dueDate = attributes?.due_date || "TBD";
     const trimester = Math.ceil(pregnancyWeek / 13);
-    const pregnancyIcon = (window.ProductIcons && window.ProductIcons.getPregnancyIcon)
-      ? window.ProductIcons.getPregnancyIcon(pregnancyWeek, 'large')
-      : '🤰';
+    const pregnancyIcon = this._getStatusAnimatedIcon("pregnant", attributes, "large");
 
     cardContent.innerHTML = `
       <div class="pregnancy-container">
@@ -346,11 +345,12 @@ class PeriodCountdownTimer extends HTMLElement {
     const birthDate = attributes?.birth_date || new Date().toISOString();
     const daysSinceBirth = this.calculateDaysSince(birthDate);
     const weeksSinceBirth = Math.floor(daysSinceBirth / 7);
+    const postpartumIcon = this._getStatusAnimatedIcon("postpartum", attributes);
 
     cardContent.innerHTML = `
       <div class="postpartum-container">
         <div class="postpartum-badge">
-          <div class="badge-emoji">👶</div>
+          <div class="badge-emoji">${postpartumIcon}</div>
           <div class="badge-text">
             <h3>${this._t('postpartum')}</h3>
             <p>${daysSinceBirth} ${this._t('days_since_birth')}</p>
@@ -399,10 +399,11 @@ class PeriodCountdownTimer extends HTMLElement {
   }
 
   renderMenopauseMode(cardContent) {
+    const menopauseIcon = this._getStatusAnimatedIcon("menopause");
     cardContent.innerHTML = `
       <div class="menopause-container">
         <div class="menopause-badge">
-          <div class="badge-emoji">🌙</div>
+          <div class="badge-emoji">${menopauseIcon}</div>
           <div class="badge-text">
             <h3>${this._t('menopause')}</h3>
             <p>${this._t('menopause_desc')}</p>
@@ -1068,6 +1069,12 @@ class PeriodCountdownTimer extends HTMLElement {
     return window.ProductIcons?.getSvgIcon(product) || '';
   }
 
+  _getStatusAnimatedIcon(statusKey, attrs = {}, size = "large") {
+    return window.ProductIcons?.getStatusAnimatedIcon?.(statusKey, attrs, size)
+      || window.ProductIcons?.getStatusIcon?.(statusKey, size)
+      || '';
+  }
+
   _createAnimatedProductSVG(productKey, mode) {
     if (productKey === "cup") return this._createAnimatedCupSVG(mode);
     if (productKey === "tampon") return this._createAnimatedTamponSVG(mode);
@@ -1399,7 +1406,18 @@ class PeriodCountdownTimer extends HTMLElement {
       }
 
       .badge-emoji {
-        font-size: 2.5rem;
+        width: 44px;
+        height: 44px;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .badge-emoji svg {
+        width: 100%;
+        height: 100%;
+        display: block;
       }
 
       .badge-text h3 {
@@ -1859,7 +1877,8 @@ class PeriodCountdownTimer extends HTMLElement {
         }
         
         .badge-emoji {
-          font-size: 2rem;
+          width: 36px;
+          height: 36px;
         }
         
         .badge-text h3 {
