@@ -484,6 +484,7 @@ class PeriodCountdownTimer extends HTMLElement {
 
     this.updateProductDropdown(this.timerState.currentStatus);
     this.attachTimerEventListeners();
+    this._loadTimerState();
   }
 
   renderPregnancyMilestones(trimester) {
@@ -655,9 +656,9 @@ class PeriodCountdownTimer extends HTMLElement {
     const logCupBtn = this.querySelector("#logCupBtn");
     const reminderCheckbox = this.querySelector("#reminderCheckbox");
 
-    if (startBtn) startBtn.addEventListener("click", () => this.startTimer());
-    if (pauseBtn) pauseBtn.addEventListener("click", () => this.pauseTimer());
-    if (resetBtn) resetBtn.addEventListener("click", () => this.resetTimer());
+    if (startBtn) startBtn.addEventListener("click", () => { this.startTimer(); this._updateTimerState(); });
+    if (pauseBtn) pauseBtn.addEventListener("click", () => { this.pauseTimer(); this._updateTimerState(); });
+    if (resetBtn) resetBtn.addEventListener("click", () => { this.resetTimer(); this._updateTimerState(); });
     if (logUsageBtn) logUsageBtn.addEventListener("click", () => this.logProductUsage("used"));
     if (logCupBtn) logCupBtn.addEventListener("click", () => this.logProductUsage("emptied"));
 
@@ -799,6 +800,7 @@ class PeriodCountdownTimer extends HTMLElement {
       this.updateDisplay();
       this.updateButtonStates();
       this.updateUsageButtons();
+      this._updateTimerState();
     } catch (error) {
       console.error("Error selecting product:", error);
     }
@@ -906,6 +908,7 @@ class PeriodCountdownTimer extends HTMLElement {
       this.updateDisplay();
       this.updateButtonStates();
       this.updateUsageButtons();
+      this._updateTimerState();
 
       const successKey = action === "emptied" ? "usage_logged_emptied" : "usage_logged_used";
       this.showUsageFeedback(this._t(successKey), "success");
@@ -1003,6 +1006,7 @@ class PeriodCountdownTimer extends HTMLElement {
 
       setTimeout(() => {
         this.resetTimer();
+        this._updateTimerState();
         timerDisplay?.classList.remove("timer-complete");
       }, 3000);
     } catch (error) {
@@ -1062,6 +1066,109 @@ class PeriodCountdownTimer extends HTMLElement {
     if (logCupBtn) {
       logCupBtn.hidden = !isCupSelected;
       logCupBtn.disabled = !isCupSelected;
+    }
+  }
+
+  _saveTimerState() {
+    try {
+      if (!this._hass || !this.config?.entity) return;
+      const serviceData = {
+        entity_id: this.config.entity,
+        remaining_seconds: this.timerState.remainingSeconds,
+        total_seconds: this.timerState.totalSeconds,
+        is_running: this.timerState.isRunning,
+        saved_at: Date.now(),
+      };
+      if (this.timerState.selectedProduct) {
+        serviceData.selected_product = this.timerState.selectedProduct;
+      }
+      this.callService("menstruation_gauge", "save_timer_state", serviceData)
+        .catch(err => console.warn("Failed to save timer state:", err));
+    } catch (error) {
+      console.error("Error saving timer state:", error);
+    }
+  }
+
+  _updateTimerState() {
+    this._saveTimerState();
+  }
+
+  _loadTimerState() {
+    try {
+      if (!this._hass || !this.config?.entity) return;
+
+      const stateObj = this._hass.states[this.config.entity];
+      if (!stateObj) return;
+
+      const profile = stateObj.attributes?.profile;
+      if (!profile) return;
+
+      const timerStateObj = this._hass.states[`menstruation_gauge_timer.${profile}`];
+      if (!timerStateObj?.attributes) return;
+
+      const attrs = timerStateObj.attributes;
+      const savedProduct = attrs.selected_product;
+      if (!savedProduct) return;
+
+      // Validate the saved product exists in the current dropdown
+      const productSelect = this.querySelector("#productSelect");
+      if (!productSelect) return;
+      const option = productSelect.querySelector(`option[value="${savedProduct}"]`);
+      if (!option || !option.dataset.seconds) return;
+
+      const totalFromConfig = parseInt(option.dataset.seconds);
+      const wasRunning = attrs.is_running === true;
+      const savedAt = parseInt(attrs.saved_at || 0);
+      let remaining = parseInt(attrs.remaining_seconds || 0);
+
+      // Adjust remaining for time elapsed while the timer was running offline
+      if (wasRunning && savedAt > 0) {
+        const elapsed = Math.floor((Date.now() - savedAt) / 1000);
+        remaining = Math.max(0, remaining - elapsed);
+        if (remaining === 0) return; // Timer completed while offline; start fresh
+      }
+
+      // Restore dropdown selection
+      productSelect.value = savedProduct;
+
+      // Restore timer state
+      this.timerState.selectedProduct = savedProduct;
+      this.timerState.totalSeconds = totalFromConfig;
+      this.timerState.remainingSeconds = Math.min(remaining, totalFromConfig);
+
+      // Set up animated product icon
+      const timerIcon = this.querySelector("#timerIcon");
+      if (timerIcon) {
+        if (this._animator) {
+          this._animator.reset();
+          this._animator = null;
+        }
+        const animatable = ["cup", "tampon", "pad"];
+        if (this.config?.product_animations !== false && animatable.includes(savedProduct)) {
+          const mode = this.config?.animation_style || "realistic";
+          const animSvg = this._createAnimatedProductSVG(savedProduct, mode);
+          if (animSvg) {
+            timerIcon.innerHTML = '';
+            timerIcon.appendChild(animSvg);
+            this._animator = new ProductFillAnimator(animSvg, savedProduct, totalFromConfig, mode);
+          } else {
+            timerIcon.innerHTML = option.dataset.icon || '';
+          }
+        } else {
+          timerIcon.innerHTML = option.dataset.icon || '';
+        }
+      }
+
+      this.updateDisplay();
+      this.updateButtonStates();
+      this.updateUsageButtons();
+
+      // Resume the timer if it was running and still has time remaining
+      if (wasRunning && this.timerState.remainingSeconds > 0) {
+        this.startTimer();
+      }
+    } catch (error) {
+      console.error("Error loading timer state:", error);
     }
   }
 
