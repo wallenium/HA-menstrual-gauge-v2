@@ -34,6 +34,31 @@ function resolveSize(size) {
   return ICON_SIZES[key] || ICON_SIZES.default;
 }
 
+function getPregnancyIcon(weeksPregnant, size = 'default') {
+  const weeks = Math.max(0, Math.min(40, parseInt(String(weeksPregnant || '0'), 10) || 0));
+  const bellyRadius = 2 + (weeks / 40) * 22;
+  const iconSize = resolveSize(size);
+
+  // Belly ellipse: grows from right side of torso (cx=15, cy=14)
+  const bellyPath = `<ellipse cx="15" cy="14" rx="${bellyRadius.toFixed(1)}" ry="${(bellyRadius * 0.85).toFixed(1)}" fill="none" stroke="currentColor" stroke-width="1.6"/>`;
+
+  // Head
+  const head = '<circle cx="12" cy="5" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/>';
+
+  // Torso outline (shoulders to hips, leaving right side open for belly)
+  const torso = '<path d="M8 9 C7 9 6 10 6 11 L6 18 C6 19 7 20 8 20 L16 20 C17 20 18 19 18 18 L18 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>';
+
+  // Shoulder line
+  const shoulders = '<path d="M9 8 Q12 7 15 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>';
+
+  // Legs
+  const legs = '<path d="M9 20 L8 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M15 20 L16 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>';
+
+  const svgContent = head + shoulders + torso + bellyPath + legs;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${iconSize}" height="${iconSize}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${svgContent}</svg>`;
+}
+
 function getSvgIcon(productName, size = 'default') {
   const productKey = normalizeProductKey(productName);
   const iconPath = PRODUCT_ICON_PATHS[productKey];
@@ -63,6 +88,7 @@ function createAnimatedSvgElement(productName, size = 'default') {
 const ProductIcons = {
   getSvgIcon,
   createAnimatedSvgElement,
+  getPregnancyIcon,
   getIcon(productKey) {
     return getSvgIcon(productKey);
   },

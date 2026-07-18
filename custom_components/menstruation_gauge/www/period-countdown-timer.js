@@ -287,11 +287,14 @@ class PeriodCountdownTimer extends HTMLElement {
     const pregnancyWeek = attributes?.pregnancy_week || 0;
     const dueDate = attributes?.due_date || "TBD";
     const trimester = Math.ceil(pregnancyWeek / 13);
+    const pregnancyIcon = (window.ProductIcons && window.ProductIcons.getPregnancyIcon)
+      ? window.ProductIcons.getPregnancyIcon(pregnancyWeek, 'large')
+      : '🤰';
 
     cardContent.innerHTML = `
       <div class="pregnancy-container">
         <div class="pregnancy-badge">
-          <div class="badge-emoji">🤰</div>
+          <div class="badge-emoji">${pregnancyIcon}</div>
           <div class="badge-text">
             <h3>${this._t('pregnant')}</h3>
             <p>${this._t('week')} ${pregnancyWeek} • ${this._t('trimester')} ${trimester}</p>
