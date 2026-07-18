@@ -276,12 +276,9 @@ class MenstrualProductStatsCard extends HTMLElement {
   }
 
   calculateStats(productUsageThisCycle, productUsageStats, daysUntilNextStart) {
-    const averagePerCycle = productUsageStats.average_per_cycle || productUsageStats.averages_per_cycle || {};
-    const cyclesConsidered = Number(
-      productUsageStats.cycles_considered
-      || averagePerCycle.cycles_considered
-      || 0
-    );
+    const statsData = productUsageStats.stats || productUsageStats;
+    const averagePerCycle = statsData.average_per_cycle || {};
+    const cyclesConsidered = Number(statsData.cycles_considered || 0);
     const thisCycleCup = Number(productUsageThisCycle.cup || 0);
 
     return {
