@@ -24,11 +24,18 @@ class MenstrualProductInventoryCard extends HTMLElement {
       ...config,
     };
     this._ensureRoot();
+    this._attachHandlers();
     this._render();
   }
 
   set hass(hass) {
     this._hass = hass;
+    // Only re-render when the inventory entity state actually changes to avoid
+    // destroying the DOM (and losing input focus) on every HA poll cycle.
+    const entityId = this.config?.inventory_entity || "sensor.household_product_stock";
+    const newState = hass?.states?.[entityId];
+    if (newState === this._lastRenderedState) return;
+    this._lastRenderedState = newState;
     this._render();
   }
 
@@ -210,8 +217,82 @@ class MenstrualProductInventoryCard extends HTMLElement {
     }
   }
 
+  _attachHandlers() {
+    if (this._handlersAttached) return;
+    this._handlersAttached = true;
+
+    // Single delegated click listener on shadowRoot — survives innerHTML replacements
+    this.shadowRoot.addEventListener("click", async (ev) => {
+      const button = ev.target?.closest("button[data-action]");
+      if (!button) return;
+
+      try {
+        const action = button.dataset.action;
+        const product = button.dataset.product;
+        if (!action || !product) return;
+
+        const inputQuantity = Number(this._inputValues?.[product] ?? 1);
+        let quantity = Number(button.dataset.quantity || inputQuantity || 1);
+        if (["set-input", "add-input", "consume-input"].includes(button.dataset.role)) {
+          quantity = inputQuantity;
+        }
+
+        if (action === "set_thresholds") {
+          const warning = Number(this._thresholdValues?.[product]?.warning);
+          const critical = Number(this._thresholdValues?.[product]?.critical);
+          await this._callInventory("set_thresholds", product, null, {
+            warning_threshold: Number.isFinite(warning) ? warning : undefined,
+            critical_threshold: Number.isFinite(critical) ? critical : undefined,
+          });
+          return;
+        }
+
+        const member = this._selectedMember || this.config.member || "";
+        await this._callInventory(action, product, quantity, member ? { member } : {});
+      } catch (error) {
+        console.error("Button click error:", error);
+      }
+    });
+
+    // Delegated input handler for qty and threshold inputs
+    this.shadowRoot.addEventListener("input", (ev) => {
+      const input = ev.target;
+      if (!input) return;
+
+      const role = input.dataset?.role;
+      const product = input.dataset?.product;
+      if (!role || !product) return;
+
+      if (role === "qty") {
+        const value = Number(input.value || 0);
+        this._inputValues = { ...(this._inputValues || {}), [product]: value };
+      } else if (role === "warning" || role === "critical") {
+        const value = Number(input.value || 0);
+        this._thresholdValues = {
+          ...(this._thresholdValues || {}),
+          [product]: {
+            ...(this._thresholdValues?.[product] || {}),
+            [role]: value,
+          },
+        };
+      }
+    });
+
+    // Delegated change handler for member selector
+    this.shadowRoot.addEventListener("change", (ev) => {
+      if (ev.target?.id === "memberSelector") {
+        this._selectedMember = ev.target.value;
+      }
+    });
+  }
+
   _render() {
     if (!this.shadowRoot || !this._hass || !this.config) return;
+
+    // Keep _lastRenderedState in sync so the set hass() guard stays accurate
+    // even when _render() is called directly (e.g. from _setError).
+    const entityId = this.config?.inventory_entity || "sensor.household_product_stock";
+    this._lastRenderedState = this._hass?.states?.[entityId];
 
     const inventoryEntity = this._escapeHtml(this.config.inventory_entity);
     const stateObj = this._getEntity();
@@ -339,67 +420,6 @@ class MenstrualProductInventoryCard extends HTMLElement {
         </div>
       </ha-card>
     `;
-
-    const memberSelector = this.shadowRoot.querySelector("#memberSelector");
-    if (memberSelector) {
-      memberSelector.addEventListener("change", (event) => {
-        this._selectedMember = event.target.value;
-      });
-    }
-
-    this.shadowRoot.querySelectorAll("input[data-role='qty']").forEach((input) => {
-      input.addEventListener("input", (event) => {
-        const product = event.target.dataset.product;
-        const value = Number(event.target.value || 0);
-        this._inputValues = { ...(this._inputValues || {}), [product]: value };
-      });
-    });
-
-    this.shadowRoot.querySelectorAll("input[data-role='warning'], input[data-role='critical']").forEach((input) => {
-      input.addEventListener("input", (event) => {
-        const product = event.target.dataset.product;
-        const role = event.target.dataset.role;
-        const value = Number(event.target.value || 0);
-        this._thresholdValues = {
-          ...(this._thresholdValues || {}),
-          [product]: {
-            ...(this._thresholdValues?.[product] || {}),
-            [role]: value,
-          },
-        };
-      });
-    });
-
-    this.shadowRoot.querySelectorAll("button[data-action]").forEach((button) => {
-      button.addEventListener("click", async (event) => {
-        try {
-          const action = event.currentTarget.dataset.action;
-          const product = event.currentTarget.dataset.product;
-          if (!action || !product) return;
-
-          const inputQuantity = Number(this._inputValues?.[product] ?? 1);
-          let quantity = Number(event.currentTarget.dataset.quantity || inputQuantity || 1);
-          if (["set-input", "add-input", "consume-input"].includes(event.currentTarget.dataset.role)) {
-            quantity = inputQuantity;
-          }
-
-          if (action === "set_thresholds") {
-            const warning = Number(this._thresholdValues?.[product]?.warning);
-            const critical = Number(this._thresholdValues?.[product]?.critical);
-            await this._callInventory("set_thresholds", product, null, {
-              warning_threshold: Number.isFinite(warning) ? warning : undefined,
-              critical_threshold: Number.isFinite(critical) ? critical : undefined,
-            });
-            return;
-          }
-
-          const member = this._selectedMember || this.config.member || "";
-          await this._callInventory(action, product, quantity, member ? { member } : {});
-        } catch (error) {
-          console.error("Button click error:", error);
-        }
-      });
-    });
   }
 }
 

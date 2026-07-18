@@ -242,6 +242,7 @@ class MenstrualProductInventoryCardEditor extends HTMLElement {
     orderItems.forEach((item) => {
       item.addEventListener("dragstart", (e) => {
         this._dragSrcIdx = Number(item.dataset.idx);
+        this._dragItems = [...orderItems];
         item.classList.add("dragging");
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData("text/plain", item.dataset.idx);
@@ -249,14 +250,15 @@ class MenstrualProductInventoryCardEditor extends HTMLElement {
 
       item.addEventListener("dragend", () => {
         item.classList.remove("dragging");
-        this.shadowRoot.querySelectorAll("#order-list .order-item").forEach((i) => i.classList.remove("drag-over"));
+        this._dragItems?.forEach((i) => i.classList.remove("drag-over"));
+        this._dragItems = null;
         this._dragSrcIdx = null;
       });
 
       item.addEventListener("dragover", (e) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = "move";
-        this.shadowRoot.querySelectorAll("#order-list .order-item").forEach((i) => i.classList.remove("drag-over"));
+        this._dragItems?.forEach((i) => i.classList.remove("drag-over"));
         item.classList.add("drag-over");
       });
 
