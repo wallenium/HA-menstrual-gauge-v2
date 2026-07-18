@@ -207,37 +207,12 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
     return map[statusKey] || map.neutral;
   }
 
-  _iconPath(icon) {
-    if (icon === 'drop') {
-      return '<path d="M12 2C12 2 6 9 6 13a6 6 0 1 0 12 0c0-4-6-11-6-11z" fill="none" stroke="currentColor" stroke-width="1.8"/>';
+  _statusIcon(statusKey, color, attrs, size = 'default') {
+    const iconMarkup = window.ProductIcons?.getStatusAnimatedIcon?.(statusKey, attrs, size);
+    if (!iconMarkup) {
+      return '<svg viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><path d="M7 12h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
     }
-    if (icon === 'warning') {
-      return '<path d="M12 3 2.5 20h19L12 3z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 9v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/>';
-    }
-    if (icon === 'heart') {
-      return '<path d="M12 20s-7-4.2-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.8-7 10-7 10z" fill="none" stroke="currentColor" stroke-width="1.8"/>';
-    }
-    if (icon === 'ovulation') {
-      return '<path d="M12 20s-7-4.2-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.8-7 10-7 10z" fill="none" stroke="currentColor" stroke-width="1.8"/>';
-    }
-    if (icon === 'flower') {
-      return '<circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="7" r="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="17" r="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="7" cy="12" r="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="17" cy="12" r="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/>';
-    }
-    if (icon === 'pregnant') {
-      return '<circle cx="12" cy="7" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 21c0-3 1.5-7 4-7s4 4 4 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M14 14c1.5 0 3 1 3 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>';
-    }
-    if (icon === 'baby') {
-      return '<circle cx="12" cy="6" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6 21v-2a6 6 0 0 1 12 0v2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M9 11h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>';
-    }
-    if (icon === 'moon') {
-      return '<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z" fill="none" stroke="currentColor" stroke-width="1.8"/>';
-    }
-    return '<path d="M7 12h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>';
-  }
-
-  _statusIcon(icon, color) {
-    const marker = icon === 'ovulation' ? `<circle cx="18" cy="6" r="3" fill="${color}" stroke="var(--ha-card-background, #fff)" stroke-width="1.2"/>` : '';
-    return `<svg viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false">${this._iconPath(icon)}${marker}</svg>`;
+    return iconMarkup;
   }
 
   // Build the SVG cycle phase circle with colored sectors for cycle modes
@@ -339,7 +314,7 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
 
   // Build the progress bar layout for pregnant / pre_menarche modes
   _buildProgressLayout(statusKey, attrs, status) {
-    let emoji = '';
+    let iconMarkup = '';
     let titleText = '';
     let progressPercent = 0;
     let progressLabel = '';
@@ -349,9 +324,7 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
     if (statusKey === 'pregnant') {
       const weeksRaw = attrs.weeks_pregnant !== undefined ? attrs.weeks_pregnant : attrs.pregnancy_week;
       const weeksPregnant = Math.max(0, parseInt(String(weeksRaw || '0'), 10) || 0);
-      emoji = (window.ProductIcons && window.ProductIcons.getPregnancyIcon)
-        ? window.ProductIcons.getPregnancyIcon(weeksPregnant)
-        : '🤰';
+      iconMarkup = window.ProductIcons?.getPregnancyIcon?.(weeksPregnant, 'default') || this._statusIcon(statusKey, status.color, attrs);
       const totalWeeks = 40;
       progressPercent = Math.min(100, Math.round((weeksPregnant / totalWeeks) * 100));
       titleText = `${this._t('pregnant')} – ${this._t('week')} ${weeksPregnant}/${totalWeeks}`;
@@ -364,7 +337,7 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
         subtitleText = `${this._t('due_date')}: ${dueDateNorm}`;
       }
     } else if (statusKey === 'pre_menarche') {
-      emoji = '🌸';
+      iconMarkup = window.ProductIcons?.getMenarcheIcon?.('default') || this._statusIcon(statusKey, status.color, attrs);
       const menarcheData = attrs.menarche_data || {};
       const daysUntil = attrs.days_until_menarche !== undefined ? parseInt(String(attrs.days_until_menarche || '0'), 10) : null;
       const estimatedDate = this._normalizeISO(menarcheData.estimated_date || attrs.estimated_menarche_date);
@@ -395,7 +368,7 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
       progressLabel = `${progressPercent}%`;
       progressColor = 'var(--primary-color, #9b59b6)';
     } else if (statusKey === 'postpartum') {
-      emoji = '👶';
+      iconMarkup = window.ProductIcons?.getPostpartumIcon?.('default') || this._statusIcon(statusKey, status.color, attrs);
       const birthDateNorm = this._normalizeISO(attrs.birth_date);
       const postpartumDuration = Math.max(1, parseInt(String(attrs.postpartum_duration || '42'), 10) || 42);
 
@@ -434,7 +407,7 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
     return `
       <div class="progress-layout">
         <div class="progress-header">
-          <span class="progress-emoji" role="img" aria-hidden="true">${emoji}</span>
+          <span class="progress-icon" role="img" aria-hidden="true">${iconMarkup}</span>
           <div class="progress-title-wrap">
             <div class="progress-title">${titleText}</div>
             ${subtitleText ? `<div class="progress-subtitle">${subtitleText}</div>` : ''}
@@ -452,11 +425,8 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
 
   // Build simple icon + text layout for menarche, menopause
   _buildIconTextLayout(statusKey, status, attrs) {
-    const emojiMap = {
-      menarche: '🌸',
-      menopause: '🌙',
-    };
-    const emoji = emojiMap[statusKey] || '⭕';
+    const iconMarkup = window.ProductIcons?.getStatusAnimatedIcon?.(statusKey, attrs, 'default')
+      || this._statusIcon(statusKey, status.color, attrs);
 
     let extraInfo = '';
     if (statusKey === 'menopause') {
@@ -481,7 +451,7 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
 
     return `
       <div class="icon-text-layout">
-        <span class="big-emoji" role="img" aria-hidden="true">${emoji}</span>
+        <span class="big-icon" role="img" aria-hidden="true">${iconMarkup}</span>
         <div class="icon-text-info">
           <div class="icon-text-title" style="color:${status.color};">${titleLabel}</div>
           ${extraInfo ? `<div class="icon-text-sub">${extraInfo}</div>` : ''}
@@ -521,7 +491,7 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
           <div class="circle-wrap">${circleHtml}</div>
           <div class="info">
             <div class="status-line">
-              <span class="status-icon" style="border-color:${status.color};color:${status.color};">${this._statusIcon(status.icon, status.color)}</span>
+              <span class="status-icon" style="border-color:${status.color};color:${status.color};">${this._statusIcon(statusKey, status.color, attrs, 'small')}</span>
               <span class="status-text">${status.label}</span>
             </div>
             <div class="cycle-day">${this._t('cycle_day')} ${cycleDay}/${cycleLength}</div>
@@ -542,7 +512,7 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
           <div class="circle-wrap">${circleHtml}</div>
           <div class="info">
             <div class="status-line">
-              <span class="status-icon" style="border-color:${status.color};color:${status.color};">${this._statusIcon(status.icon, status.color)}</span>
+              <span class="status-icon" style="border-color:${status.color};color:${status.color};">${this._statusIcon(statusKey, status.color, attrs, 'small')}</span>
               <span class="status-text">${status.label}</span>
             </div>
             <div class="cycle-day">${this._t('cycle_day')} ${cycleDay}/${cycleLength}</div>
@@ -587,7 +557,8 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
         /* === Progress bar mode === */
         .progress-layout { display: flex; flex-direction: column; gap: 8px; }
         .progress-header { display: flex; align-items: center; gap: 10px; }
-        .progress-emoji { font-size: 2rem; line-height: 1; flex: 0 0 auto; }
+        .progress-icon { width: 34px; height: 34px; line-height: 1; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; }
+        .progress-icon svg { width: 100%; height: 100%; display: block; }
         .progress-title-wrap { min-width: 0; flex: 1; }
         .progress-title { font-size: 0.92rem; font-weight: 600; color: var(--primary-text-color); }
         .progress-subtitle { font-size: 0.78rem; color: var(--secondary-text-color); margin-top: 2px; }
@@ -598,7 +569,8 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
 
         /* === Icon + text mode === */
         .icon-text-layout { display: flex; align-items: center; gap: 12px; }
-        .big-emoji { font-size: 2.2rem; line-height: 1; flex: 0 0 auto; }
+        .big-icon { width: 38px; height: 38px; line-height: 1; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; }
+        .big-icon svg { width: 100%; height: 100%; display: block; }
         .icon-text-info { min-width: 0; }
         .icon-text-title { font-size: 1rem; font-weight: 600; }
         .icon-text-sub { font-size: 0.8rem; color: var(--secondary-text-color); margin-top: 2px; }
@@ -618,8 +590,8 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
           .status-icon svg { width: 16px; height: 16px; }
           .status-text { font-size: 0.9rem; }
           .cycle-day { font-size: 0.76rem; }
-          .progress-emoji { font-size: 1.6rem; }
-          .big-emoji { font-size: 1.8rem; }
+          .progress-icon { width: 28px; height: 28px; }
+          .big-icon { width: 32px; height: 32px; }
         }
       </style>
       <ha-card>

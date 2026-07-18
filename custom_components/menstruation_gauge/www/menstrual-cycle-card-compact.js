@@ -28,7 +28,7 @@ class MenstrualCycleCard extends HTMLElement {
     if (!stateObj) return;
 
     const attrs = stateObj.attributes || {};
-    const status = this._getStatusInfo(stateObj.state);
+    const status = this._getStatusInfo(stateObj.state, attrs);
     const statusBadge = this.querySelector("#statusBadge");
     const cycleInfo = this.querySelector("#cycleInfo");
 
@@ -62,7 +62,7 @@ class MenstrualCycleCard extends HTMLElement {
       statusBadge.style.background = status.badgeBg;
       statusBadge.style.boxShadow = `0 0 0 3px ${status.badgeGlow}, inset 0 0 0 2px ${status.color}`;
       statusBadge.innerHTML = `
-        <span class="status-emoji">${status.emoji}</span>
+        <span class="status-icon" role="img" aria-hidden="true">${status.icon}</span>
         <span class="status-label">${status.label}</span>
       `;
     }
@@ -77,31 +77,35 @@ class MenstrualCycleCard extends HTMLElement {
     }
   }
 
-  _getStatusInfo(state) {
+  _getStatusInfo(state, attrs = {}) {
+    const animatedIcon = (statusKey) => window.ProductIcons?.getStatusAnimatedIcon?.(statusKey, attrs, 'large')
+      || window.ProductIcons?.getStatusIcon?.(statusKey, 'large')
+      || '';
+
     const statusMap = {
       period: {
-        emoji: "🩸",
+        icon: animatedIcon('period'),
         color: "var(--error-color, #e74c3c)",
         badgeBg: "rgba(231, 76, 60, 0.14)",
         badgeGlow: "rgba(231, 76, 60, 0.30)",
         label: this._t('period'),
       },
       fertile: {
-        emoji: "💚",
+        icon: animatedIcon('ovulation'),
         color: "var(--success-color, #27ae60)",
         badgeBg: "rgba(39, 174, 96, 0.14)",
         badgeGlow: "rgba(39, 174, 96, 0.30)",
         label: this._t('fertile'),
       },
       pms: {
-        emoji: "⚠️",
+        icon: animatedIcon('pms'),
         color: "var(--warning-color, #f39c12)",
         badgeBg: "rgba(243, 156, 18, 0.14)",
         badgeGlow: "rgba(243, 156, 18, 0.30)",
         label: this._t('pms'),
       },
       neutral: {
-        emoji: "⭕",
+        icon: animatedIcon('neutral'),
         color: "var(--secondary-text-color, #95a5a6)",
         badgeBg: "rgba(149, 165, 166, 0.14)",
         badgeGlow: "rgba(149, 165, 166, 0.30)",
@@ -171,9 +175,19 @@ class MenstrualCycleCard extends HTMLElement {
         width: 100%;
       }
 
-      .status-emoji {
-        font-size: 2.5rem;
+      .status-icon {
+        width: 48px;
+        height: 48px;
         line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .status-icon svg {
+        width: 100%;
+        height: 100%;
+        display: block;
       }
 
       .status-label {
@@ -224,8 +238,9 @@ class MenstrualCycleCard extends HTMLElement {
           gap: 4px;
         }
 
-        .status-emoji {
-          font-size: 2rem;
+        .status-icon {
+          width: 40px;
+          height: 40px;
         }
 
         .status-label {
