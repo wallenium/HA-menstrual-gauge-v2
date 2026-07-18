@@ -618,3 +618,67 @@ remove_pre_menarche_sign:
             - "acne"
             - "body_odor"
             - "vaginal_discharge"
+
+save_timer_state:
+  name: Save timer state
+  description: |
+    Persist the current countdown timer state (remaining time, selected product,
+    running/paused) so it survives page reloads and is available on other devices.
+    Called automatically by the Period Countdown Timer card.
+  fields:
+    entity_id:
+      required: false
+      example: "sensor.anna_zyklus"
+      selector:
+        entity:
+          domain: sensor
+    profile:
+      required: false
+      example: "anna"
+      selector:
+        text:
+    entry_id:
+      required: false
+      example: "a1b2c3d4e5f6..."
+      selector:
+        text:
+    remaining_seconds:
+      required: true
+      example: 10800
+      description: Remaining countdown seconds at the time of saving.
+      selector:
+        number:
+          min: 0
+          max: 86400
+          mode: box
+    total_seconds:
+      required: true
+      example: 25200
+      description: Total countdown duration in seconds for the selected product.
+      selector:
+        number:
+          min: 0
+          max: 86400
+          mode: box
+    selected_product:
+      required: false
+      example: "tampon"
+      description: Currently selected product key (tampon, pad, cup, liner, underwear).
+      selector:
+        text:
+    is_running:
+      required: true
+      example: true
+      description: Whether the timer was actively running when the state was saved.
+      selector:
+        boolean:
+    saved_at:
+      required: true
+      example: 1750000000000
+      description: >
+        JavaScript Date.now() millisecond timestamp when the state was saved.
+        Used to calculate elapsed time when restoring a running timer.
+      selector:
+        number:
+          min: 0
+          mode: box

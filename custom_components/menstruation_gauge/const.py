@@ -65,6 +65,7 @@ SERVICE_UPDATE_MENARCHE_DATE = "update_menarche_date"
 SERVICE_GET_MENARCHE_INFO = "get_menarche_info"
 SERVICE_ADD_PRE_MENARCHE_SIGN = "add_pre_menarche_sign"
 SERVICE_REMOVE_PRE_MENARCHE_SIGN = "remove_pre_menarche_sign"
+SERVICE_SAVE_TIMER_STATE = "save_timer_state"
 
 SERVICE_FIELD_DATE = "date"
 SERVICE_FIELD_DATES = "dates"

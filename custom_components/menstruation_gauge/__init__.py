@@ -86,6 +86,7 @@ from .const import (
     SERVICE_SET_MENARCHE_MODE,
     SERVICE_SET_PERIOD_DURATION,
     SERVICE_SET_PREGNANCY_MODE,
+    SERVICE_SAVE_TIMER_STATE,
     SERVICE_UPDATE_MENARCHE_DATE,
     SERVICE_UPDATE_PREGNANCY_DATE,
     SIGNAL_HISTORY_UPDATED,
@@ -575,6 +576,9 @@ def _register_domain_services(hass: HomeAssistant) -> None:
     async def async_remove_pre_menarche_sign(call: ServiceCall) -> None:
         await _async_handle_remove_pre_menarche_sign(hass, call)
 
+    async def async_save_timer_state(call: ServiceCall) -> None:
+        await _async_handle_save_timer_state(hass, call)
+
     hass.services.async_register(
         DOMAIN,
         SERVICE_ADD_CYCLE_START,
@@ -755,6 +759,20 @@ def _register_domain_services(hass: HomeAssistant) -> None:
         }),
     )
 
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SAVE_TIMER_STATE,
+        async_save_timer_state,
+        schema=vol.Schema({
+            **common_profile_field,
+            vol.Required("remaining_seconds"): vol.All(vol.Coerce(int), vol.Range(min=0)),
+            vol.Required("total_seconds"): vol.All(vol.Coerce(int), vol.Range(min=0)),
+            vol.Optional("selected_product"): cv.string,
+            vol.Required("is_running"): cv.boolean,
+            vol.Required("saved_at"): vol.All(vol.Coerce(int), vol.Range(min=0)),
+        }),
+    )
+
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up integration from YAML (not used, config-entry only)."""
@@ -819,6 +837,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data[DOMAIN][entry.entry_id] = runtime
     await _async_update_household_inventory_state(hass)
+    await _async_load_timer_state(hass, profile)
 
     # Re-register services if they were removed when the last entry was unloaded.
     # Normally services are registered once in async_setup(); this handles the
@@ -863,11 +882,54 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_GET_MENARCHE_INFO,
             SERVICE_ADD_PRE_MENARCHE_SIGN,
             SERVICE_REMOVE_PRE_MENARCHE_SIGN,
+            SERVICE_SAVE_TIMER_STATE,
         ):
             if hass.services.has_service(DOMAIN, service):
                 hass.services.async_remove(DOMAIN, service)
 
     return unload_ok
+
+
+async def _async_load_timer_state(hass: HomeAssistant, profile: str) -> None:
+    """Load persisted timer state and expose it as a virtual HA state for the frontend."""
+    store = Store(hass, STORAGE_VERSION, f"{STORAGE_KEY}.timer_state.{profile}")
+    timer_state = await store.async_load()
+    if isinstance(timer_state, dict):
+        hass.states.async_set(
+            f"menstruation_gauge_timer.{profile}",
+            "active" if timer_state.get("is_running") else "idle",
+            timer_state,
+        )
+
+
+async def _async_handle_save_timer_state(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Persist countdown timer state so it survives page reloads and device switches."""
+    runtime = _runtime_for_call(hass, call)
+    profile = runtime.profile
+
+    remaining_seconds = max(0, int(call.data.get("remaining_seconds", 0)))
+    total_seconds = max(0, int(call.data.get("total_seconds", 0)))
+    raw_product = call.data.get("selected_product")
+    selected_product = str(raw_product).strip() if raw_product else None
+    is_running = bool(call.data.get("is_running", False))
+    saved_at = max(0, int(call.data.get("saved_at", 0)))
+
+    timer_state: dict[str, Any] = {
+        "remaining_seconds": remaining_seconds,
+        "total_seconds": total_seconds,
+        "selected_product": selected_product,
+        "is_running": is_running,
+        "saved_at": saved_at,
+    }
+
+    store = Store(hass, STORAGE_VERSION, f"{STORAGE_KEY}.timer_state.{profile}")
+    await store.async_save(timer_state)
+
+    hass.states.async_set(
+        f"menstruation_gauge_timer.{profile}",
+        "active" if is_running else "idle",
+        timer_state,
+    )
 
 
 async def _async_handle_add(hass: HomeAssistant, call: ServiceCall) -> None:
