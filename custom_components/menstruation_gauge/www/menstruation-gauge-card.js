@@ -30,6 +30,7 @@ class MenstruationGaugeCard extends HTMLElement {
     };
     this._viewDate = new Date();
     this._editorOpen = false;
+    this._lastRenderKey = null;
     this._render();
   }
 
@@ -705,12 +706,18 @@ class MenstruationGaugeCard extends HTMLElement {
 
   _renderCenterContent(model, palette, canEdit, isOverdueSoon, countdown) {
     if (!model.pregnancyInfo?.isPregnant) {
-      return `<button type="button" class="countdown ${isOverdueSoon ? 'overdue-soon' : ''} ${canEdit ? '' : 'passive'}" data-action="toggle-editor">${countdown}</button>`;
+      const statusIconMarkup = window.ProductIcons?.getStatusIcon?.(model.state, 'large') || '';
+      return `
+        <button type="button" class="center-panel ${isOverdueSoon ? 'overdue-soon' : ''} ${canEdit ? '' : 'passive'}" data-action="toggle-editor">
+          ${statusIconMarkup ? `<div class="center-icon" aria-hidden="true">${statusIconMarkup}</div>` : ''}
+          <div class="center-days">${countdown}</div>
+        </button>
+      `;
     }
 
     const pregnancyInfo = model.pregnancyInfo;
-    const iconMarkup = window.ProductIcons?.getPregnancyIcon?.(pregnancyInfo, 'large')
-      || window.ProductIcons?.getStatusAnimatedIcon?.('pregnant', pregnancyInfo, 'large')
+    const iconMarkup = window.ProductIcons?.getPregnancyIcon?.(pregnancyInfo, 56)
+      || window.ProductIcons?.getStatusAnimatedIcon?.('pregnant', pregnancyInfo, 56)
       || '';
     const secondaryParts = [`${this._t('month')} ${pregnancyInfo.month}`];
     if (Number.isFinite(Number(pregnancyInfo.trimester))) {
@@ -1017,6 +1024,35 @@ class MenstruationGaugeCard extends HTMLElement {
     });
   }
 
+  _buildRenderKey(model, countdown, isOverdueSoon, canEdit, cardTitle, friendlyName) {
+    return [
+      model.state,
+      model.pregnancyInfo?.isPregnant ? 1 : 0,
+      model.pregnancyInfo?.week,
+      model.pregnancyInfo?.month,
+      model.pregnancyInfo?.trimester,
+      countdown,
+      model.predicted || '',
+      model.daysUntilMenarche,
+      isOverdueSoon ? 1 : 0,
+      this._editorOpen ? 1 : 0,
+      this._viewDate?.getFullYear(),
+      this._viewDate?.getMonth(),
+      this._lastCardWidth,
+      this._lang(),
+      [...model.confirmedSet].sort().join(','),
+      model.fertileStart || '',
+      model.fertileEnd || '',
+      model.ovulationDay || '',
+      this._modalIso || '',
+      canEdit ? 1 : 0,
+      this._resolveThemeMode(),
+      cardTitle,
+      friendlyName,
+      Object.keys(model.symptomByDate || {}).sort().join(','),
+    ].join('|');
+  }
+
   _render() {
     this._ensureRoot();
     if (!this._config || !this._hass) return;
@@ -1042,6 +1078,16 @@ class MenstruationGaugeCard extends HTMLElement {
       : (Number.isFinite(daysUntil)
         ? `${daysUntil} ${this._t('days_unit')}`
         : this._t('days_unknown'));
+
+    // Skip full DOM replacement when nothing visible has changed — prevents
+    // the pregnancy SVG mask from being torn down and re-applied on every
+    // unrelated hass state push (which caused the preg_02.svg flicker).
+    const renderKey = this._buildRenderKey(model, countdown, isOverdueSoon, canEdit, cardTitle, friendlyName);
+    if (renderKey === this._lastRenderKey) {
+      this._attachHandlers();
+      return;
+    }
+    this._lastRenderKey = renderKey;
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -1083,10 +1129,12 @@ class MenstruationGaugeCard extends HTMLElement {
           color: ${palette.countdownColor};
         }
         .center-panel.passive { cursor: default; pointer-events: none; opacity: .92; }
+        .center-panel.overdue-soon { border: 2px dashed ${palette.buttonBorder}; border-radius: 12px; padding: 6px 10px; }
         .center .pregnancy-panel { border: none; outline: none; background: none; box-shadow: none; padding: 4px 0; min-width: unset; border-radius: 0; -webkit-appearance: none; appearance: none; }
-        .center-icon { width: 52px; height: 52px; display: inline-flex; align-items: center; justify-content: center; }
-        .center-icon svg { width: 52px; height: 52px; display: block; }
+        .center-icon { width: 56px; height: 56px; display: inline-flex; align-items: center; justify-content: center; }
+        .center-icon svg { width: 56px; height: 56px; display: block; }
         .center-icon img { width: 100%; height: 100%; object-fit: contain; display: block; }
+        .center-days { font-size: 1.05rem; font-weight: 700; line-height: 1.3; }
         .center-primary { font-size: 1rem; font-weight: 700; line-height: 1.2; }
         .center-secondary { font-size: .76rem; line-height: 1.25; opacity: .84; }
         .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
