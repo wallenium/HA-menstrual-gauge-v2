@@ -81,6 +81,9 @@ class MenstrualProductInventoryCard extends HTMLElement {
         status_good: "Gut",
         status_warning: "Warnung",
         status_critical: "Kritisch",
+        pregnancy: "Schwangerschaft",
+        week: "Woche",
+        trimester: "Trimester",
         unknown_member: "Unbekannt",
         error_prefix: "Fehler",
         tampon: "Tampons",
@@ -114,6 +117,9 @@ class MenstrualProductInventoryCard extends HTMLElement {
         status_good: "Good",
         status_warning: "Warning",
         status_critical: "Critical",
+        pregnancy: "Pregnancy",
+        week: "Week",
+        trimester: "Trimester",
         unknown_member: "Unknown",
         error_prefix: "Error",
         tampon: "Tampons",
@@ -126,7 +132,7 @@ class MenstrualProductInventoryCard extends HTMLElement {
     return (i18n[this._lang()] && i18n[this._lang()][key]) || (i18n.en[key] || key);
   }
 
-  _products() {
+  _products(pregnancyInfo = null) {
     const ALL_PRODUCTS = ["tampon", "pad", "cup", "liner", "underwear"];
 
     // Apply custom order if specified
@@ -140,12 +146,17 @@ class MenstrualProductInventoryCard extends HTMLElement {
     }
 
     // Apply visibility filter – if not set, show all products (backward compatible)
+    let products = ordered;
     if (Array.isArray(this.config?.visible_products) && this.config.visible_products.length > 0) {
       const visibleSet = new Set(this.config.visible_products.filter((p) => ALL_PRODUCTS.includes(p)));
-      return ordered.filter((p) => visibleSet.has(p));
+      products = ordered.filter((p) => visibleSet.has(p));
     }
 
-    return ordered;
+    if (pregnancyInfo?.isPregnant) {
+      return products.filter((product) => product !== "tampon" && product !== "cup");
+    }
+
+    return products;
   }
 
   _getEntity() {
@@ -194,6 +205,84 @@ class MenstrualProductInventoryCard extends HTMLElement {
 
   _getProductIconSvg(productKey) {
     return window.ProductIcons?.getSvgIcon(productKey, 'large') || '';
+  }
+
+  _resolvePregnancyInfo(source = {}) {
+    const sharedResolver = window.ProductIcons?.resolvePregnancyInfo;
+    if (typeof sharedResolver === "function") {
+      return sharedResolver(source);
+    }
+
+    const parsePositiveInt = (value) => {
+      const normalized = parseInt(String(value ?? "").trim(), 10);
+      return Number.isFinite(normalized) && normalized > 0 ? normalized : null;
+    };
+    const clampInt = (value, min, max) => Math.max(min, Math.min(max, value));
+    const weeksValue = parsePositiveInt(source?.weeks_pregnant ?? source?.pregnancy_week ?? source?.week);
+    const monthValue = parsePositiveInt(source?.pregnancy_month ?? source?.month);
+    const trimesterValue = parsePositiveInt(source?.pregnancy_trimester ?? source?.trimester);
+    const month = monthValue !== null
+      ? clampInt(monthValue, 1, 9)
+      : clampInt(Math.ceil((weeksValue || 1) / 4), 1, 9);
+    const week = weeksValue ?? (((month - 1) * 4) + 1);
+    const trimester = trimesterValue !== null
+      ? clampInt(trimesterValue, 1, 3)
+      : clampInt(weeksValue !== null ? Math.ceil(weeksValue / 13) : Math.ceil(month / 3), 1, 3);
+    const isPregnant = Boolean(source?.is_pregnant) || String(source?.state || "").toLowerCase() === "pregnant";
+
+    return { isPregnant, week, month, trimester };
+  }
+
+  _isCycleState(stateObj) {
+    const attrs = stateObj?.attributes || {};
+    return Boolean(
+      stateObj
+      && typeof attrs === "object"
+      && ("history" in attrs || "pregnancy_data" in attrs || "cycle_statistics" in attrs)
+    );
+  }
+
+  _findMemberCycleState(member, inventoryEntityId) {
+    const wantedProfile = String(member?.profile || "").trim().toLowerCase();
+    const wantedName = String(member?.name || "").trim().toLowerCase();
+    const states = Object.entries(this._hass?.states || {});
+
+    for (const [entityId, stateObj] of states) {
+      if (entityId === inventoryEntityId || !entityId.startsWith("sensor.") || !this._isCycleState(stateObj)) {
+        continue;
+      }
+
+      const attrs = stateObj.attributes || {};
+      const profile = String(attrs.profile || "").trim().toLowerCase();
+      const friendlyName = String(attrs.friendly_name || "").trim().toLowerCase();
+      if ((wantedProfile && profile === wantedProfile) || (wantedName && friendlyName === wantedName)) {
+        return stateObj;
+      }
+    }
+
+    return null;
+  }
+
+  _resolvePregnancyContext(attrs, inventoryEntityId) {
+    const members = Array.isArray(attrs.household_members) ? attrs.household_members : [];
+    const selectedMember = String((this._selectedMember ?? this.config.member) || "").trim();
+    const targetMember = selectedMember
+      ? members.find((member) => member?.name === selectedMember || member?.profile === selectedMember) || { name: selectedMember, profile: selectedMember }
+      : (members.length === 1 ? members[0] : null);
+
+    if (!targetMember) {
+      return { isPregnant: false, week: 1, month: 1, trimester: 1 };
+    }
+
+    const cycleState = this._findMemberCycleState(targetMember, inventoryEntityId);
+    if (!cycleState) {
+      return { isPregnant: false, week: 1, month: 1, trimester: 1 };
+    }
+
+    const pregnancyInfo = this._resolvePregnancyInfo({ state: cycleState.state, ...(cycleState.attributes || {}) });
+    return pregnancyInfo.isPregnant
+      ? pregnancyInfo
+      : { ...pregnancyInfo, isPregnant: false };
   }
 
   _formatTimestamp(ts) {
@@ -314,10 +403,13 @@ class MenstrualProductInventoryCard extends HTMLElement {
     const lastUsageText = lastUsage
       ? `${this._escapeHtml(this._t(lastUsage.product))} ×${this._escapeHtml(lastUsage.quantity)} · ${this._escapeHtml(lastUsage.member || this._t("unknown_member"))} · ${this._escapeHtml(this._formatTimestamp(lastUsage.timestamp))}`
       : this._t("no_usage");
-
+    const pregnancyInfo = this._resolvePregnancyContext(attrs, entityId);
+    const pregnancyMetaText = pregnancyInfo.isPregnant
+      ? `${this._t("week")} ${pregnancyInfo.week} · ${this._t("trimester")} ${pregnancyInfo.trimester}`
+      : "";
     const showThresholds = this.config.show_thresholds !== false;
 
-    const rows = this._products()
+    const rows = this._products(pregnancyInfo)
       .map((product) => {
         const quantity = Math.max(0, Number(inventory[product] || 0));
         const threshold = thresholds[product] || { warning: 10, critical: 5 };
@@ -407,6 +499,7 @@ class MenstrualProductInventoryCard extends HTMLElement {
           </label>
         </div>
         <div class="meta"><strong>${this._t("last_usage")}:</strong> ${lastUsageText}</div>
+        ${pregnancyInfo.isPregnant ? `<div class="meta"><strong>${this._t("pregnancy")}:</strong> ${this._escapeHtml(pregnancyMetaText)}</div>` : ""}
         ${this._errorMessage ? `<div class="error">${this._escapeHtml(this._errorMessage)}</div>` : ""}
         <div class="rows">${rows}</div>
         <div class="logs">

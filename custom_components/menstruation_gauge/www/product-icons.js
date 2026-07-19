@@ -46,6 +46,18 @@ function resolveStrokeWidth(size) {
   return Math.max(1.2, Math.min(2.2, iconSize / 13));
 }
 
+function parsePositiveInt(value) {
+  const normalized = parseInt(String(value ?? '').trim(), 10);
+  if (!Number.isFinite(normalized) || normalized <= 0) {
+    return null;
+  }
+  return normalized;
+}
+
+function clampInt(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
 function buildIconSvg(content, size = 'default', options = {}) {
   const iconSize = resolveSize(size);
   const strokeWidth = resolveStrokeWidth(size);
@@ -77,18 +89,36 @@ const PREGNANCY_MONTH_ICON_PATHS = {
 };
 
 function normalizePregnancyMonth(monthOrWeeks) {
-  const rawValue = parseInt(String(monthOrWeeks || '0'), 10);
-  if (!Number.isFinite(rawValue) || rawValue <= 0) {
+  const rawValue = parsePositiveInt(monthOrWeeks);
+  if (rawValue === null) {
     return 1;
   }
 
   const month = rawValue > 9 ? Math.ceil(rawValue / 4) : rawValue;
-  return Math.max(1, Math.min(9, month));
+  return clampInt(month, 1, 9);
+}
+
+function resolvePregnancyInfo(source = {}) {
+  const isObjectSource = source !== null && typeof source === 'object';
+  const weeksValue = parsePositiveInt(isObjectSource ? (source.weeks_pregnant ?? source.pregnancy_week ?? source.week) : source);
+  const monthValue = parsePositiveInt(isObjectSource ? (source.pregnancy_month ?? source.month) : null);
+  const trimesterValue = parsePositiveInt(isObjectSource ? (source.pregnancy_trimester ?? source.trimester) : null);
+  const month = monthValue !== null ? clampInt(monthValue, 1, 9) : normalizePregnancyMonth(weeksValue);
+  const week = weeksValue ?? (((month - 1) * 4) + 1);
+  const trimester = trimesterValue !== null
+    ? clampInt(trimesterValue, 1, 3)
+    : clampInt(weeksValue !== null ? Math.ceil(weeksValue / 13) : Math.ceil(month / 3), 1, 3);
+  const stateKey = isObjectSource ? String(source.state || '').toLowerCase() : '';
+  const isPregnant = isObjectSource
+    ? Boolean(source.is_pregnant ?? source.isPregnant) || stateKey === 'pregnant'
+    : true;
+
+  return { isPregnant, week, month, trimester };
 }
 
 function getPregnancyIcon(monthOrWeeks, size = 'default') {
-  const pregnancyMonth = normalizePregnancyMonth(monthOrWeeks);
-  const iconContent = PREGNANCY_MONTH_ICON_PATHS[pregnancyMonth] || PREGNANCY_MONTH_ICON_PATHS[1];
+  const pregnancyInfo = resolvePregnancyInfo(monthOrWeeks);
+  const iconContent = PREGNANCY_MONTH_ICON_PATHS[pregnancyInfo.month] || PREGNANCY_MONTH_ICON_PATHS[1];
   return buildIconSvg(iconContent, size);
 }
 
@@ -252,7 +282,7 @@ function getStatusIcon(statusKey, size = 'default') {
   if (normalized === 'period') return getPeriodIcon(size);
   if (normalized === 'ovulation' || normalized === 'fertile') return getOvulationIcon(size);
   if (normalized === 'pms') return getPMSIcon(size);
-  if (normalized === 'pregnant') return getPregnancyIcon(20, size);
+  if (normalized === 'pregnant') return getPregnancyIcon(undefined, size);
   if (normalized === 'postpartum') return getPostpartumIcon(size);
   if (normalized === 'pre_menarche' || normalized === 'menarche') return getMenarcheIcon(size);
   if (normalized === 'menopause') return getMenopauseIcon(size);
@@ -263,9 +293,7 @@ function getStatusAnimatedIcon(statusKey, attrs, size = 'default') {
   const normalized = String(statusKey || '').toLowerCase();
 
   if (normalized === 'pregnant') {
-    const weeksRaw = attrs?.weeks_pregnant !== undefined ? attrs.weeks_pregnant : attrs?.pregnancy_week;
-    const weeksPregnant = Math.max(0, parseInt(String(weeksRaw || '0'), 10) || 0);
-    return getPregnancyIcon(weeksPregnant, size);
+    return getPregnancyIcon(attrs, size);
   }
   if (normalized === 'postpartum') return getPostpartumIcon(size);
   if (normalized === 'pre_menarche' || normalized === 'menarche') return getMenarcheIcon(size);
@@ -307,6 +335,8 @@ const ProductIcons = {
   getPeriodIcon,
   getOvulationIcon,
   getPMSIcon,
+  normalizePregnancyMonth,
+  resolvePregnancyInfo,
   getPregnancyIcon,
   getPostpartumIcon,
   getMenarcheIcon,
