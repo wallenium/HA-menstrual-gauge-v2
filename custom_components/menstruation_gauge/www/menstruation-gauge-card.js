@@ -99,6 +99,7 @@ class MenstruationGaugeCard extends HTMLElement {
         cat_hygiene: 'Hygiene',
         cat_test: 'Test',
         cat_cervical_mucus: 'Zervixschleim',
+        cat_pregnancy_symptoms: 'Schwangerschaft',
         // Symptom option labels
         opt_light: 'Gering',
         opt_medium: 'Mittel',
@@ -129,6 +130,15 @@ class MenstruationGaugeCard extends HTMLElement {
         opt_cremig: 'Cremig',
         opt_fadenziehend: 'Fadenziehend',
         opt_untypisch: 'Untypisch',
+        // Pregnancy symptom options
+        opt_preg_nausea: 'Übelkeit',
+        opt_preg_fatigue: 'Erschöpfung',
+        opt_preg_heartburn: 'Sodbrennen',
+        opt_preg_swelling: 'Schwellungen',
+        opt_preg_mood_swings: 'Stimmungsschwankungen',
+        opt_preg_frequent_urination: 'Häufiges Wasserlassen',
+        opt_preg_braxton_hicks: 'Braxton-Hicks',
+        opt_preg_back_pain: 'Rückenschmerzen',
       },
       en: {
         days_unit: 'days',
@@ -154,6 +164,7 @@ class MenstruationGaugeCard extends HTMLElement {
         cat_hygiene: 'Hygiene',
         cat_test: 'Test',
         cat_cervical_mucus: 'Cervical Mucus',
+        cat_pregnancy_symptoms: 'Pregnancy',
         // Symptom option labels
         opt_light: 'Light',
         opt_medium: 'Medium',
@@ -184,6 +195,15 @@ class MenstruationGaugeCard extends HTMLElement {
         opt_cremig: 'Creamy',
         opt_fadenziehend: 'Stretchy',
         opt_untypisch: 'Atypical',
+        // Pregnancy symptom options
+        opt_preg_nausea: 'Nausea',
+        opt_preg_fatigue: 'Fatigue',
+        opt_preg_heartburn: 'Heartburn',
+        opt_preg_swelling: 'Swelling',
+        opt_preg_mood_swings: 'Mood Swings',
+        opt_preg_frequent_urination: 'Frequent Urination',
+        opt_preg_braxton_hicks: 'Braxton Hicks',
+        opt_preg_back_pain: 'Back Pain',
       },
     };
     return (i18n[this._lang()] && i18n[this._lang()][key]) || (i18n.en[key] || key);
@@ -391,7 +411,8 @@ class MenstruationGaugeCard extends HTMLElement {
     return configuredEntity || null;
   }
 
-  _symptomConfig(state) {
+  _symptomConfig(state, isPregnant = false) {
+    const pregnant = isPregnant || String(state || '') === 'pregnant';
     const all = [
       { key: 'bleeding_strength', icon: 'mdi:water-opacity', multi: false, options: ['light', 'medium', 'heavy', 'very_heavy'] },
       { key: 'spotting', icon: 'mdi:blood-bag', multi: false, options: ['red', 'brown'] },
@@ -404,6 +425,23 @@ class MenstruationGaugeCard extends HTMLElement {
     if (String(state || '') === 'pre_menarche') {
       const allowed = new Set(['spotting', 'pain', 'hygiene']);
       return all.filter((cat) => allowed.has(cat.key));
+    }
+    if (pregnant) {
+      const pregnancyConfig = all
+        .filter((cat) => cat.key !== 'bleeding_strength')
+        .map((cat) => {
+          if (cat.key === 'hygiene') {
+            return { ...cat, options: cat.options.filter((opt) => opt !== 'tampon' && opt !== 'cup') };
+          }
+          return cat;
+        });
+      pregnancyConfig.push({
+        key: 'pregnancy_symptoms',
+        icon: 'mdi:baby-carriage',
+        multi: true,
+        options: ['preg_nausea', 'preg_fatigue', 'preg_heartburn', 'preg_swelling', 'preg_mood_swings', 'preg_frequent_urination', 'preg_braxton_hicks', 'preg_back_pain'],
+      });
+      return pregnancyConfig;
     }
     return all;
   }
@@ -822,7 +860,7 @@ class MenstruationGaugeCard extends HTMLElement {
     const isPreMenarche = model.state === 'pre_menarche';
     const isPregnant = Boolean(model.pregnancyInfo?.isPregnant);
     const periodModalContext = this._periodModalContext(iso, model);
-    const symptomConfig = this._symptomConfig(model.state);
+    const symptomConfig = this._symptomConfig(model.state, isPregnant);
 
     const categoryRows = symptomConfig.map((cat) => {
       const catLabel = this._t(`cat_${cat.key}`);
@@ -830,15 +868,14 @@ class MenstruationGaugeCard extends HTMLElement {
         const currentValues = Array.isArray(existing[cat.key]) ? existing[cat.key] : [];
         const checkboxes = cat.options.map((opt) => {
           const checked = currentValues.includes(opt) ? 'checked' : '';
-          const disabled = isPregnant ? 'disabled' : '';
-          return `<label class="sym-opt-label ${isPregnant ? 'sym-disabled' : ''}"><input type="checkbox" class="sym-multi" name="${cat.key}" value="${opt}" ${checked} ${disabled}><span>${this._t(`opt_${opt}`)}</span></label>`;
+          return `<label class="sym-opt-label"><input type="checkbox" class="sym-multi" name="${cat.key}" value="${opt}" ${checked}><span>${this._t(`opt_${opt}`)}</span></label>`;
         }).join('');
         return `<div class="sym-row"><div class="sym-cat-head"><ha-icon icon="${cat.icon}"></ha-icon><span>${catLabel}</span></div><div class="sym-options sym-multi-opts">${checkboxes}</div></div>`;
       }
       const currentValue = existing[cat.key] || '';
       const buttons = cat.options.map((opt) => {
         const sel = currentValue === opt ? ' sym-selected' : '';
-        return `<button type="button" class="sym-opt-btn${sel}${isPregnant ? ' sym-disabled' : ''}" data-cat="${cat.key}" data-val="${opt}" ${isPregnant ? 'disabled' : ''}>${this._t(`opt_${opt}`)}</button>`;
+        return `<button type="button" class="sym-opt-btn${sel}" data-cat="${cat.key}" data-val="${opt}">${this._t(`opt_${opt}`)}</button>`;
       }).join('');
       return `<div class="sym-row"><div class="sym-cat-head"><ha-icon icon="${cat.icon}"></ha-icon><span>${catLabel}</span></div><div class="sym-options sym-single-opts">${buttons}</div></div>`;
     }).join('');
@@ -865,11 +902,11 @@ class MenstruationGaugeCard extends HTMLElement {
             ${categoryRows}
             <div class="sym-row">
               <div class="sym-cat-head"><ha-icon icon="mdi:thermometer"></ha-icon><span>${this._t('basal_temp_label')}</span></div>
-              <input id="sym-basal-temp" type="number" step="0.1" min="35" max="42" value="${basalTemp}" class="sym-temp-input ${isPregnant ? 'sym-disabled' : ''}" placeholder="36.5" ${isPregnant ? 'disabled' : ''}>
+              <input id="sym-basal-temp" type="number" step="0.1" min="35" max="42" value="${basalTemp}" class="sym-temp-input" placeholder="36.5">
             </div>
           </div>
           <div class="sym-footer">
-            <button type="button" class="btn sym-save" ${isPregnant ? 'disabled' : ''}>${this._t('save')}</button>
+            <button type="button" class="btn sym-save">${this._t('save')}</button>
             <button type="button" class="btn sym-cancel">${this._t('cancel')}</button>
           </div>
         </div>
@@ -883,11 +920,6 @@ class MenstruationGaugeCard extends HTMLElement {
 
     const root = this.shadowRoot;
     const model = this._buildModel();
-    if (model.pregnancyInfo?.isPregnant) {
-      this._modalIso = null;
-      this._render();
-      return;
-    }
     const entityId = model.entityId || this._config?.entity || '';
     const entryId = model.stateObj?.attributes?.entry_id || this._config?.entry_id || '';
     const profile = model.stateObj?.attributes?.profile;
@@ -903,7 +935,7 @@ class MenstruationGaugeCard extends HTMLElement {
 
     // Collect symptom data from modal inputs
     const symptomData = {};
-    this._symptomConfig(model.state).forEach((cat) => {
+    this._symptomConfig(model.state, model.pregnancyInfo?.isPregnant).forEach((cat) => {
       if (cat.multi) {
         const checked = Array.from(root.querySelectorAll(`.sym-multi[name="${cat.key}"]:checked`)).map((el) => el.value);
         if (checked.length > 0) symptomData[cat.key] = checked;
