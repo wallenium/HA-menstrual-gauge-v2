@@ -70,6 +70,33 @@ BLEEDING_STRENGTH_PRIORITY = {"light": 1, "medium": 2, "heavy": 3, "very_heavy":
 CYCLE_STATS_MAX_CYCLES = 12
 CYCLE_RECENT_LIMIT = 12
 CYCLE_HISTORY_LIMIT_MONTHS = 18
+PRODUCT_USAGE_PRODUCT_ALIASES = {
+    "tampon": "tampon",
+    "tampons": "tampon",
+    "pad": "pad",
+    "pads": "pad",
+    "binde": "pad",
+    "binden": "pad",
+    "cup": "cup",
+    "cups": "cup",
+    "menstrual_cup": "cup",
+    "menstrual cup": "cup",
+    "liner": "liner",
+    "liners": "liner",
+    "pantyliner": "liner",
+    "pantyliners": "liner",
+    "slipeinlage": "liner",
+    "slipeinlagen": "liner",
+    "underwear": "underwear",
+    "period_underwear": "underwear",
+    "period underwear": "underwear",
+    "period_panties": "underwear",
+    "period panties": "underwear",
+    "period_panty": "underwear",
+    "period panty": "underwear",
+    "periodenunterwaesche": "underwear",
+    "periodenunterwäsche": "underwear",
+}
 
 
 def _group_product_usage_by_date(product_usage: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
@@ -90,6 +117,14 @@ def _entry_quantity(entry: dict[str, Any]) -> int:
         return max(1, int(entry.get("quantity", 1) or 1))
     except (TypeError, ValueError):
         return 1
+
+
+def _normalize_product_usage_product(raw: Any) -> str | None:
+    value = str(raw or "").strip().lower()
+    if not value:
+        return None
+    normalized = value.replace("-", "_")
+    return PRODUCT_USAGE_PRODUCT_ALIASES.get(normalized) or PRODUCT_USAGE_PRODUCT_ALIASES.get(value)
 
 
 def _count_products(entries: list[dict[str, Any]]) -> dict[str, int]:
@@ -120,11 +155,12 @@ def _build_product_usage_stats(
     history: list[str],
     product_usage: list[dict[str, Any]],
     today: date,
+    symptom_history: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     normalized_history = normalize_history(history)
     usable_history = [item for item in normalized_history if item <= today.isoformat()] or normalized_history
     blocks = bleeding_blocks(usable_history)
-    grouped_usage = _group_product_usage_by_date(product_usage)
+    grouped_usage = _group_product_usage_by_date(_merge_product_usage_sources(product_usage, symptom_history or []))
 
     today_counts = _count_products(grouped_usage.get(today.isoformat(), []))
 
@@ -150,12 +186,104 @@ def _build_product_usage_stats(
 
 
 def _parse_iso_date(raw: Any) -> date | None:
-    if not isinstance(raw, str):
+    if raw in (None, ""):
         return None
+    if isinstance(raw, date):
+        return raw
+    if isinstance(raw, datetime):
+        return raw.date()
+
+    text = str(raw).strip()
+    if not text:
+        return None
+
     try:
-        return date.fromisoformat(raw)
+        return date.fromisoformat(text)
+    except ValueError:
+        pass
+
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).date()
+    except ValueError:
+        pass
+
+    try:
+        numeric = float(text)
     except ValueError:
         return None
+
+    if not numeric.is_integer():
+        return None
+
+    try:
+        timestamp = int(numeric)
+        if abs(timestamp) >= 1_000_000_000_000:
+            timestamp /= 1000
+        return datetime.utcfromtimestamp(timestamp).date()
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
+def _normalize_product_usage_entry(entry: dict[str, Any]) -> dict[str, Any] | None:
+    entry_date = (
+        _parse_iso_date(entry.get("date"))
+        or _parse_iso_date(entry.get("created_at"))
+        or _parse_iso_date(entry.get("logged_at"))
+        or _parse_iso_date(entry.get("timestamp"))
+    )
+    product = _normalize_product_usage_product(entry.get("product"))
+    if entry_date is None or product is None:
+        return None
+    return {
+        **entry,
+        "date": entry_date.isoformat(),
+        "product": product,
+        "quantity": _entry_quantity(entry),
+        "action": str(entry.get("action", "used")).strip().lower() or "used",
+    }
+
+
+def _merge_product_usage_sources(
+    product_usage: list[dict[str, Any]],
+    symptom_history: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    normalized_usage: list[dict[str, Any]] = []
+    explicit_pairs: set[tuple[str, str]] = set()
+
+    for raw_entry in product_usage:
+        if not isinstance(raw_entry, dict):
+            continue
+        normalized_entry = _normalize_product_usage_entry(raw_entry)
+        if normalized_entry is None:
+            continue
+        normalized_usage.append(normalized_entry)
+        explicit_pairs.add((normalized_entry["date"], normalized_entry["product"]))
+
+    for symptom_entry in symptom_history:
+        if not isinstance(symptom_entry, dict):
+            continue
+        entry_date = _parse_iso_date(symptom_entry.get("date"))
+        if entry_date is None:
+            continue
+
+        for raw_product in _coerce_multi_values(symptom_entry.get("hygiene")):
+            product = _normalize_product_usage_product(raw_product)
+            date_key = entry_date.isoformat()
+            if product is None or (date_key, product) in explicit_pairs:
+                continue
+            normalized_usage.append(
+                {
+                    "date": date_key,
+                    "product": product,
+                    "quantity": 1,
+                    "action": "used",
+                }
+            )
+
+    return sorted(
+        normalized_usage,
+        key=lambda item: (item.get("date", ""), item.get("product", ""), item.get("action", "")),
+    )
 
 
 def _symptom_entries_for_period(
@@ -352,15 +480,17 @@ def _compact_symptom_history(symptom_history: list[dict[str, Any]]) -> list[dict
 
 def _compact_product_usage_for_sensor(
     product_usage: list[dict[str, Any]],
+    symptom_history: list[dict[str, Any]],
     today: date,
     days: int = PRODUCT_USAGE_TIMELINE_DAYS,
 ) -> list[dict[str, Any]]:
     """Limit product usage to a recent window for sensor broadcasting."""
-    if not product_usage:
-        return product_usage
-    cutoff = today - timedelta(days=days)
+    merged_usage = _merge_product_usage_sources(product_usage, symptom_history)
+    if not merged_usage:
+        return merged_usage
+    cutoff = today - timedelta(days=max(days - 1, 0))
     compact_entries: list[dict[str, Any]] = []
-    for entry in product_usage:
+    for entry in merged_usage:
         entry_date = _parse_iso_date(entry.get("date"))
         if entry_date is None or entry_date > today or entry_date < cutoff:
             continue
@@ -539,7 +669,12 @@ class MenstruationGaugeSensor(SensorEntity):
             pre_menarche_data=runtime.pre_menarche_data,
             today=today,
         )
-        usage_stats = _build_product_usage_stats(runtime.history, runtime.product_usage, today)
+        usage_stats = _build_product_usage_stats(
+            runtime.history,
+            runtime.product_usage,
+            today,
+            runtime.symptom_history,
+        )
         symptom_data_today = _summarize_symptoms_for_period(model.symptom_history, today, today)
 
         symptom_data_this_cycle: dict[str, Any] = {}
@@ -554,7 +689,11 @@ class MenstruationGaugeSensor(SensorEntity):
 
         symptom_statistics = _build_symptom_statistics(model.history, model.symptom_history, today)
         compact_symptom_history = _compact_symptom_history(model.symptom_history)
-        compact_product_usage = _compact_product_usage_for_sensor(runtime.product_usage, today)
+        compact_product_usage = _compact_product_usage_for_sensor(
+            runtime.product_usage,
+            runtime.symptom_history,
+            today,
+        )
 
         # Cycle start / day in current cycle
         cycle_start_date: str | None = model.grouped_starts[-1] if model.grouped_starts else None
@@ -733,7 +872,12 @@ class ProductUsageStatsConsolidatedSensor(SensorEntity):
         self._friendly_name = runtime.friendly_name
         self._attr_name = f"{self._friendly_name}: Period products today"
 
-        stats = _build_product_usage_stats(runtime.history, runtime.product_usage, dt_util.now().date())
+        stats = _build_product_usage_stats(
+            runtime.history,
+            runtime.product_usage,
+            dt_util.now().date(),
+            runtime.symptom_history,
+        )
         today = stats["today"]
         this_cycle = stats["this_cycle"]
         averages = stats["stats"]["average_per_cycle"]

@@ -305,34 +305,47 @@ class MenstrualProductStatsCard extends HTMLElement {
     const statsData = productUsageStats.stats || productUsageStats;
     const averagePerCycle = statsData.average_per_cycle || {};
     const cyclesConsidered = Number(statsData.cycles_considered || 0);
-    const thisCycleCup = Number(productUsageThisCycle.cup || 0);
+    const getCycleValue = (averageKey, currentKey) => {
+      const averageValue = Number(averagePerCycle[averageKey]);
+      if (cyclesConsidered > 0 || averageValue > 0) {
+        return Number.isFinite(averageValue) ? averageValue : 0;
+      }
+      return Number(productUsageThisCycle[currentKey] || 0);
+    };
 
     return {
       cyclesConsidered: Math.max(0, cyclesConsidered),
-      tamponsPerCycle: Number(averagePerCycle.tampon || 0),
-      padsPerCycle: Number(averagePerCycle.pad || 0),
-      cupEmptiesPerDay: Number(averagePerCycle.cup ?? averagePerCycle.cup_empties ?? thisCycleCup),
-      linersPerCycle: Number(averagePerCycle.liner || 0),
-      underwearPerCycle: Number(averagePerCycle.underwear || 0),
+      tamponsPerCycle: getCycleValue("tampon", "tampon"),
+      padsPerCycle: getCycleValue("pad", "pad"),
+      cupEmptiesPerDay: Number(averagePerCycle.cup ?? averagePerCycle.cup_empties ?? productUsageThisCycle.cup ?? 0),
+      linersPerCycle: getCycleValue("liner", "liner"),
+      underwearPerCycle: getCycleValue("underwear", "underwear"),
       planningDays: Math.max(0, Number(daysUntilNextStart || 0)),
     };
   }
 
   renderTimeline(productUsage) {
     const usageByDate = new Map();
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
+    const todayOrdinal = this.todayOrdinal();
 
-    for (const entry of productUsage) {
-      if (!entry?.date) continue;
-      const entryDate = new Date(`${entry.date}T00:00:00`);
-      const diffDays = Math.floor((now - entryDate) / 86400000);
+    for (const entry of Array.isArray(productUsage) ? productUsage : []) {
+      const dateKey = this.normalizeDateKey(entry?.date ?? entry?.created_at ?? entry?.logged_at ?? entry?.timestamp);
+      const productKey = this.normalizeProductKey(entry?.product);
+      if (!dateKey || !productKey) continue;
+      const entryOrdinal = this.dateKeyToOrdinal(dateKey);
+      if (entryOrdinal === null) continue;
+      const diffDays = todayOrdinal - entryOrdinal;
       if (diffDays < 0 || diffDays >= 30) continue;
 
-      if (!usageByDate.has(entry.date)) {
-        usageByDate.set(entry.date, []);
+      if (!usageByDate.has(dateKey)) {
+        usageByDate.set(dateKey, []);
       }
-      usageByDate.get(entry.date).push(entry);
+      usageByDate.get(dateKey).push({
+        ...entry,
+        date: dateKey,
+        product: productKey,
+        quantity: this.normalizeQuantity(entry?.quantity),
+      });
     }
 
     const dates = Array.from(usageByDate.keys()).sort().reverse();
@@ -359,7 +372,7 @@ class MenstrualProductStatsCard extends HTMLElement {
   }
 
   productLabel(entry) {
-    const product = entry?.product;
+    const product = this.normalizeProductKey(entry?.product) || entry?.product;
     if (product === "cup" && entry?.action === "emptied") {
       return this._t("cup_empty");
     }
@@ -376,6 +389,91 @@ class MenstrualProductStatsCard extends HTMLElement {
   normalizeQuantity(value) {
     const parsed = Number(value);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+  }
+
+  normalizeProductKey(value) {
+    const raw = String(value ?? "").trim().toLowerCase();
+    if (!raw) {
+      return null;
+    }
+    const normalized = raw.replace(/-/g, "_");
+    return {
+      tampon: "tampon",
+      tampons: "tampon",
+      pad: "pad",
+      pads: "pad",
+      binde: "pad",
+      binden: "pad",
+      cup: "cup",
+      cups: "cup",
+      menstrual_cup: "cup",
+      "menstrual cup": "cup",
+      liner: "liner",
+      liners: "liner",
+      pantyliner: "liner",
+      pantyliners: "liner",
+      slipeinlage: "liner",
+      slipeinlagen: "liner",
+      underwear: "underwear",
+      period_underwear: "underwear",
+      "period underwear": "underwear",
+      period_panties: "underwear",
+      "period panties": "underwear",
+      period_panty: "underwear",
+      "period panty": "underwear",
+      periodenunterwaesche: "underwear",
+      "periodenunterwäsche": "underwear",
+    }[normalized] || {
+      "period underwear": "underwear",
+      "period panties": "underwear",
+      "period panty": "underwear",
+      "menstrual cup": "cup",
+    }[raw] || raw;
+  }
+
+  normalizeDateKey(value) {
+    if (value === null || value === undefined || value === "") {
+      return null;
+    }
+
+    const raw = String(value).trim();
+    const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      const [, year, month, day] = match;
+      const parsed = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+      if (
+        parsed.getUTCFullYear() === Number(year)
+        && parsed.getUTCMonth() + 1 === Number(month)
+        && parsed.getUTCDate() === Number(day)
+      ) {
+        return `${year}-${month}-${day}`;
+      }
+    }
+
+    const numeric = Number(raw);
+    if (Number.isFinite(numeric) && Number.isInteger(numeric)) {
+      const timestamp = Math.abs(numeric) >= 1_000_000_000_000 ? numeric : numeric * 1000;
+      const parsed = new Date(timestamp);
+      if (!Number.isNaN(parsed.getTime())) {
+        return `${parsed.getUTCFullYear()}-${String(parsed.getUTCMonth() + 1).padStart(2, "0")}-${String(parsed.getUTCDate()).padStart(2, "0")}`;
+      }
+    }
+
+    return null;
+  }
+
+  dateKeyToOrdinal(value) {
+    const match = String(value ?? "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) {
+      return null;
+    }
+    const [, year, month, day] = match;
+    return Math.floor(Date.UTC(Number(year), Number(month) - 1, Number(day)) / 86400000);
+  }
+
+  todayOrdinal() {
+    const now = new Date();
+    return Math.floor(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / 86400000);
   }
 
   formatNumber(value) {
@@ -417,7 +515,16 @@ class MenstrualProductStatsCard extends HTMLElement {
   }
 
   formatDate(value) {
-    const date = new Date(`${value}T00:00:00`);
+    const dateKey = this.normalizeDateKey(value);
+    if (!dateKey) {
+      return value;
+    }
+    const match = dateKey.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) {
+      return value;
+    }
+    const [, year, month, day] = match;
+    const date = new Date(Number(year), Number(month) - 1, Number(day), 12);
     try {
       return new Intl.DateTimeFormat(this.dateLocale(), {
         month: "short",

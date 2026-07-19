@@ -112,6 +112,23 @@ function testCalculateStatsEmptyStats() {
   console.log('  ✓ calculateStats – fully empty input produces all-zero result');
 }
 
+function testCalculateStatsFallsBackToCurrentCycle() {
+  const card = makeCard();
+  const result = card.calculateStats(
+    { tampon: 2, pad: 1, cup: 3, liner: 4, underwear: 5 },
+    { average_per_cycle: {}, cycles_considered: 0 },
+    7,
+  );
+
+  assert.strictEqual(result.tamponsPerCycle, 2);
+  assert.strictEqual(result.padsPerCycle, 1);
+  assert.strictEqual(result.cupEmptiesPerDay, 3);
+  assert.strictEqual(result.linersPerCycle, 4);
+  assert.strictEqual(result.underwearPerCycle, 5);
+
+  console.log('  ✓ calculateStats – falls back to current-cycle totals when no averages exist');
+}
+
 // ---------------------------------------------------------------------------
 // renderTimeline / usageByDate grouping
 // ---------------------------------------------------------------------------
@@ -234,6 +251,42 @@ function testRenderTimelineOutsideWindow() {
   console.log('  ✓ renderTimeline – entries outside 30-day window excluded');
 }
 
+function testRenderTimelineExactCutoffIncluded() {
+  const card = makeCard();
+  const cutoff = new Date();
+  cutoff.setHours(0, 0, 0, 0);
+  cutoff.setDate(cutoff.getDate() - 29);
+  const dateStr = cutoff.toISOString().slice(0, 10);
+
+  const html = card.renderTimeline([
+    { date: dateStr, product: 'tampon', quantity: 1 },
+  ]);
+
+  assert.ok(html.includes('chip tampon'), 'cutoff-day entry remains visible');
+
+  console.log('  ✓ renderTimeline – exact cutoff day is included');
+}
+
+function testRenderTimelineNormalizesDatetimeAndAliases() {
+  const card = makeCard();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  today.setDate(today.getDate() - 1);
+  const isoDay = today.toISOString().slice(0, 10);
+
+  const html = card.renderTimeline([
+    { created_at: `${isoDay}T09:15:00Z`, product: 'pantyliners', quantity: 2 },
+    { date: `${isoDay}T10:30:00+02:00`, product: 'period panties', quantity: 1 },
+    { date: isoDay, product: 'binde', quantity: 1 },
+  ]);
+
+  assert.ok(html.includes('chip liner'), 'pantyliners normalize to liner');
+  assert.ok(html.includes('chip underwear'), 'period panties normalize to underwear');
+  assert.ok(html.includes('chip pad'), 'binde normalizes to pad');
+
+  console.log('  ✓ renderTimeline – datetime fields and product aliases normalize correctly');
+}
+
 // ---------------------------------------------------------------------------
 // productLabel
 // ---------------------------------------------------------------------------
@@ -262,11 +315,14 @@ let failed = 0;
   testCalculateStatsAllProducts,
   testCalculateStatsMissingLinerUnderwear,
   testCalculateStatsEmptyStats,
+  testCalculateStatsFallsBackToCurrentCycle,
   testRenderTimelineAllProducts,
   testRenderTimelineMultipleEntriesSameDay,
   testRenderTimelineEmptyInput,
   testRenderTimelineUnknownProductType,
   testRenderTimelineOutsideWindow,
+  testRenderTimelineExactCutoffIncluded,
+  testRenderTimelineNormalizesDatetimeAndAliases,
   testProductLabelLinerUnderwear,
 ].forEach((fn) => {
   try {

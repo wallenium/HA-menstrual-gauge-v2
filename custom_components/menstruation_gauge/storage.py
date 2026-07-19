@@ -3,13 +3,42 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from .const import STORAGE_KEY, STORAGE_VERSION
+
+
+_PRODUCT_USAGE_PRODUCT_ALIASES: dict[str, str] = {
+    "tampon": "tampon",
+    "tampons": "tampon",
+    "pad": "pad",
+    "pads": "pad",
+    "binde": "pad",
+    "binden": "pad",
+    "cup": "cup",
+    "cups": "cup",
+    "menstrual_cup": "cup",
+    "menstrual cup": "cup",
+    "liner": "liner",
+    "liners": "liner",
+    "pantyliner": "liner",
+    "pantyliners": "liner",
+    "slipeinlage": "liner",
+    "slipeinlagen": "liner",
+    "underwear": "underwear",
+    "period_underwear": "underwear",
+    "period underwear": "underwear",
+    "period_panties": "underwear",
+    "period panties": "underwear",
+    "period_panty": "underwear",
+    "period panty": "underwear",
+    "periodenunterwaesche": "underwear",
+    "periodenunterwäsche": "underwear",
+}
 
 
 class MenstruationStorage:
@@ -175,11 +204,47 @@ class MenstruationStorage:
         )
 
     @staticmethod
-    def _normalize_iso(value: str) -> str | None:
+    def _normalize_iso(value: Any) -> str | None:
+        if value in (None, ""):
+            return None
+
         try:
             return date.fromisoformat(str(value)).isoformat()
         except ValueError:
+            pass
+
+        raw = str(value).strip()
+        if not raw:
             return None
+
+        try:
+            return datetime.fromisoformat(raw.replace("Z", "+00:00")).date().isoformat()
+        except ValueError:
+            pass
+
+        try:
+            numeric = float(raw)
+        except ValueError:
+            return None
+
+        if not numeric.is_integer():
+            return None
+
+        try:
+            timestamp = int(numeric)
+            if abs(timestamp) >= 1_000_000_000_000:
+                timestamp /= 1000
+            return datetime.fromtimestamp(timestamp, tz=timezone.utc).date().isoformat()
+        except (OverflowError, OSError, ValueError):
+            return None
+
+    @staticmethod
+    def _normalize_product_usage_product(value: Any) -> str | None:
+        raw = str(value or "").strip().lower()
+        if not raw:
+            return None
+        normalized = raw.replace("-", "_")
+        return _PRODUCT_USAGE_PRODUCT_ALIASES.get(normalized) or _PRODUCT_USAGE_PRODUCT_ALIASES.get(raw)
 
     @staticmethod
     def _normalize_symptoms(symptoms: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -208,8 +273,13 @@ class MenstruationStorage:
             if not isinstance(entry, dict):
                 continue
 
-            date_str = MenstruationStorage._normalize_iso(entry.get("date"))
-            product = str(entry.get("product", "")).strip().lower()
+            date_str = (
+                MenstruationStorage._normalize_iso(entry.get("date"))
+                or MenstruationStorage._normalize_iso(entry.get("created_at"))
+                or MenstruationStorage._normalize_iso(entry.get("logged_at"))
+                or MenstruationStorage._normalize_iso(entry.get("timestamp"))
+            )
+            product = MenstruationStorage._normalize_product_usage_product(entry.get("product"))
             action = str(entry.get("action", "used")).strip().lower() or "used"
 
             if not date_str or not product:
