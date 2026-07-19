@@ -7,6 +7,7 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
     this._tooltipMouseLeaveHandler = null;
     this._scrollHeatmap = null;
     this._scrollCueUpdateHandler = null;
+    this._lastRenderSignature = null;
   }
 
   static getConfigElement() {
@@ -40,12 +41,17 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
       cycle_alignment: 'top',
       ...config,
     };
+    this._lastRenderSignature = null;
     this._ensureRoot();
     this._render();
   }
 
   set hass(hass) {
     this._hass = hass;
+    if (!this._config) return;
+    const signature = this._computeRenderSignature(hass);
+    if (signature === this._lastRenderSignature) return;
+    this._lastRenderSignature = signature;
     this._render();
   }
 
@@ -188,7 +194,10 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
   }
 
   _resolveEntityId() {
-    const states = this._hass?.states || {};
+    return this._resolveEntityIdFromStates(this._hass?.states || {});
+  }
+
+  _resolveEntityIdFromStates(states) {
     const configuredEntity = String(this._config?.entity || '').trim();
     if (configuredEntity && states[configuredEntity]) return configuredEntity;
 
@@ -202,6 +211,49 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
     }
 
     return configuredEntity || null;
+  }
+
+  _configSignature() {
+    const cfg = this._config || {};
+    return JSON.stringify({
+      entity: cfg.entity || '',
+      entry_id: cfg.entry_id || '',
+      max_cycles: Number(cfg.max_cycles || 18),
+      period_duration_days: Number(cfg.period_duration_days || 5),
+      title: String(cfg.title || ''),
+      show_fertile_period: cfg.show_fertile_period !== false,
+      cycle_alignment: String(cfg.cycle_alignment || 'top'),
+      symptom_entities: Array.isArray(cfg.symptom_entities) ? cfg.symptom_entities : [],
+    });
+  }
+
+  _stateVersion(stateObj, entityId) {
+    if (!stateObj) return `${entityId || ''}:missing`;
+    return `${entityId || ''}:${stateObj.state ?? ''}:${stateObj.last_changed || ''}:${stateObj.last_updated || ''}`;
+  }
+
+  _symptomSourcesSignature(states) {
+    const rawConfig = Array.isArray(this._config?.symptom_entities) ? this._config.symptom_entities : [];
+    return rawConfig.map((rawItem) => {
+      const item = typeof rawItem === 'string' ? { entity: rawItem } : (rawItem || {});
+      const entityId = String(item.entity || item.entity_id || '').trim();
+      if (!entityId) return 'missing:';
+      return this._stateVersion(states[entityId], entityId);
+    }).join('|');
+  }
+
+  _computeRenderSignature(hass) {
+    const states = hass?.states || {};
+    const entityId = this._resolveEntityIdFromStates(states);
+    const mainStateVersion = entityId ? this._stateVersion(states[entityId], entityId) : 'no-entity';
+    const lang = String(hass?.locale?.language || 'en');
+    return [
+      lang,
+      this._configSignature(),
+      entityId || '',
+      mainStateVersion,
+      this._symptomSourcesSignature(states),
+    ].join('||');
   }
 
   _normalizeISO(value) {
