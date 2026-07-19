@@ -190,8 +190,8 @@ function testRenderTimelineMultipleEntriesSameDay() {
 
   const html = card.renderTimeline(timeline);
   // Both liner entries appear (×2 and ×1)
-  assert.ok(html.includes('×2'), 'first liner entry quantity ×2');
-  assert.ok(html.includes('×1'), 'second entry quantity ×1');
+  assert.ok(/×\s*2/.test(html), 'first liner entry quantity ×2');
+  assert.ok(/×\s*1/.test(html), 'second entry quantity ×1');
   // The date key appears exactly once in a timeline-row
   const rowMatches = (html.match(/timeline-row/g) || []).length;
   assert.strictEqual(rowMatches, 1, 'exactly one date row for a single date');
@@ -287,6 +287,30 @@ function testRenderTimelineNormalizesDatetimeAndAliases() {
   console.log('  ✓ renderTimeline – datetime fields and product aliases normalize correctly');
 }
 
+function testNormalizeQuantityHandlesNumbersAndStrings() {
+  const card = makeCard();
+
+  assert.strictEqual(card.normalizeQuantity(3), 3, 'numeric quantity 3 stays 3');
+  assert.strictEqual(card.normalizeQuantity('3'), 3, 'string quantity "3" stays 3');
+  assert.strictEqual(card.normalizeQuantity('3.0'), 3, 'decimal string quantity "3.0" stays 3');
+  assert.strictEqual(card.normalizeQuantity('3x'), 3, 'suffix string quantity "3x" stays 3');
+  assert.strictEqual(card.normalizeQuantity('x3'), 3, 'prefix string quantity "x3" stays 3');
+
+  console.log('  ✓ normalizeQuantity – parses numeric strings robustly');
+}
+
+function testNormalizeQuantityFallbacks() {
+  const card = makeCard();
+
+  assert.strictEqual(card.normalizeQuantity(undefined), 1, 'undefined falls back to 1');
+  assert.strictEqual(card.normalizeQuantity(null), 1, 'null falls back to 1');
+  assert.strictEqual(card.normalizeQuantity(0), 1, '0 falls back to 1');
+  assert.strictEqual(card.normalizeQuantity(-2), 1, 'negative quantity falls back to 1');
+  assert.strictEqual(card.normalizeQuantity('abc'), 1, 'non-numeric string falls back to 1');
+
+  console.log('  ✓ normalizeQuantity – invalid values fall back to 1');
+}
+
 // ---------------------------------------------------------------------------
 // productLabel
 // ---------------------------------------------------------------------------
@@ -323,6 +347,8 @@ let failed = 0;
   testRenderTimelineOutsideWindow,
   testRenderTimelineExactCutoffIncluded,
   testRenderTimelineNormalizesDatetimeAndAliases,
+  testNormalizeQuantityHandlesNumbersAndStrings,
+  testNormalizeQuantityFallbacks,
   testProductLabelLinerUnderwear,
 ].forEach((fn) => {
   try {

@@ -387,8 +387,22 @@ class MenstrualProductStatsCard extends HTMLElement {
   }
 
   normalizeQuantity(value) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+    let parsed = null;
+    if (typeof value === "number") {
+      parsed = value;
+    } else if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed) {
+        const match = trimmed.match(/[-+]?\d+(?:[.,]\d+)?/);
+        if (match) {
+          parsed = Number(match[0].replace(",", "."));
+        }
+      }
+    }
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return 1;
+    }
+    return Math.max(1, Math.floor(parsed));
   }
 
   normalizeProductKey(value) {

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import date, datetime, timezone
+import math
+import re
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -266,6 +268,30 @@ class MenstruationStorage:
         return sorted(seen.values(), key=lambda item: item.get("date", ""))
 
     @staticmethod
+    def _coerce_quantity(value: Any, default: int = 1) -> int:
+        parsed: float | None
+        if isinstance(value, bool):
+            parsed = None
+        elif isinstance(value, (int, float)):
+            parsed = float(value)
+        else:
+            text = str(value or "").strip()
+            if not text:
+                parsed = None
+            else:
+                match = re.search(r"[-+]?\d+(?:[.,]\d+)?", text)
+                if match is None:
+                    parsed = None
+                else:
+                    try:
+                        parsed = float(match.group(0).replace(",", "."))
+                    except ValueError:
+                        parsed = None
+        if parsed is None or not math.isfinite(parsed) or parsed <= 0:
+            return max(1, int(default))
+        return max(1, int(parsed))
+
+    @staticmethod
     def _normalize_product_usage(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Normalize product usage entries and drop invalid items."""
         normalized: list[dict[str, Any]] = []
@@ -285,10 +311,7 @@ class MenstruationStorage:
             if not date_str or not product:
                 continue
 
-            try:
-                quantity = max(1, int(entry.get("quantity", 1)))
-            except (TypeError, ValueError):
-                quantity = 1
+            quantity = MenstruationStorage._coerce_quantity(entry.get("quantity", 1))
 
             normalized_entry: dict[str, Any] = {
                 "date": date_str,
