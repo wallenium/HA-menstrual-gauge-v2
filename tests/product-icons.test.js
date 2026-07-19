@@ -26,6 +26,7 @@ const {
   resolvePregnancyInfo,
   getPregnancyIcon,
   getPregnancyAssetUrl,
+  createAnimatedSvgElement,
 } = global.window.ProductIcons;
 
 const ASSET_BASE = '/menstruation_gauge/assets/pregnancy';
@@ -184,6 +185,100 @@ function testExports() {
 }
 
 // ---------------------------------------------------------------------------
+// createAnimatedSvgElement – uses period assets for animated product icons
+// ---------------------------------------------------------------------------
+
+class MockNode {
+  constructor(tagName) {
+    this.tagName = tagName;
+    this.attributes = {};
+    this.children = [];
+    this.dataset = {};
+    this._listeners = {};
+  }
+
+  setAttribute(name, value) {
+    this.attributes[name] = String(value);
+  }
+
+  setAttributeNS(_ns, name, value) {
+    this.attributes[name] = String(value);
+  }
+
+  appendChild(child) {
+    this.children.push(child);
+    return child;
+  }
+
+  insertBefore(child, _before) {
+    this.children.unshift(child);
+    return child;
+  }
+
+  addEventListener(name, handler) {
+    this._listeners[name] = handler;
+  }
+}
+
+function createMockDocument() {
+  return {
+    createElementNS: (_ns, tag) => new MockNode(tag),
+  };
+}
+
+function findFirst(node, predicate) {
+  if (!node) return null;
+  if (predicate(node)) return node;
+  for (const child of node.children || []) {
+    const found = findFirst(child, predicate);
+    if (found) return found;
+  }
+  return null;
+}
+
+function testCreateAnimatedSvgElementUsesAssets() {
+  const previousDocument = global.document;
+  global.document = createMockDocument();
+
+  const expectations = {
+    tampon: 'tampon.svg',
+    cup: 'menstrual_cup.svg',
+    pad: 'pad.svg',
+  };
+
+  Object.entries(expectations).forEach(([product, filename]) => {
+    const svg = createAnimatedSvgElement(product, 'large');
+    assert.ok(svg, `${product}: svg is created`);
+    assert.ok(
+      svg.dataset.assetSrc.endsWith(`/menstruation_gauge/assets/period/${filename}`),
+      `${product}: asset URL points to new period asset`,
+    );
+    assert.ok(
+      String(svg.dataset.fillMask || '').startsWith('url(#pi-asset-mask-'),
+      `${product}: fill mask metadata exists for level animation`,
+    );
+
+    const image = findFirst(svg, (node) => node.tagName === 'image' && (
+      node.attributes.href || node.attributes['xlink:href']
+    ));
+    const href = image && (image.attributes.href || image.attributes['xlink:href']);
+    assert.ok(
+      String(href || '').endsWith(`/menstruation_gauge/assets/period/${filename}`),
+      `${product}: animated svg references expected asset image`,
+    );
+  });
+
+  assert.strictEqual(
+    createAnimatedSvgElement('does_not_exist', 'large'),
+    null,
+    'missing/unknown product returns null (fallback path)',
+  );
+
+  global.document = previousDocument;
+  console.log('  ✓ createAnimatedSvgElement (asset-based + fallback)');
+}
+
+// ---------------------------------------------------------------------------
 // Run
 // ---------------------------------------------------------------------------
 
@@ -196,6 +291,7 @@ let failed = 0;
   testGetPregnancyIcon,
   testGetPregnancyAssetUrl,
   testExports,
+  testCreateAnimatedSvgElementUsesAssets,
 ].forEach((fn) => {
   try {
     fn();

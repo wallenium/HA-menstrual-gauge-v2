@@ -845,6 +845,7 @@ class PeriodCountdownTimer extends HTMLElement {
           const mode = this.config?.animation_style || "realistic";
           const animSvg = this._createAnimatedProductSVG(key, mode);
           if (animSvg) {
+            this._attachAnimatedSvgFallback(animSvg, product.icon);
             timerIcon.innerHTML = '';
             timerIcon.appendChild(animSvg);
             this._animator = new ProductFillAnimator(animSvg, key, product.seconds, mode);
@@ -1209,6 +1210,7 @@ class PeriodCountdownTimer extends HTMLElement {
           const mode = this.config?.animation_style || "realistic";
           const animSvg = this._createAnimatedProductSVG(savedProduct, mode);
           if (animSvg) {
+            this._attachAnimatedSvgFallback(animSvg, option.dataset.icon || '');
             timerIcon.innerHTML = '';
             timerIcon.appendChild(animSvg);
             this._animator = new ProductFillAnimator(animSvg, savedProduct, totalFromConfig, mode);
@@ -1250,6 +1252,26 @@ class PeriodCountdownTimer extends HTMLElement {
     return null;
   }
 
+  _applyAnimatedFillMask(svg, fillElement) {
+    const maskValue = svg?.dataset?.fillMask;
+    if (maskValue) {
+      fillElement.setAttribute("mask", maskValue);
+    }
+  }
+
+  _attachAnimatedSvgFallback(svg, fallbackHtml) {
+    if (!svg || typeof svg.addEventListener !== "function") return;
+    svg.addEventListener("product-icon-asset-error", () => {
+      const timerIcon = this.querySelector("#timerIcon");
+      if (!timerIcon || !timerIcon.contains(svg)) return;
+      if (this._animator && this._animator.svg === svg) {
+        this._animator.reset();
+        this._animator = null;
+      }
+      timerIcon.innerHTML = fallbackHtml || "";
+    }, { once: true });
+  }
+
   _createAnimatedCupSVG(mode) {
     const color = mode === "avoid_blood" ? "#2563eb" : "#be123c";
     const svg = window.ProductIcons?.createAnimatedSvgElement("cup", "large");
@@ -1264,6 +1286,7 @@ class PeriodCountdownTimer extends HTMLElement {
     fillRect.setAttribute("height", "0");
     fillRect.setAttribute("fill", color);
     fillRect.setAttribute("opacity", "0.8");
+    this._applyAnimatedFillMask(svg, fillRect);
     svg.insertBefore(fillRect, svg.firstChild);
 
     return svg;
@@ -1284,6 +1307,7 @@ class PeriodCountdownTimer extends HTMLElement {
     fillRect.setAttribute("rx", "3");
     fillRect.setAttribute("fill", color);
     fillRect.setAttribute("opacity", "0.8");
+    this._applyAnimatedFillMask(svg, fillRect);
     svg.insertBefore(fillRect, svg.firstChild);
 
     return svg;
@@ -1302,6 +1326,7 @@ class PeriodCountdownTimer extends HTMLElement {
     fillCircle.setAttribute("r", "0");
     fillCircle.setAttribute("fill", color);
     fillCircle.setAttribute("opacity", "0.8");
+    this._applyAnimatedFillMask(svg, fillCircle);
     svg.insertBefore(fillCircle, svg.firstChild);
 
     return svg;
