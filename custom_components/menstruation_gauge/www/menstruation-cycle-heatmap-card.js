@@ -435,10 +435,12 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
         li.appendChild(icon);
 
         const catKey = `cat_${s.k}`;
-        const catLabel = this._t(catKey) !== catKey ? this._t(catKey) : (s.k || '');
-        const valStr = Array.isArray(s.v) ? s.v.join(', ') : String(s.v || '');
-        const optKey = `opt_${valStr}`;
-        const valLabel = valStr ? (this._t(optKey) !== optKey ? this._t(optKey) : valStr) : '';
+        const catLabel = this._t(catKey) !== catKey ? this._t(catKey) : String(s.k || '').replace(/_/g, ' ');
+        const valArr = Array.isArray(s.v) ? s.v : (s.v !== null && s.v !== undefined && s.v !== '' ? [String(s.v)] : []);
+        const valLabel = valArr
+          .map((v) => { const ok = `opt_${v}`; const t = this._t(ok); return t !== ok ? t : String(v).replace(/_/g, ' '); })
+          .filter(Boolean)
+          .join(', ');
 
         const span = document.createElement('span');
         span.textContent = valLabel ? `${catLabel}: ${valLabel}` : catLabel;
