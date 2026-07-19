@@ -212,6 +212,14 @@ class PeriodCountdownTimer extends HTMLElement {
       const status = stateObj.state;
       this.timerState.currentStatus = status;
 
+      // Update card title based on status
+      const cardTitle = this.querySelector(".card-title");
+      if (cardTitle) {
+        cardTitle.textContent = status === "pregnant"
+          ? this._t('pregnancy_card_title')
+          : this._t('card_title');
+      }
+
       // Update card meta
       const cardMeta = this.querySelector("#cardMeta");
       if (cardMeta) {
@@ -304,9 +312,12 @@ class PeriodCountdownTimer extends HTMLElement {
   }
 
   renderPregnancyMode(cardContent, attributes) {
-    const pregnancyWeek = attributes?.pregnancy_week || 0;
+    // Prefer `weeks_pregnant` (set by the sensor); fall back to legacy `pregnancy_week`
+    const rawWeeks = attributes?.weeks_pregnant ?? attributes?.pregnancy_week ?? null;
+    const pregnancyWeek = (rawWeeks !== null && rawWeeks !== undefined && rawWeeks > 0) ? rawWeeks : null;
+    const weekDisplay = pregnancyWeek !== null ? pregnancyWeek : '–';
     const dueDate = attributes?.due_date || "TBD";
-    const trimester = Math.ceil(pregnancyWeek / 13);
+    const trimester = pregnancyWeek !== null ? Math.ceil(pregnancyWeek / 13) : '–';
     const pregnancyIcon = this._getStatusAnimatedIcon("pregnant", attributes, "large");
 
     cardContent.innerHTML = `
@@ -315,7 +326,7 @@ class PeriodCountdownTimer extends HTMLElement {
           <div class="badge-emoji">${pregnancyIcon}</div>
           <div class="badge-text">
             <h3>${this._t('pregnant')}</h3>
-            <p>${this._t('week')} ${pregnancyWeek} • ${this._t('trimester')} ${trimester}</p>
+            <p>${this._t('week')} ${weekDisplay} • ${this._t('trimester')} ${trimester}</p>
           </div>
         </div>
 
@@ -326,7 +337,7 @@ class PeriodCountdownTimer extends HTMLElement {
           </div>
           <div class="info-box">
             <span class="info-label">${this._t('pregnancy_week')}</span>
-            <span class="info-value">${pregnancyWeek}</span>
+            <span class="info-value">${weekDisplay}</span>
           </div>
         </div>
 
@@ -343,6 +354,7 @@ class PeriodCountdownTimer extends HTMLElement {
         <div class="symptom-tracker">
           <h4>${this._t('symptoms')}</h4>
           <div class="symptom-grid" id="symptomGrid"></div>
+          <div class="symptom-feedback" id="symptomFeedback" hidden></div>
         </div>
 
         <div class="reminder-section">
@@ -548,16 +560,82 @@ class PeriodCountdownTimer extends HTMLElement {
     const symptomGrid = this.querySelector("#symptomGrid");
     if (!symptomGrid) return;
 
-    const symptoms = mode === 'pregnancy' 
-      ? ['Übelkeit', 'Müdigkeit', 'Kopfschmerz', 'Rückenschmerz', 'Sodbrennen', 'Schwellungen']
-      : ['Hitzewallungen', 'Schweißausbrüche', 'Schlafstörungen', 'Stimmungsschwankungen'];
+    // Each entry: { label: display text, key: backend value for pregnancy_symptoms field }
+    const symptoms = mode === 'pregnancy'
+      ? [
+          { label: 'Übelkeit',      key: 'nausea'     },
+          { label: 'Müdigkeit',     key: 'fatigue'    },
+          { label: 'Kopfschmerz',   key: 'headache'   },
+          { label: 'Rückenschmerz', key: 'back_pain'  },
+          { label: 'Sodbrennen',    key: 'heartburn'  },
+          { label: 'Schwellungen',  key: 'swelling'   },
+        ]
+      : [
+          { label: 'Hitzewallungen',     key: null },
+          { label: 'Schweißausbrüche',   key: null },
+          { label: 'Schlafstörungen',    key: null },
+          { label: 'Stimmungsschwankungen', key: null },
+        ];
 
     symptomGrid.innerHTML = symptoms.map(s => `
       <label class="symptom-btn">
-        <input type="checkbox" />
-        <span>${s}</span>
+        <input type="checkbox" data-symptom-key="${s.key || ''}" />
+        <span>${s.label}</span>
       </label>
     `).join('');
+
+    if (mode === 'pregnancy') {
+      this._attachSymptomListeners();
+    }
+  }
+
+  _attachSymptomListeners() {
+    const symptomGrid = this.querySelector("#symptomGrid");
+    const feedback = this.querySelector("#symptomFeedback");
+    if (!symptomGrid) return;
+
+    symptomGrid.querySelectorAll('input[type="checkbox"][data-symptom-key]').forEach(checkbox => {
+      checkbox.addEventListener('change', async () => {
+        const key = checkbox.getAttribute('data-symptom-key');
+        if (!key) return;
+
+        // Collect all currently checked symptoms
+        const checked = Array.from(
+          symptomGrid.querySelectorAll('input[type="checkbox"]:checked[data-symptom-key]')
+        ).map(cb => cb.getAttribute('data-symptom-key')).filter(Boolean);
+
+        try {
+          const today = new Date().toISOString().slice(0, 10);
+          const serviceData = {
+            entity_id: this.config?.entity,
+            profile: this.config?.profile,
+            entry_id: this.config?.entry_id,
+            date: today,
+            symptom_data: checked.length > 0
+              ? { pregnancy_symptoms: checked }
+              : { pregnancy_symptoms: [] },
+          };
+          await this.callService("menstruation_gauge", "add_symptom", serviceData);
+
+          if (feedback) {
+            feedback.hidden = false;
+            feedback.textContent = this._t('symptom_saved');
+            feedback.className = 'symptom-feedback success';
+            clearTimeout(this._symptomFeedbackTimeout);
+            this._symptomFeedbackTimeout = setTimeout(() => { feedback.hidden = true; }, 2500);
+          }
+        } catch (error) {
+          console.error("Error logging symptom:", error);
+          if (feedback) {
+            feedback.hidden = false;
+            feedback.textContent = this._t('symptom_save_error');
+            feedback.className = 'symptom-feedback error';
+            clearTimeout(this._symptomFeedbackTimeout);
+            this._symptomFeedbackTimeout = setTimeout(() => { feedback.hidden = true; }, 3000);
+          }
+        }
+      });
+    });
   }
 
   renderRecoveryItems(weeksSinceBirth) {
@@ -1391,7 +1469,11 @@ class PeriodCountdownTimer extends HTMLElement {
         cup_empty_only: "Cup-Leerung ist nur für die Menstruationstasse verfügbar.",
         usage_logged_used: "Produktverbrauch gespeichert.",
         usage_logged_emptied: "Cup-Leerung gespeichert.",
-        usage_logged_error: "Produktverbrauch konnte nicht gespeichert werden."
+        usage_logged_error: "Produktverbrauch konnte nicht gespeichert werden.",
+        card_title: "Menstruations-Countdown",
+        pregnancy_card_title: "Schwangerschaft",
+        symptom_saved: "Symptome gespeichert.",
+        symptom_save_error: "Symptome konnten nicht gespeichert werden."
       },
       en: {
         // Status labels
@@ -1450,7 +1532,11 @@ class PeriodCountdownTimer extends HTMLElement {
         cup_empty_only: "Cup emptying is only available for the menstrual cup.",
         usage_logged_used: "Product usage saved.",
         usage_logged_emptied: "Cup emptying saved.",
-        usage_logged_error: "Could not save product usage."
+        usage_logged_error: "Could not save product usage.",
+        card_title: "Menstrual Countdown",
+        pregnancy_card_title: "Pregnancy",
+        symptom_saved: "Symptoms saved.",
+        symptom_save_error: "Could not save symptoms."
       },
     };
 
@@ -1982,6 +2068,28 @@ class PeriodCountdownTimer extends HTMLElement {
       }
 
       .usage-feedback.error {
+        color: var(--mg-status-error);
+        background: color-mix(in srgb, var(--mg-status-error) 14%, transparent);
+        border-color: color-mix(in srgb, var(--mg-status-error) 36%, transparent);
+      }
+
+      .symptom-feedback {
+        margin-top: 8px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-align: center;
+        border: 1px solid transparent;
+      }
+
+      .symptom-feedback.success {
+        color: var(--mg-status-success);
+        background: color-mix(in srgb, var(--mg-status-success) 14%, transparent);
+        border-color: color-mix(in srgb, var(--mg-status-success) 36%, transparent);
+      }
+
+      .symptom-feedback.error {
         color: var(--mg-status-error);
         background: color-mix(in srgb, var(--mg-status-error) 14%, transparent);
         border-color: color-mix(in srgb, var(--mg-status-error) 36%, transparent);
