@@ -80,6 +80,10 @@ class MenstruationGaugeCard extends HTMLElement {
         days_until_menarche: 'Tage bis Menarche',
         menarche_expected_in: 'Menarche erwartet in {days} Tagen',
         menarche_overdue: 'Menarche {days} Tage überfällig',
+        pregnancy: 'Schwangerschaft',
+        week: 'Woche',
+        month: 'Monat',
+        trimester: 'Trimester',
         // Modal UI
         modal_edit_day: 'Tag bearbeiten',
         period_toggle: 'Periode',
@@ -131,6 +135,10 @@ class MenstruationGaugeCard extends HTMLElement {
         days_until_menarche: 'Days until menarche',
         menarche_expected_in: 'Menarche expected in {days} days',
         menarche_overdue: 'Menarche {days} days overdue',
+        pregnancy: 'Pregnancy',
+        week: 'Week',
+        month: 'Month',
+        trimester: 'Trimester',
         // Modal UI
         modal_edit_day: 'Edit Day',
         period_toggle: 'Period',
@@ -234,10 +242,60 @@ class MenstruationGaugeCard extends HTMLElement {
     return 5;
   }
 
+  _resolvePregnancyInfo(source = {}) {
+    const sharedResolver = window.ProductIcons?.resolvePregnancyInfo;
+    if (typeof sharedResolver === 'function') {
+      return sharedResolver(source);
+    }
+
+    const parsePositiveInt = (value) => {
+      const normalized = parseInt(String(value ?? '').trim(), 10);
+      return Number.isFinite(normalized) && normalized > 0 ? normalized : null;
+    };
+    const clampInt = (value, min, max) => Math.max(min, Math.min(max, value));
+    const pregnancyData = source && typeof source === 'object' && source.pregnancy_data && typeof source.pregnancy_data === 'object'
+      ? source.pregnancy_data
+      : {};
+    const weeksValue = parsePositiveInt(
+      source?.weeks_pregnant
+      ?? source?.pregnancy_week
+      ?? source?.week
+      ?? pregnancyData.weeks_pregnant
+      ?? pregnancyData.pregnancy_week
+      ?? pregnancyData.week,
+    );
+    const monthValue = parsePositiveInt(
+      source?.pregnancy_month
+      ?? source?.month
+      ?? pregnancyData.pregnancy_month
+      ?? pregnancyData.month,
+    );
+    const trimesterValue = parsePositiveInt(
+      source?.pregnancy_trimester
+      ?? source?.trimester
+      ?? pregnancyData.pregnancy_trimester
+      ?? pregnancyData.trimester,
+    );
+    const month = monthValue !== null
+      ? clampInt(monthValue, 1, 9)
+      : clampInt(Math.ceil((weeksValue || 1) / 4), 1, 9);
+    const week = weeksValue !== null
+      ? clampInt(weeksValue, 1, 40)
+      : clampInt((((month - 1) * 4) + 1), 1, 40);
+    const trimester = trimesterValue !== null
+      ? clampInt(trimesterValue, 1, 3)
+      : clampInt(weeksValue !== null ? Math.ceil(week / 13) : Math.ceil(month / 3), 1, 3);
+    const isPregnant = Boolean(source?.is_pregnant ?? source?.isPregnant ?? pregnancyData.is_pregnant ?? pregnancyData.isPregnant)
+      || String(source?.state || '').toLowerCase() === 'pregnant';
+
+    return { isPregnant, week, month, trimester };
+  }
+
   _buildModel() {
     const entityId = this._resolveEntityId();
     const stateObj = entityId ? this._hass?.states?.[entityId] : undefined;
     const attrs = stateObj?.attributes || {};
+    const pregnancyInfo = this._resolvePregnancyInfo({ state: stateObj?.state, ...attrs });
     const historyRaw = JSON.stringify(attrs.history);
     if (historyRaw !== this._lastHistoryRaw) {
       this._lastHistoryRaw = historyRaw;
@@ -308,6 +366,7 @@ class MenstruationGaugeCard extends HTMLElement {
       ovulationDay,
       menarcheData,
       daysUntilMenarche,
+      pregnancyInfo,
       symptomByDate,
       daysInMonth,
       series,
@@ -644,6 +703,29 @@ class MenstruationGaugeCard extends HTMLElement {
     `;
   }
 
+  _renderCenterContent(model, palette, canEdit, isOverdueSoon, countdown) {
+    if (!model.pregnancyInfo?.isPregnant) {
+      return `<button type="button" class="countdown ${isOverdueSoon ? 'overdue-soon' : ''} ${canEdit ? '' : 'passive'}" data-action="toggle-editor">${countdown}</button>`;
+    }
+
+    const pregnancyInfo = model.pregnancyInfo;
+    const iconMarkup = window.ProductIcons?.getPregnancyIcon?.(pregnancyInfo, 'large')
+      || window.ProductIcons?.getStatusAnimatedIcon?.('pregnant', pregnancyInfo, 'large')
+      || '';
+    const secondaryParts = [`${this._t('month')} ${pregnancyInfo.month}`];
+    if (Number.isFinite(Number(pregnancyInfo.trimester))) {
+      secondaryParts.push(`${this._t('trimester')} ${pregnancyInfo.trimester}`);
+    }
+
+    return `
+      <button type="button" class="center-panel pregnancy-panel ${canEdit ? '' : 'passive'}" data-action="toggle-editor">
+        <div class="center-icon" aria-hidden="true">${iconMarkup}</div>
+        <div class="center-primary">${this._t('week')} ${pregnancyInfo.week}</div>
+        <div class="center-secondary">${secondaryParts.join(' · ')}</div>
+      </button>
+    `;
+  }
+
   _calendarGrid(model, locale) {
     const y = this._viewDate.getFullYear();
     const m = this._viewDate.getMonth();
@@ -686,6 +768,7 @@ class MenstruationGaugeCard extends HTMLElement {
   async _toggleCycleStart(iso) {
     if (this._config?.calendar_edit_enabled === false) return;
     const model = this._buildModel();
+    if (model.pregnancyInfo?.isPregnant) return;
     const service = model.confirmedSet.has(iso) ? 'remove_cycle_start' : 'add_cycle_start';
     const profile = model.stateObj?.attributes?.profile;
     const entityId = model.entityId || this._config?.entity || '';
@@ -730,6 +813,7 @@ class MenstruationGaugeCard extends HTMLElement {
     const isPeriodDay = model.confirmedSet.has(iso);
     const existing = model.symptomByDate?.[iso] || {};
     const isPreMenarche = model.state === 'pre_menarche';
+    const isPregnant = Boolean(model.pregnancyInfo?.isPregnant);
     const periodModalContext = this._periodModalContext(iso, model);
     const symptomConfig = this._symptomConfig(model.state);
 
@@ -739,14 +823,15 @@ class MenstruationGaugeCard extends HTMLElement {
         const currentValues = Array.isArray(existing[cat.key]) ? existing[cat.key] : [];
         const checkboxes = cat.options.map((opt) => {
           const checked = currentValues.includes(opt) ? 'checked' : '';
-          return `<label class="sym-opt-label"><input type="checkbox" class="sym-multi" name="${cat.key}" value="${opt}" ${checked}><span>${this._t(`opt_${opt}`)}</span></label>`;
+          const disabled = isPregnant ? 'disabled' : '';
+          return `<label class="sym-opt-label ${isPregnant ? 'sym-disabled' : ''}"><input type="checkbox" class="sym-multi" name="${cat.key}" value="${opt}" ${checked} ${disabled}><span>${this._t(`opt_${opt}`)}</span></label>`;
         }).join('');
         return `<div class="sym-row"><div class="sym-cat-head"><ha-icon icon="${cat.icon}"></ha-icon><span>${catLabel}</span></div><div class="sym-options sym-multi-opts">${checkboxes}</div></div>`;
       }
       const currentValue = existing[cat.key] || '';
       const buttons = cat.options.map((opt) => {
         const sel = currentValue === opt ? ' sym-selected' : '';
-        return `<button type="button" class="sym-opt-btn${sel}" data-cat="${cat.key}" data-val="${opt}">${this._t(`opt_${opt}`)}</button>`;
+        return `<button type="button" class="sym-opt-btn${sel}${isPregnant ? ' sym-disabled' : ''}" data-cat="${cat.key}" data-val="${opt}" ${isPregnant ? 'disabled' : ''}>${this._t(`opt_${opt}`)}</button>`;
       }).join('');
       return `<div class="sym-row"><div class="sym-cat-head"><ha-icon icon="${cat.icon}"></ha-icon><span>${catLabel}</span></div><div class="sym-options sym-single-opts">${buttons}</div></div>`;
     }).join('');
@@ -762,7 +847,7 @@ class MenstruationGaugeCard extends HTMLElement {
             <button type="button" class="sym-close" aria-label="close">✕</button>
           </div>
           <div class="sym-body">
-            ${isPreMenarche || !periodModalContext.showPeriodToggle ? '' : `
+            ${isPreMenarche || isPregnant || !periodModalContext.showPeriodToggle ? '' : `
             <div class="sym-row">
               <div class="sym-cat-head"><ha-icon icon="mdi:calendar-heart"></ha-icon><span>${this._t('period_toggle')}</span></div>
               <div class="sym-options sym-single-opts">
@@ -773,11 +858,11 @@ class MenstruationGaugeCard extends HTMLElement {
             ${categoryRows}
             <div class="sym-row">
               <div class="sym-cat-head"><ha-icon icon="mdi:thermometer"></ha-icon><span>${this._t('basal_temp_label')}</span></div>
-              <input id="sym-basal-temp" type="number" step="0.1" min="35" max="42" value="${basalTemp}" class="sym-temp-input" placeholder="36.5">
+              <input id="sym-basal-temp" type="number" step="0.1" min="35" max="42" value="${basalTemp}" class="sym-temp-input ${isPregnant ? 'sym-disabled' : ''}" placeholder="36.5" ${isPregnant ? 'disabled' : ''}>
             </div>
           </div>
           <div class="sym-footer">
-            <button type="button" class="btn sym-save">${this._t('save')}</button>
+            <button type="button" class="btn sym-save" ${isPregnant ? 'disabled' : ''}>${this._t('save')}</button>
             <button type="button" class="btn sym-cancel">${this._t('cancel')}</button>
           </div>
         </div>
@@ -791,13 +876,18 @@ class MenstruationGaugeCard extends HTMLElement {
 
     const root = this.shadowRoot;
     const model = this._buildModel();
+    if (model.pregnancyInfo?.isPregnant) {
+      this._modalIso = null;
+      this._render();
+      return;
+    }
     const entityId = model.entityId || this._config?.entity || '';
     const entryId = model.stateObj?.attributes?.entry_id || this._config?.entry_id || '';
     const profile = model.stateObj?.attributes?.profile;
 
     // Determine period toggle state from modal
     const periodModalContext = this._periodModalContext(iso, model);
-    const allowPeriodToggle = model.state !== 'pre_menarche' && periodModalContext.showPeriodToggle;
+    const allowPeriodToggle = !model.pregnancyInfo?.isPregnant && model.state !== 'pre_menarche' && periodModalContext.showPeriodToggle;
     const periodYesBtn = root.querySelector('.sym-opt-btn[data-cat="_period"][data-val="yes"]');
     const wantsPeriod = allowPeriodToggle
       ? (periodYesBtn?.classList.contains('sym-selected') ?? model.confirmedSet.has(iso))
@@ -973,14 +1063,36 @@ class MenstruationGaugeCard extends HTMLElement {
         .gauge-wrap { position: relative; max-width: 420px; width: 100%; aspect-ratio: 1/1; margin: 0 auto; }
         .gauge { width: 100%; height: 100%; display: block; }
         .month { font-size: 12px; fill: ${palette.monthText}; font-weight: 700; letter-spacing: .02em; text-anchor: middle; dominant-baseline: middle; }
-        .center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+        .center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; padding: 52px; box-sizing: border-box; }
         .countdown { pointer-events: auto; border-radius: 999px; border: 1px solid ${palette.buttonBorder}; padding: 4px 10px; background: ${palette.countdownBg}; cursor: pointer; font-size: 1.05rem; font-weight: 700; color: ${palette.countdownColor}; }
         .countdown.overdue-soon { border-style: dashed; border-width: 2px; }
         .countdown.passive { cursor: default; pointer-events: none; opacity: .92; }
+        .center-panel {
+          pointer-events: auto;
+          border-radius: 24px;
+          border: 1px solid ${palette.buttonBorder};
+          background: ${palette.countdownBg};
+          color: ${palette.countdownColor};
+          padding: 12px 14px;
+          min-width: 138px;
+          max-width: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 6px;
+          text-align: center;
+          cursor: pointer;
+        }
+        .center-panel.passive { cursor: default; pointer-events: none; opacity: .92; }
+        .center-icon { width: 52px; height: 52px; display: inline-flex; align-items: center; justify-content: center; }
+        .center-icon svg { width: 52px; height: 52px; display: block; }
+        .center-primary { font-size: 1rem; font-weight: 700; line-height: 1.2; }
+        .center-secondary { font-size: .76rem; line-height: 1.25; opacity: .84; }
         .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
         .title { font-weight: 700; }
         .nav { display: inline-flex; gap: 6px; }
         .btn { border: 1px solid ${palette.buttonBorder}; border-radius: 8px; background: ${palette.buttonBg}; color: ${palette.buttonColor}; padding: 4px 8px; cursor: pointer; }
+        .btn[disabled] { cursor: default; opacity: .55; }
         .editor { display: ${this._editorOpen ? 'grid' : 'none'}; gap: 8px; }
         .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
         .dow { text-align: center; font-size: 12px; opacity: .75; }
@@ -1009,6 +1121,15 @@ class MenstruationGaugeCard extends HTMLElement {
         .sym-opt-label { display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: .82rem; }
         .sym-opt-label input[type="checkbox"] { accent-color: ${palette.confirmed}; }
         .sym-temp-input { padding: 5px 8px; border-radius: 6px; border: 1px solid rgba(128,128,128,.35); background: transparent; color: inherit; font-size: .88rem; width: 100px; }
+        .sym-disabled { opacity: .62; }
+        @media (max-width: 420px) {
+          .center { padding: 64px; }
+          .center-panel { min-width: 124px; padding: 10px 12px; }
+          .center-icon { width: 44px; height: 44px; }
+          .center-icon svg { width: 44px; height: 44px; }
+          .center-primary { font-size: .92rem; }
+          .center-secondary { font-size: .72rem; }
+        }
       </style>
       <div class="root-wrap">
         <ha-card>
@@ -1020,7 +1141,7 @@ class MenstruationGaugeCard extends HTMLElement {
             </div>` : ''}
             <div class="gauge-wrap">
               ${this._renderGauge(model, palette)}
-              <div class="center"><button type="button" class="countdown ${isOverdueSoon ? 'overdue-soon' : ''} ${canEdit ? '' : 'passive'}" data-action="toggle-editor">${countdown}</button></div>
+              <div class="center">${this._renderCenterContent(model, palette, canEdit, isOverdueSoon, countdown)}</div>
             </div>
             ${this._config.show_editor && canEdit ? `
             <div class="editor">

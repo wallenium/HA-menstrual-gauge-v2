@@ -100,17 +100,43 @@ function normalizePregnancyMonth(monthOrWeeks) {
 
 function resolvePregnancyInfo(source = {}) {
   const isObjectSource = source !== null && typeof source === 'object';
-  const weeksValue = parsePositiveInt(isObjectSource ? (source.weeks_pregnant ?? source.pregnancy_week ?? source.week) : source);
-  const monthValue = parsePositiveInt(isObjectSource ? (source.pregnancy_month ?? source.month) : null);
-  const trimesterValue = parsePositiveInt(isObjectSource ? (source.pregnancy_trimester ?? source.trimester) : null);
+  const pregnancyData = isObjectSource && source.pregnancy_data && typeof source.pregnancy_data === 'object'
+    ? source.pregnancy_data
+    : {};
+  const weeksValue = parsePositiveInt(
+    isObjectSource
+      ? (source.weeks_pregnant
+        ?? source.pregnancy_week
+        ?? source.week
+        ?? pregnancyData.weeks_pregnant
+        ?? pregnancyData.pregnancy_week
+        ?? pregnancyData.week)
+      : source,
+  );
+  const monthValue = parsePositiveInt(
+    isObjectSource
+      ? (source.pregnancy_month
+        ?? source.month
+        ?? pregnancyData.pregnancy_month
+        ?? pregnancyData.month)
+      : null,
+  );
+  const trimesterValue = parsePositiveInt(
+    isObjectSource
+      ? (source.pregnancy_trimester
+        ?? source.trimester
+        ?? pregnancyData.pregnancy_trimester
+        ?? pregnancyData.trimester)
+      : null,
+  );
   const month = monthValue !== null ? clampInt(monthValue, 1, 9) : normalizePregnancyMonth(weeksValue);
-  const week = weeksValue ?? (((month - 1) * 4) + 1);
+  const week = weeksValue !== null ? clampInt(weeksValue, 1, 40) : clampInt((((month - 1) * 4) + 1), 1, 40);
   const trimester = trimesterValue !== null
     ? clampInt(trimesterValue, 1, 3)
-    : clampInt(weeksValue !== null ? Math.ceil(weeksValue / 13) : Math.ceil(month / 3), 1, 3);
+    : clampInt(weeksValue !== null ? Math.ceil(week / 13) : Math.ceil(month / 3), 1, 3);
   const stateKey = isObjectSource ? String(source.state || '').toLowerCase() : '';
   const isPregnant = isObjectSource
-    ? Boolean(source.is_pregnant ?? source.isPregnant) || stateKey === 'pregnant'
+    ? Boolean(source.is_pregnant ?? source.isPregnant ?? pregnancyData.is_pregnant ?? pregnancyData.isPregnant) || stateKey === 'pregnant'
     : true;
 
   return { isPregnant, week, month, trimester };
