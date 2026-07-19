@@ -466,6 +466,7 @@ class MenstrualProductInventoryCard extends HTMLElement {
         .product-name { flex: 1; font-weight: 600; color: var(--primary-text-color); }
         .product-icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--primary-color, #8e44ad); opacity: 0.85; }
         .product-icon svg { width: 100%; height: 100%; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+        .product-icon img { width: 100%; height: 100%; object-fit: contain; display: block; }
         .stock { font-size: 1.5rem; font-weight: 700; display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
         .stock span { font-size: 0.8rem; font-weight: 500; }
         .stock.good { color: var(--mg-status-success); }

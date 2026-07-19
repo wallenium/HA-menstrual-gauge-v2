@@ -1903,6 +1903,13 @@ class PeriodCountdownTimer extends HTMLElement {
         color: var(--primary-color, #8e44ad);
       }
 
+      .timer-icon img {
+        width: 48px;
+        height: 48px;
+        object-fit: contain;
+        display: block;
+      }
+
       .timer-content {
         display: flex;
         flex-direction: column;
@@ -2033,6 +2040,7 @@ class PeriodCountdownTimer extends HTMLElement {
         .timer-time { font-size: 2rem; }
         .timer-icon { font-size: 2.5rem; width: 40px; height: 40px; }
         .timer-icon svg { width: 40px; height: 40px; }
+        .timer-icon img { width: 40px; height: 40px; object-fit: contain; display: block; }
         .btn { padding: 8px 12px; font-size: 0.8rem; }
         
         .tips-grid,
