@@ -80,6 +80,11 @@ function clampInt(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+function buildMaskedAssetIcon(src, size = 'default') {
+  const iconSize = resolveSize(size);
+  return `<span aria-hidden="true" style="display:block;width:${iconSize}px;height:${iconSize}px;flex:0 0 auto;background-color:currentColor;-webkit-mask:url('${src}') center / contain no-repeat;mask:url('${src}') center / contain no-repeat;"></span>`;
+}
+
 function buildIconSvg(content, size = 'default', options = {}) {
   const iconSize = resolveSize(size);
   const strokeWidth = resolveStrokeWidth(size);
@@ -167,9 +172,8 @@ function resolvePregnancyInfo(source = {}) {
 function getPregnancyIcon(monthOrWeeks, size = 'default') {
   const pregnancyInfo = resolvePregnancyInfo(monthOrWeeks);
   const assetFilename = PREGNANCY_ASSET_FILENAMES[pregnancyInfo.month] || PREGNANCY_ASSET_FILENAMES[1];
-  const iconSize = resolveSize(size);
   const src = `${ASSET_BASE_URL}/pregnancy/${assetFilename}`;
-  return `<img src="${src}" width="${iconSize}" height="${iconSize}" alt="" aria-hidden="true" focusable="false" style="object-fit:contain;display:block;" loading="lazy">`;
+  return buildMaskedAssetIcon(src, size);
 }
 
 function getPostpartumIcon(size = 'default') {
@@ -358,9 +362,8 @@ function getSvgIcon(productName, size = 'default') {
     return '';
   }
 
-  const iconSize = resolveSize(size);
   const src = `${ASSET_BASE_URL}/period/${assetFilename}`;
-  return `<img src="${src}" width="${iconSize}" height="${iconSize}" alt="" aria-hidden="true" focusable="false" style="object-fit:contain;display:block;" loading="lazy">`;
+  return buildMaskedAssetIcon(src, size);
 }
 
 function createAnimatedSvgElement(productName, size = 'default') {
