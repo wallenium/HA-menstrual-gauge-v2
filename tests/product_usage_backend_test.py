@@ -104,6 +104,28 @@ class ProductUsageBackendTests(unittest.TestCase):
             ],
         )
 
+    def test_storage_normalizes_quantity_variants(self) -> None:
+        normalized = storage.MenstruationStorage._normalize_product_usage(
+            [
+                {"date": "2026-07-18", "product": "tampon", "quantity": "3"},
+                {"date": "2026-07-18", "product": "pad", "quantity": "2x"},
+                {"date": "2026-07-18", "product": "cup", "quantity": "3.0"},
+                {"date": "2026-07-18", "product": "liner", "quantity": "0"},
+                {"date": "2026-07-18", "product": "underwear", "quantity": "invalid"},
+            ]
+        )
+
+        self.assertEqual(
+            normalized,
+            [
+                {"date": "2026-07-18", "product": "cup", "quantity": 3, "action": "used"},
+                {"date": "2026-07-18", "product": "liner", "quantity": 1, "action": "used"},
+                {"date": "2026-07-18", "product": "pad", "quantity": 2, "action": "used"},
+                {"date": "2026-07-18", "product": "tampon", "quantity": 3, "action": "used"},
+                {"date": "2026-07-18", "product": "underwear", "quantity": 1, "action": "used"},
+            ],
+        )
+
     def test_merge_product_usage_sources_uses_symptom_fallbacks(self) -> None:
         merged = sensor._merge_product_usage_sources(
             [
@@ -162,6 +184,23 @@ class ProductUsageBackendTests(unittest.TestCase):
         self.assertEqual(stats["this_cycle"], {"tampon": 2, "pad": 1, "cup": 1, "liner": 1, "underwear": 1})
         self.assertEqual(stats["stats"]["cycles_considered"], 1)
         self.assertEqual(stats["stats"]["average_per_cycle"], {"tampon": 2, "pad": 1, "cup": 1, "liner": 1, "underwear": 1})
+
+    def test_build_product_usage_stats_sums_quantities_same_day(self) -> None:
+        stats = sensor._build_product_usage_stats(
+            history=["2026-07-18", "2026-07-19"],
+            product_usage=[
+                {"date": "2026-07-18", "product": "tampon", "quantity": "2x"},
+                {"date": "2026-07-18", "product": "tampon", "quantity": "3"},
+                {"date": "2026-07-18", "product": "pad", "quantity": 0},
+                {"date": "2026-07-18", "product": "cup", "quantity": None},
+            ],
+            today=date(2026, 7, 19),
+            symptom_history=[],
+        )
+
+        self.assertEqual(stats["today"], {"tampon": 0, "pad": 0, "cup": 0, "liner": 0, "underwear": 0})
+        self.assertEqual(stats["this_cycle"], {"tampon": 5, "pad": 1, "cup": 1, "liner": 0, "underwear": 0})
+        self.assertEqual(stats["stats"]["average_per_cycle"], {"tampon": 5, "pad": 1, "cup": 1, "liner": 0, "underwear": 0})
 
 
 if __name__ == "__main__":

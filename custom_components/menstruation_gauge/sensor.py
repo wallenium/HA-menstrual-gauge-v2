@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 from statistics import mean
+import math
+import re
 from typing import Any
 
 from homeassistant.components.sensor import SensorEntity
@@ -113,10 +115,31 @@ def _empty_product_counts() -> dict[str, int]:
 
 
 def _entry_quantity(entry: dict[str, Any]) -> int:
-    try:
-        return max(1, int(entry.get("quantity", 1) or 1))
-    except (TypeError, ValueError):
-        return 1
+    return _coerce_quantity(entry.get("quantity", 1))
+
+
+def _coerce_quantity(value: Any, default: int = 1) -> int:
+    parsed: float | None
+    if isinstance(value, bool):
+        parsed = None
+    elif isinstance(value, (int, float)):
+        parsed = float(value)
+    else:
+        text = str(value or "").strip()
+        if not text:
+            parsed = None
+        else:
+            match = re.search(r"[-+]?\d+(?:[.,]\d+)?", text)
+            if match is None:
+                parsed = None
+            else:
+                try:
+                    parsed = float(match.group(0).replace(",", "."))
+                except ValueError:
+                    parsed = None
+    if parsed is None or not math.isfinite(parsed) or parsed <= 0:
+        return max(1, int(default))
+    return max(1, int(parsed))
 
 
 def _normalize_product_usage_product(raw: Any) -> str | None:
