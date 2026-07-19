@@ -361,7 +361,7 @@ class MenstrualProductStatsCard extends HTMLElement {
             <div class="timeline-items">
               ${usageByDate.get(dateKey).map((entry) => `
                 <span class="chip ${this.escapeClassName(entry.product)}">
-                  ${this._getSvgIcon(entry.product)}${this.escapeHtml(this.productLabel(entry))} ×${this.normalizeQuantity(entry.quantity)}
+                  ${this._getSvgIcon(entry.product)} × ${this.normalizeQuantity(entry.quantity)}
                 </span>
               `).join("")}
             </div>
