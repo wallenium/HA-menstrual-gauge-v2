@@ -94,35 +94,16 @@ function buildIconSvg(content, size = 'default', options = {}) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${iconSize}" height="${iconSize}" fill="none" stroke="currentColor" stroke-width="${strokeWidth.toFixed(2)}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"${svgStyle}>${styleTag}${content}</svg>`;
 }
 
-const PREGNANCY_MONTH_ICON_PATHS = {
-  // preg_01.svg
-  1: '<circle cx="12" cy="5" r="2.7"/><path d="M9 8.5 Q12 7.5 15 8.5"/><path d="M8.2 9.8C7.2 9.8 6.3 10.8 6.3 11.8V18.2C6.3 19.3 7.2 20.2 8.2 20.2H14.8"/><ellipse cx="15.2" cy="14.2" rx="2" ry="1.6"/><path d="M9 20.2L8.1 23.2"/><path d="M14.8 20.2L15.7 23.2"/>',
-  // preg_02.svg
-  2: '<circle cx="12" cy="5" r="2.7"/><path d="M9 8.5 Q12 7.5 15 8.5"/><path d="M8.2 9.8C7.2 9.8 6.3 10.8 6.3 11.8V18.2C6.3 19.3 7.2 20.2 8.2 20.2H14.8"/><ellipse cx="15.2" cy="14.2" rx="2.6" ry="2"/><path d="M9 20.2L8.1 23.2"/><path d="M14.8 20.2L15.7 23.2"/>',
-  // preg_03.svg
-  3: '<circle cx="12" cy="5" r="2.7"/><path d="M9 8.5 Q12 7.5 15 8.5"/><path d="M8.2 9.8C7.2 9.8 6.3 10.8 6.3 11.8V18.2C6.3 19.3 7.2 20.2 8.2 20.2H14.8"/><ellipse cx="15.2" cy="14.2" rx="3.2" ry="2.5"/><path d="M9 20.2L8.1 23.2"/><path d="M14.8 20.2L15.7 23.2"/>',
-  // preg_04.svg
-  4: '<circle cx="12" cy="5" r="2.7"/><path d="M9 8.5 Q12 7.5 15 8.5"/><path d="M8.2 9.8C7.2 9.8 6.3 10.8 6.3 11.8V18.2C6.3 19.3 7.2 20.2 8.2 20.2H14.8"/><ellipse cx="15.2" cy="14.2" rx="3.8" ry="3"/><path d="M9 20.2L8.1 23.2"/><path d="M14.8 20.2L15.7 23.2"/>',
-  // preg_05.svg
-  5: '<circle cx="12" cy="5" r="2.7"/><path d="M9 8.5 Q12 7.5 15 8.5"/><path d="M8.2 9.8C7.2 9.8 6.3 10.8 6.3 11.8V18.2C6.3 19.3 7.2 20.2 8.2 20.2H14.8"/><ellipse cx="15.2" cy="14.2" rx="4.4" ry="3.4"/><path d="M9 20.2L8.1 23.2"/><path d="M14.8 20.2L15.7 23.2"/>',
-  // preg_06.svg
-  6: '<circle cx="12" cy="5" r="2.7"/><path d="M9 8.5 Q12 7.5 15 8.5"/><path d="M8.2 9.8C7.2 9.8 6.3 10.8 6.3 11.8V18.2C6.3 19.3 7.2 20.2 8.2 20.2H14.8"/><ellipse cx="15.2" cy="14.2" rx="5" ry="3.9"/><path d="M9 20.2L8.1 23.2"/><path d="M14.8 20.2L15.7 23.2"/>',
-  // preg_07.svg
-  7: '<circle cx="12" cy="5" r="2.7"/><path d="M9 8.5 Q12 7.5 15 8.5"/><path d="M8.2 9.8C7.2 9.8 6.3 10.8 6.3 11.8V18.2C6.3 19.3 7.2 20.2 8.2 20.2H14.8"/><ellipse cx="15.2" cy="14.2" rx="5.7" ry="4.4"/><path d="M9 20.2L8.1 23.2"/><path d="M14.8 20.2L15.7 23.2"/>',
-  // preg_08.svg
-  8: '<circle cx="12" cy="5" r="2.7"/><path d="M9 8.5 Q12 7.5 15 8.5"/><path d="M8.2 9.8C7.2 9.8 6.3 10.8 6.3 11.8V18.2C6.3 19.3 7.2 20.2 8.2 20.2H14.8"/><ellipse cx="15.2" cy="14.2" rx="6.5" ry="5.1"/><path d="M9 20.2L8.1 23.2"/><path d="M14.8 20.2L15.7 23.2"/>',
-  // preg_09.svg
-  9: '<circle cx="12" cy="5" r="2.7"/><path d="M9 8.5 Q12 7.5 15 8.5"/><path d="M8.2 9.8C7.2 9.8 6.3 10.8 6.3 11.8V18.2C6.3 19.3 7.2 20.2 8.2 20.2H14.8"/><ellipse cx="15.2" cy="14.2" rx="7.3" ry="5.7"/><path d="M9 20.2L8.1 23.2"/><path d="M14.8 20.2L15.7 23.2"/>',
-};
-
-function normalizePregnancyMonth(monthOrWeeks) {
-  const rawValue = parsePositiveInt(monthOrWeeks);
+// Converts a pregnancy week number (1–40) to a display month (1–9).
+// Always interprets the input as weeks; callers that have a month value should
+// use it directly via clampInt rather than passing it here.
+function weeksToPregnancyMonth(weeks) {
+  const rawValue = parsePositiveInt(weeks);
   if (rawValue === null) {
     return 1;
   }
 
-  const month = rawValue > 9 ? Math.ceil(rawValue / 4) : rawValue;
-  return clampInt(month, 1, 9);
+  return clampInt(Math.ceil(rawValue / 4), 1, 9);
 }
 
 function resolvePregnancyInfo(source = {}) {
@@ -156,7 +137,7 @@ function resolvePregnancyInfo(source = {}) {
         ?? pregnancyData.trimester)
       : null,
   );
-  const month = monthValue !== null ? clampInt(monthValue, 1, 9) : normalizePregnancyMonth(weeksValue);
+  const month = monthValue !== null ? clampInt(monthValue, 1, 9) : weeksToPregnancyMonth(weeksValue);
   const week = weeksValue !== null ? clampInt(weeksValue, 1, 40) : clampInt((((month - 1) * 4) + 1), 1, 40);
   const trimester = trimesterValue !== null
     ? clampInt(trimesterValue, 1, 3)
@@ -405,7 +386,7 @@ const ProductIcons = {
   getPeriodIcon,
   getOvulationIcon,
   getPMSIcon,
-  normalizePregnancyMonth,
+  weeksToPregnancyMonth,
   resolvePregnancyInfo,
   getPregnancyIcon,
   getPregnancyAssetUrl,
