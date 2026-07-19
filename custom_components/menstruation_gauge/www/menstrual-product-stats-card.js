@@ -115,6 +115,14 @@ class MenstrualProductStatsCard extends HTMLElement {
           background: linear-gradient(135deg, color-mix(in srgb, #8e44ad var(--mg-stat-alpha-strong), transparent), color-mix(in srgb, #8e44ad var(--mg-stat-alpha-soft), transparent));
         }
 
+        .stat-card.liner {
+          background: linear-gradient(135deg, color-mix(in srgb, var(--mg-color-info) var(--mg-stat-alpha-strong), transparent), color-mix(in srgb, var(--mg-color-info) var(--mg-stat-alpha-soft), transparent));
+        }
+
+        .stat-card.underwear {
+          background: linear-gradient(135deg, color-mix(in srgb, var(--mg-color-info) var(--mg-stat-alpha-strong), transparent), color-mix(in srgb, var(--mg-color-info) var(--mg-stat-alpha-soft), transparent));
+        }
+
         .stat-card.plan {
           background: linear-gradient(135deg, color-mix(in srgb, var(--mg-color-success) var(--mg-stat-alpha-strong), transparent), color-mix(in srgb, var(--mg-color-success) var(--mg-stat-alpha-soft), transparent));
         }
@@ -269,6 +277,16 @@ class MenstrualProductStatsCard extends HTMLElement {
             <div class="stat-value">${this.formatNumber(stats.cupEmptiesPerDay)}</div>
             <div class="stat-detail">${this._t("last_cycle")}</div>
           </div>
+          <div class="stat-card liner">
+            <div class="stat-label">${this._t("liners_per_cycle")}</div>
+            <div class="stat-value">${this.formatNumber(stats.linersPerCycle)}</div>
+            <div class="stat-detail">${this._t("last_cycles", { count: stats.cyclesConsidered })}</div>
+          </div>
+          <div class="stat-card underwear">
+            <div class="stat-label">${this._t("underwear_per_cycle")}</div>
+            <div class="stat-value">${this.formatNumber(stats.underwearPerCycle)}</div>
+            <div class="stat-detail">${this._t("last_cycles", { count: stats.cyclesConsidered })}</div>
+          </div>
           <div class="stat-card plan">
             <div class="stat-label">${this._t("planning_days")}</div>
             <div class="stat-value">${stats.planningDays}</div>
@@ -294,6 +312,8 @@ class MenstrualProductStatsCard extends HTMLElement {
       tamponsPerCycle: Number(averagePerCycle.tampon || 0),
       padsPerCycle: Number(averagePerCycle.pad || 0),
       cupEmptiesPerDay: Number(averagePerCycle.cup ?? averagePerCycle.cup_empties ?? thisCycleCup),
+      linersPerCycle: Number(averagePerCycle.liner || 0),
+      underwearPerCycle: Number(averagePerCycle.underwear || 0),
       planningDays: Math.max(0, Number(daysUntilNextStart || 0)),
     };
   }
@@ -419,6 +439,8 @@ class MenstrualProductStatsCard extends HTMLElement {
         tampons_per_cycle: "Tampons / Periode",
         pads_per_cycle: "Binden / Periode",
         cup_empties_per_day: "Cup-Leerungen / Tag",
+        liners_per_cycle: "Slipeinlagen / Periode",
+        underwear_per_cycle: "Periodenunterwäsche / Periode",
         planning_days: "Planungstage",
         days: "Tage",
         last_cycle: "Letzte Periode",
@@ -437,6 +459,8 @@ class MenstrualProductStatsCard extends HTMLElement {
         tampons_per_cycle: "Tampons / period",
         pads_per_cycle: "Pads / period",
         cup_empties_per_day: "Cup empties / day",
+        liners_per_cycle: "Liners / period",
+        underwear_per_cycle: "Period underwear / period",
         planning_days: "Planning days",
         days: "days",
         last_cycle: "Last period",
