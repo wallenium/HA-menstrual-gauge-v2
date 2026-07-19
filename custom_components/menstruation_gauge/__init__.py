@@ -106,6 +106,8 @@ from .storage import MenstruationStorage
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 MANIFEST_PATH = Path(__file__).with_name("manifest.json")
 WWW_DIR = Path(__file__).parent / "www"
+ASSETS_DIR = Path(__file__).parent / "assets"
+_ALLOWED_ASSET_SUBFOLDERS: frozenset[str] = frozenset({"pregnancy", "period"})
 _HTTP_ROUTES_REGISTERED_KEY = f"{DOMAIN}_http_routes_registered"
 _LOVELACE_RESOURCES_ENSURED_KEY = f"{DOMAIN}_lovelace_resources_ensured"
 _LOVELACE_RESOURCES_SCHEDULED_KEY = f"{DOMAIN}_lovelace_resources_scheduled"
@@ -1279,11 +1281,35 @@ async def _async_register_http_handlers(hass: HomeAssistant) -> None:
             headers={"Cache-Control": "public, max-age=3600, s-maxage=3600"},
         )
 
+    async def _serve_asset_file(request):  # type: ignore[no-untyped-def]
+        from aiohttp.web import HTTPBadRequest, HTTPNotFound, Response
+
+        subfolder = request.match_info["subfolder"]
+        filename = request.match_info["filename"]
+        if subfolder not in _ALLOWED_ASSET_SUBFOLDERS:
+            raise HTTPBadRequest()
+        if "/" in filename or "\\" in filename or filename.startswith(".") or not filename.endswith(".svg"):
+            raise HTTPBadRequest()
+
+        file_path = ASSETS_DIR / subfolder / filename
+        if not file_path.is_file():
+            _LOGGER.debug("Asset file not found: %s", file_path)
+            raise HTTPNotFound()
+
+        content = await hass.async_add_executor_job(file_path.read_bytes)
+        return Response(
+            body=content,
+            content_type="image/svg+xml",
+            headers={"Cache-Control": "public, max-age=86400, s-maxage=86400"},
+        )
+
     try:
+        hass.http.app.router.add_get(f"/{DOMAIN}/assets/{{subfolder}}/{{filename}}", _serve_asset_file)
         hass.http.app.router.add_get(f"/{DOMAIN}/{{filename}}", _serve_card_file)
         hass.data[_HTTP_ROUTES_REGISTERED_KEY] = True
         for _resource_url, _static_url, filename in LOVELACE_RESOURCES:
             _LOGGER.info("Registered HTTP route: /%s/%s", DOMAIN, filename)
+        _LOGGER.info("Registered HTTP route: /%s/assets/{subfolder}/{filename}", DOMAIN)
     except Exception as err:
         _LOGGER.warning("Failed to register HTTP routes for card files: %s", err)
 

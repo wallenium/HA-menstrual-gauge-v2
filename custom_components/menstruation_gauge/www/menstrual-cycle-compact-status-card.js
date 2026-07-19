@@ -551,6 +551,7 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
           display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
         }
         .status-icon svg { width: 18px; height: 18px; display: block; }
+        .status-icon img { width: 18px; height: 18px; object-fit: contain; display: block; }
         .status-text { font-size: 0.95rem; font-weight: 600; color: var(--primary-text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .cycle-day { color: var(--secondary-text-color); font-size: 0.82rem; }
 
@@ -559,6 +560,7 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
         .progress-header { display: flex; align-items: center; gap: 10px; }
         .progress-icon { width: 34px; height: 34px; line-height: 1; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; }
         .progress-icon svg { width: 100%; height: 100%; display: block; }
+        .progress-icon img { width: 100%; height: 100%; object-fit: contain; display: block; }
         .progress-title-wrap { min-width: 0; flex: 1; }
         .progress-title { font-size: 0.92rem; font-weight: 600; color: var(--primary-text-color); }
         .progress-subtitle { font-size: 0.78rem; color: var(--secondary-text-color); margin-top: 2px; }
@@ -571,6 +573,7 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
         .icon-text-layout { display: flex; align-items: center; gap: 12px; }
         .big-icon { width: 38px; height: 38px; line-height: 1; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; }
         .big-icon svg { width: 100%; height: 100%; display: block; }
+        .big-icon img { width: 100%; height: 100%; object-fit: contain; display: block; }
         .icon-text-info { min-width: 0; }
         .icon-text-title { font-size: 1rem; font-weight: 600; }
         .icon-text-sub { font-size: 0.8rem; color: var(--secondary-text-color); margin-top: 2px; }
@@ -588,6 +591,7 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
           .wrap { gap: 10px; }
           .status-icon { width: 24px; height: 24px; }
           .status-icon svg { width: 16px; height: 16px; }
+          .status-icon img { width: 16px; height: 16px; object-fit: contain; display: block; }
           .status-text { font-size: 0.9rem; }
           .cycle-day { font-size: 0.76rem; }
           .progress-icon { width: 28px; height: 28px; }

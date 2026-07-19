@@ -1084,8 +1084,10 @@ class MenstruationGaugeCard extends HTMLElement {
           cursor: pointer;
         }
         .center-panel.passive { cursor: default; pointer-events: none; opacity: .92; }
+        .pregnancy-panel { border: none; background: none; box-shadow: none; padding: 4px 0; min-width: unset; }
         .center-icon { width: 52px; height: 52px; display: inline-flex; align-items: center; justify-content: center; }
         .center-icon svg { width: 52px; height: 52px; display: block; }
+        .center-icon img { width: 100%; height: 100%; object-fit: contain; display: block; }
         .center-primary { font-size: 1rem; font-weight: 700; line-height: 1.2; }
         .center-secondary { font-size: .76rem; line-height: 1.25; opacity: .84; }
         .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -1125,8 +1127,10 @@ class MenstruationGaugeCard extends HTMLElement {
         @media (max-width: 420px) {
           .center { padding: 64px; }
           .center-panel { min-width: 124px; padding: 10px 12px; }
+          .pregnancy-panel { padding: 4px 0; min-width: unset; }
           .center-icon { width: 44px; height: 44px; }
           .center-icon svg { width: 44px; height: 44px; }
+          .center-icon img { width: 100%; height: 100%; object-fit: contain; display: block; }
           .center-primary { font-size: .92rem; }
           .center-secondary { font-size: .72rem; }
         }

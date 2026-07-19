@@ -2,6 +2,28 @@
  * Shared product icon definitions for all menstrual cards.
  */
 
+const ASSET_BASE_URL = '/menstruation_gauge/assets';
+
+const PRODUCT_ASSET_FILENAMES = {
+  tampon: 'tampon.svg',
+  pad: 'pad.svg',
+  cup: 'menstrual_cup.svg',
+  liner: 'pantyliner.svg',
+  underwear: 'period_panty.svg',
+};
+
+const PREGNANCY_ASSET_FILENAMES = {
+  1: 'preg_01.svg',
+  2: 'preg_02.svg',
+  3: 'preg_03.svg',
+  4: 'preg_04.svg',
+  5: 'preg_05.svg',
+  6: 'preg_06.svg',
+  7: 'preg_07.svg',
+  8: 'preg_08.svg',
+  9: 'preg_09.svg',
+};
+
 const PRODUCT_ICON_PATHS = {
   // tampon.svg
   tampon: '<path d="M9.5 3.1C9.5 2.22 10.22 1.5 11.1 1.5H12.9C13.78 1.5 14.5 2.22 14.5 3.1V14.4C14.5 15.96 13.23 17.22 11.68 17.22H12.32C10.77 17.22 9.5 15.96 9.5 14.4V3.1Z" fill="currentColor" stroke="none"/><path d="M12 17.2V20.8"/><path d="M12 20.8C12 22.2 13.15 23.35 14.55 23.35"/>',
@@ -144,8 +166,10 @@ function resolvePregnancyInfo(source = {}) {
 
 function getPregnancyIcon(monthOrWeeks, size = 'default') {
   const pregnancyInfo = resolvePregnancyInfo(monthOrWeeks);
-  const iconContent = PREGNANCY_MONTH_ICON_PATHS[pregnancyInfo.month] || PREGNANCY_MONTH_ICON_PATHS[1];
-  return buildIconSvg(iconContent, size);
+  const assetFilename = PREGNANCY_ASSET_FILENAMES[pregnancyInfo.month] || PREGNANCY_ASSET_FILENAMES[1];
+  const iconSize = resolveSize(size);
+  const src = `${ASSET_BASE_URL}/pregnancy/${assetFilename}`;
+  return `<img src="${src}" width="${iconSize}" height="${iconSize}" alt="" aria-hidden="true" focusable="false" style="object-fit:contain;display:block;" loading="lazy">`;
 }
 
 function getPostpartumIcon(size = 'default') {
@@ -329,13 +353,14 @@ function getStatusAnimatedIcon(statusKey, attrs, size = 'default') {
 
 function getSvgIcon(productName, size = 'default') {
   const productKey = normalizeProductKey(productName);
-  const iconPath = PRODUCT_ICON_PATHS[productKey];
-  if (!iconPath) {
+  const assetFilename = PRODUCT_ASSET_FILENAMES[productKey];
+  if (!assetFilename) {
     return '';
   }
 
   const iconSize = resolveSize(size);
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${iconSize}" height="${iconSize}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${iconPath}</svg>`;
+  const src = `${ASSET_BASE_URL}/period/${assetFilename}`;
+  return `<img src="${src}" width="${iconSize}" height="${iconSize}" alt="" aria-hidden="true" focusable="false" style="object-fit:contain;display:block;" loading="lazy">`;
 }
 
 function createAnimatedSvgElement(productName, size = 'default') {
@@ -343,14 +368,30 @@ function createAnimatedSvgElement(productName, size = 'default') {
     return null;
   }
 
-  const iconMarkup = getSvgIcon(productName, size);
-  if (!iconMarkup) {
+  const productKey = normalizeProductKey(productName);
+  const iconPath = PRODUCT_ICON_PATHS[productKey];
+  if (!iconPath) {
     return null;
   }
 
+  const iconSize = resolveSize(size);
+  const strokeWidth = resolveStrokeWidth(size);
+  const svgMarkup = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${iconSize}" height="${iconSize}" fill="none" stroke="currentColor" stroke-width="${strokeWidth.toFixed(2)}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${iconPath}</svg>`;
   const template = document.createElement('template');
-  template.innerHTML = iconMarkup.trim();
+  template.innerHTML = svgMarkup.trim();
   return template.content.firstElementChild;
+}
+
+function getPregnancyAssetUrl(month) {
+  const clamped = clampInt(parsePositiveInt(month) || 1, 1, 9);
+  return `${ASSET_BASE_URL}/pregnancy/${PREGNANCY_ASSET_FILENAMES[clamped]}`;
+}
+
+function getProductAssetUrl(productName) {
+  const productKey = normalizeProductKey(productName);
+  const filename = PRODUCT_ASSET_FILENAMES[productKey];
+  if (!filename) return '';
+  return `${ASSET_BASE_URL}/period/${filename}`;
 }
 
 const ProductIcons = {
@@ -364,6 +405,8 @@ const ProductIcons = {
   normalizePregnancyMonth,
   resolvePregnancyInfo,
   getPregnancyIcon,
+  getPregnancyAssetUrl,
+  getProductAssetUrl,
   getPostpartumIcon,
   getMenarcheIcon,
   getMenopauseIcon,
@@ -374,7 +417,7 @@ const ProductIcons = {
     return getSvgIcon(productKey, size);
   },
   getAllProducts() {
-    return Object.keys(PRODUCT_ICON_PATHS);
+    return Object.keys(PRODUCT_ASSET_FILENAMES);
   },
 };
 

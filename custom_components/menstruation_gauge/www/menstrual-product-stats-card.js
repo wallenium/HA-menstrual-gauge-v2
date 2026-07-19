@@ -191,6 +191,14 @@ class MenstrualProductStatsCard extends HTMLElement {
           flex-shrink: 0;
         }
 
+        .chip img {
+          width: 14px;
+          height: 14px;
+          flex-shrink: 0;
+          object-fit: contain;
+          display: block;
+        }
+
         .chip.tampon {
           background: color-mix(in srgb, var(--mg-color-error) var(--mg-chip-alpha), transparent);
           color: var(--mg-chip-text-error);
