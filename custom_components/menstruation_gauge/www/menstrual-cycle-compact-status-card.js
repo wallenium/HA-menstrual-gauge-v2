@@ -79,6 +79,22 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
         phase_ovulation: 'Eisprung',
         phase_pms: 'PMS',
         phase_neutral: 'Neutral',
+        tt_product_usage: 'Produktverbrauch',
+        tt_symptoms: 'Symptome',
+        tt_no_data: 'Keine Zusatzdaten',
+        tt_status_icon: 'Status-Icon',
+        tt_tampon: 'Tampon',
+        tt_pad: 'Binde',
+        tt_cup: 'Menstruationstasse',
+        tt_liner: 'Slipeinlage',
+        tt_underwear: 'Periodenunterwäsche',
+        tt_bleeding: 'Blutung',
+        tt_mood: 'Stimmung',
+        tt_pain: 'Schmerzen',
+        tt_spotting: 'Schmierblutung',
+        tt_cervical_mucus: 'Zervixschleim',
+        tt_intercourse: 'Geschlechtsverkehr',
+        tt_hygiene: 'Hygiene',
       },
       en: {
         entity_not_found: 'Entity not found',
@@ -112,6 +128,22 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
         phase_ovulation: 'Ovulation',
         phase_pms: 'PMS',
         phase_neutral: 'Neutral',
+        tt_product_usage: 'Product Usage',
+        tt_symptoms: 'Symptoms',
+        tt_no_data: 'No additional data',
+        tt_status_icon: 'Status icon',
+        tt_tampon: 'Tampon',
+        tt_pad: 'Pad',
+        tt_cup: 'Menstrual Cup',
+        tt_liner: 'Liner',
+        tt_underwear: 'Period Underwear',
+        tt_bleeding: 'Bleeding',
+        tt_mood: 'Mood',
+        tt_pain: 'Pain',
+        tt_spotting: 'Spotting',
+        tt_cervical_mucus: 'Cervical Mucus',
+        tt_intercourse: 'Intercourse',
+        tt_hygiene: 'Hygiene',
       },
     };
     return (i18n[this._lang()] && i18n[this._lang()][key]) || (i18n.en[key] || key);
@@ -213,6 +245,61 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
       return '<svg viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><path d="M7 12h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
     }
     return iconMarkup;
+  }
+
+  _escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  _buildTooltipContent(attrs) {
+    const sections = [];
+
+    // --- Product usage section ---
+    const productUsage = attrs.product_usage_today;
+    if (productUsage && typeof productUsage === 'object') {
+      const products = ['tampon', 'pad', 'cup', 'liner', 'underwear'];
+      const usedProducts = products.filter((p) => Number(productUsage[p] || 0) > 0);
+      if (usedProducts.length > 0) {
+        const rows = usedProducts.map((p) => `<div class="tt-row"><span class="tt-key">${this._t(`tt_${p}`)}</span><span class="tt-val">${Number(productUsage[p])}</span></div>`).join('');
+        sections.push(`<div class="tt-section"><div class="tt-heading">${this._t('tt_product_usage')}</div>${rows}</div>`);
+      }
+    }
+
+    // --- Symptom data section ---
+    const symptomData = attrs.symptom_data_today;
+    if (symptomData && typeof symptomData === 'object') {
+      const symptomKeyMap = [
+        ['bleeding_strength', 'tt_bleeding'],
+        ['mood', 'tt_mood'],
+        ['pain_types', 'tt_pain'],
+        ['spotting', 'tt_spotting'],
+        ['cervical_mucus', 'tt_cervical_mucus'],
+        ['hygiene', 'tt_hygiene'],
+        ['intercourse', 'tt_intercourse'],
+      ];
+      const rows = [];
+      for (const [dataKey, i18nKey] of symptomKeyMap) {
+        const val = symptomData[dataKey];
+        if (val == null || val === '' || (Array.isArray(val) && val.length === 0)) continue;
+        const display = Array.isArray(val)
+          ? val.map((v) => this._escapeHtml(v)).join(', ')
+          : this._escapeHtml(val);
+        rows.push(`<div class="tt-row"><span class="tt-key">${this._t(i18nKey)}</span><span class="tt-val">${display}</span></div>`);
+      }
+      if (rows.length > 0) {
+        sections.push(`<div class="tt-section"><div class="tt-heading">${this._t('tt_symptoms')}</div>${rows.join('')}</div>`);
+      }
+    }
+
+    if (sections.length === 0) {
+      return `<div class="tt-empty">${this._t('tt_no_data')}</div>`;
+    }
+
+    return sections.join('');
   }
 
   // Build the SVG cycle phase circle with colored sectors for cycle modes
@@ -484,17 +571,21 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
     let bodyHtml = '';
 
     if (CYCLE_MODES.includes(statusKey)) {
-      // Mode 1: Cycle circle with colored phase zones
+      // Mode 1: Cycle circle (left) | info text (centre) | status icon with tooltip (right)
       const circleHtml = this._buildCycleCircle(cycleDay, cycleLength, attrs);
+      const tooltipHtml = this._buildTooltipContent(attrs);
       bodyHtml = `
         <div class="wrap">
           <div class="circle-wrap">${circleHtml}</div>
           <div class="info">
-            <div class="status-line">
-              <span class="status-icon" style="border-color:${status.color};color:${status.color};">${this._statusIcon(statusKey, status.color, attrs, 'small')}</span>
-              <span class="status-text">${status.label}</span>
-            </div>
+            <div class="status-text">${status.label}</div>
             <div class="cycle-day">${this._t('cycle_day')} ${cycleDay}/${cycleLength}</div>
+          </div>
+          <div class="icon-right-wrap">
+            <button class="icon-right-btn" style="border-color:${status.color};color:${status.color};" aria-label="${this._t('tt_status_icon')}: ${status.label}" aria-describedby="status-tooltip" tabindex="0">
+              ${this._statusIcon(statusKey, status.color, attrs, 'default')}
+            </button>
+            <div class="icon-tooltip" role="tooltip" id="status-tooltip">${tooltipHtml}</div>
           </div>
         </div>
       `;
@@ -507,15 +598,19 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
     } else {
       // Fallback: cycle mode display
       const circleHtml = this._buildCycleCircle(cycleDay, cycleLength, attrs);
+      const tooltipHtml = this._buildTooltipContent(attrs);
       bodyHtml = `
         <div class="wrap">
           <div class="circle-wrap">${circleHtml}</div>
           <div class="info">
-            <div class="status-line">
-              <span class="status-icon" style="border-color:${status.color};color:${status.color};">${this._statusIcon(statusKey, status.color, attrs, 'small')}</span>
-              <span class="status-text">${status.label}</span>
-            </div>
+            <div class="status-text">${status.label}</div>
             <div class="cycle-day">${this._t('cycle_day')} ${cycleDay}/${cycleLength}</div>
+          </div>
+          <div class="icon-right-wrap">
+            <button class="icon-right-btn" style="border-color:${status.color};color:${status.color};" aria-label="${this._t('tt_status_icon')}: ${status.label}" aria-describedby="status-tooltip" tabindex="0">
+              ${this._statusIcon(statusKey, status.color, attrs, 'default')}
+            </button>
+            <div class="icon-tooltip" role="tooltip" id="status-tooltip">${tooltipHtml}</div>
           </div>
         </div>
       `;
@@ -544,16 +639,80 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
           50% { opacity: 0.6; r: 2.2; }
         }
         .info { min-width: 0; flex: 1; display: grid; gap: 4px; }
-        .status-line { display: flex; align-items: center; gap: 8px; }
-        .status-icon {
-          width: 26px; height: 26px; border-radius: 50%; border: 1px solid;
-          background: var(--ha-card-background, var(--card-background-color));
-          display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
-        }
-        .status-icon svg { width: 18px; height: 18px; display: block; }
-        .status-icon img { width: 18px; height: 18px; object-fit: contain; display: block; }
         .status-text { font-size: 0.95rem; font-weight: 600; color: var(--primary-text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .cycle-day { color: var(--secondary-text-color); font-size: 0.82rem; }
+
+        /* === Right status icon === */
+        .icon-right-wrap {
+          position: relative;
+          flex: 0 0 auto;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .icon-right-btn {
+          width: clamp(64px, 22vw, 80px);
+          height: clamp(64px, 22vw, 80px);
+          border-radius: 50%;
+          border: 2px solid;
+          background: var(--ha-card-background, var(--card-background-color));
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          padding: 0;
+          box-sizing: border-box;
+          outline: none;
+          -webkit-tap-highlight-color: transparent;
+        }
+        .icon-right-btn:focus-visible {
+          outline: 2px solid var(--primary-color, #3498db);
+          outline-offset: 2px;
+        }
+        .icon-right-btn svg { width: 58%; height: 58%; display: block; }
+        .icon-right-btn img { width: 58%; height: 58%; object-fit: contain; display: block; }
+
+        /* === Tooltip === */
+        .icon-tooltip {
+          position: absolute;
+          right: 0;
+          bottom: calc(100% + 6px);
+          background: var(--ha-card-background, var(--card-background-color, #fff));
+          border: 1px solid var(--divider-color, rgba(127,127,127,0.35));
+          border-radius: 8px;
+          padding: 8px 10px;
+          font-size: 0.78rem;
+          min-width: 150px;
+          max-width: 220px;
+          z-index: 100;
+          pointer-events: none;
+          opacity: 0;
+          transform: translateY(4px);
+          transition: opacity 150ms ease, transform 150ms ease;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+          color: var(--primary-text-color);
+          white-space: normal;
+        }
+        .icon-right-wrap:hover .icon-tooltip,
+        .icon-right-wrap:focus-within .icon-tooltip {
+          opacity: 1;
+          transform: translateY(0);
+          pointer-events: auto;
+        }
+        .tt-section { margin-bottom: 6px; }
+        .tt-section:last-child { margin-bottom: 0; }
+        .tt-heading {
+          font-weight: 600;
+          font-size: 0.70rem;
+          color: var(--secondary-text-color);
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          margin-bottom: 3px;
+        }
+        .tt-row { display: flex; justify-content: space-between; gap: 8px; line-height: 1.4; }
+        .tt-key { color: var(--secondary-text-color); }
+        .tt-val { font-weight: 500; color: var(--primary-text-color); text-align: right; }
+        .tt-empty { color: var(--secondary-text-color); font-style: italic; }
 
         /* === Progress bar mode === */
         .progress-layout { display: flex; flex-direction: column; gap: 8px; }
@@ -579,23 +738,22 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
         .icon-text-sub { font-size: 0.8rem; color: var(--secondary-text-color); margin-top: 2px; }
 
         @media (prefers-color-scheme: dark) {
-          .status-icon {
+          .icon-right-btn {
             background: color-mix(in srgb, var(--mg-card-bg) 84%, #000 16%);
             border-color: color-mix(in srgb, currentColor 55%, var(--mg-border));
           }
           .progress-bar-track { background: color-mix(in srgb, var(--mg-border) 70%, transparent); }
+          .icon-tooltip { box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
         }
 
         @media (max-width: 380px) {
           ha-card { padding: 8px 10px; }
-          .wrap { gap: 10px; }
-          .status-icon { width: 24px; height: 24px; }
-          .status-icon svg { width: 16px; height: 16px; }
-          .status-icon img { width: 16px; height: 16px; object-fit: contain; display: block; }
+          .wrap { gap: 8px; }
           .status-text { font-size: 0.9rem; }
           .cycle-day { font-size: 0.76rem; }
           .progress-icon { width: 28px; height: 28px; }
           .big-icon { width: 32px; height: 32px; }
+          .icon-tooltip { max-width: 180px; font-size: 0.74rem; }
         }
       </style>
       <ha-card>
