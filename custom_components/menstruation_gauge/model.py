@@ -162,8 +162,12 @@ def calculate_pregnancy_info(pregnancy_start_date: str | None, today: date | Non
     except ValueError:
         return None, None
 
-    # Calculate weeks from start date
-    weeks = (now - start).days // 7
+    # Reject future start dates – pregnancy cannot start in the future
+    if start > now:
+        return None, None
+
+    # Gestational age uses 1-based week counting (week 1 = days 0–6 after LMP)
+    weeks = (now - start).days // 7 + 1
     # Due date is 280 days after start
     due = start + timedelta(days=PREGNANCY_DAYS)
 
