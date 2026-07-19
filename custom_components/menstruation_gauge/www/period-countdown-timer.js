@@ -833,16 +833,16 @@ class PeriodCountdownTimer extends HTMLElement {
 
       const productConfig = {
         period: {
-          tampon: { icon: this._getSvgIcon("tampon"), name: this._t("tampon"), seconds: (this.config?.tampon_duration || 4) * 3600 },
-          pad: { icon: this._getSvgIcon("pad"), name: this._t("pad"), seconds: (this.config?.pad_duration || 4) * 3600 },
-          cup: { icon: this._getSvgIcon("cup"), name: this._t("cup"), seconds: (this.config?.cup_duration || 7) * 3600 },
-          underwear: { icon: this._getSvgIcon("underwear"), name: this._t("underwear"), seconds: (this.config?.underwear_duration || 6) * 3600 },
+          tampon: { icon: this._getSvgIcon("tampon", "large"), name: this._t("tampon"), seconds: (this.config?.tampon_duration || 4) * 3600 },
+          pad: { icon: this._getSvgIcon("pad", "large"), name: this._t("pad"), seconds: (this.config?.pad_duration || 4) * 3600 },
+          cup: { icon: this._getSvgIcon("cup", "large"), name: this._t("cup"), seconds: (this.config?.cup_duration || 7) * 3600 },
+          underwear: { icon: this._getSvgIcon("underwear", "large"), name: this._t("underwear"), seconds: (this.config?.underwear_duration || 6) * 3600 },
         },
         fertile: {
-          liner: { icon: this._getSvgIcon("liner"), name: this._t("liner"), seconds: (this.config?.liner_duration || 8) * 3600 },
+          liner: { icon: this._getSvgIcon("liner", "large"), name: this._t("liner"), seconds: (this.config?.liner_duration || 8) * 3600 },
         },
         pms: {
-          liner: { icon: this._getSvgIcon("liner"), name: this._t("liner"), seconds: (this.config?.liner_duration || 8) * 3600 },
+          liner: { icon: this._getSvgIcon("liner", "large"), name: this._t("liner"), seconds: (this.config?.liner_duration || 8) * 3600 },
         },
       };
 
@@ -1313,8 +1313,8 @@ class PeriodCountdownTimer extends HTMLElement {
     }
   }
 
-  _getSvgIcon(product) {
-    return window.ProductIcons?.getSvgIcon(product) || '';
+  _getSvgIcon(product, size = 'default') {
+    return window.ProductIcons?.getSvgIcon(product, size) || '';
   }
 
   _getStatusAnimatedIcon(statusKey, attrs = {}, size = "large") {
@@ -2006,12 +2006,19 @@ class PeriodCountdownTimer extends HTMLElement {
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
+        overflow: hidden;
       }
 
       .timer-icon svg {
         width: 48px;
         height: 48px;
         color: var(--primary-color, #8e44ad);
+      }
+
+      .timer-icon span {
+        color: var(--primary-color, #8e44ad);
+        max-width: 100%;
+        max-height: 100%;
       }
 
       .timer-icon img {
@@ -2173,6 +2180,7 @@ class PeriodCountdownTimer extends HTMLElement {
         .timer-time { font-size: 2rem; }
         .timer-icon { font-size: 2.5rem; width: 40px; height: 40px; }
         .timer-icon svg { width: 40px; height: 40px; }
+        .timer-icon span { width: 40px; height: 40px; }
         .timer-icon img { width: 40px; height: 40px; object-fit: contain; display: block; }
         .btn { padding: 8px 12px; font-size: 0.8rem; }
         

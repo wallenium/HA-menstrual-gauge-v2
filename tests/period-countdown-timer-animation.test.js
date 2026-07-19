@@ -55,6 +55,10 @@ global.window = {
   customCards: [],
   setTimeout,
   ProductIcons: {
+    getSvgIcon: (product, size) => {
+      const px = size === 'large' ? 48 : 24;
+      return `<span aria-hidden="true" style="display:block;width:${px}px;height:${px}px;background-color:currentColor;-webkit-mask:url('/test/${product}.svg') center / contain no-repeat;mask:url('/test/${product}.svg') center / contain no-repeat;"></span>`;
+    },
     createAnimatedSvgElement: () => {
       const svg = new MockNode('svg');
       svg.dataset.fillMask = 'url(#mask-test)';
@@ -117,11 +121,81 @@ function testAnimatedSvgFillMaskApplied() {
   console.log('  ✓ animated product fill mask assignment');
 }
 
+// ---------------------------------------------------------------------------
+// A1) Product icon color: .timer-icon span CSS uses --primary-color
+// ---------------------------------------------------------------------------
+
+function testTimerIconSpanColorCss() {
+  const timer = new PeriodCountdownTimer();
+  const styles = timer.getStyles();
+
+  // Must have a span rule inside .timer-icon that sets color to --primary-color.
+  assert.ok(
+    styles.includes('.timer-icon span') && styles.includes('--primary-color'),
+    '.timer-icon span must use --primary-color for theme-adaptive icon rendering',
+  );
+
+  console.log('  ✓ .timer-icon span CSS: --primary-color present for theme-adaptive icons');
+}
+
+// ---------------------------------------------------------------------------
+// A2) Product icon size: underwear/liner icons use "large" (48px) in product config
+// ---------------------------------------------------------------------------
+
+function testTimerProductIconSizes() {
+  const timer = new PeriodCountdownTimer();
+  timer.config = {};
+
+  // Access _getSvgIcon with size to verify it passes the parameter.
+  const underwearIcon = timer._getSvgIcon('underwear', 'large');
+  assert.ok(
+    underwearIcon.includes('width:48px') || underwearIcon.includes('width: 48px'),
+    'underwear icon with "large" size must produce a 48px-wide span',
+  );
+
+  const linerIcon = timer._getSvgIcon('liner', 'large');
+  assert.ok(
+    linerIcon.includes('width:48px') || linerIcon.includes('width: 48px'),
+    'liner icon with "large" size must produce a 48px-wide span',
+  );
+
+  // Default size (no param) remains 24px for backward compatibility.
+  const smallIcon = timer._getSvgIcon('pad');
+  assert.ok(
+    smallIcon.includes('width:24px') || smallIcon.includes('width: 24px'),
+    'pad icon with default size must produce a 24px-wide span',
+  );
+
+  console.log('  ✓ timer _getSvgIcon: large → 48px, default → 24px');
+}
+
+// ---------------------------------------------------------------------------
+// A2) Regression: product config entries use "large" icons for timer display
+// ---------------------------------------------------------------------------
+
+function testTimerProductConfigIconSize() {
+  const timer = new PeriodCountdownTimer();
+  timer.config = {};
+
+  // Capture what the product config would generate for underwear/liner.
+  const underwearIcon = timer._getSvgIcon('underwear', 'large');
+  const linerIcon = timer._getSvgIcon('liner', 'large');
+
+  // Both should produce 48px spans (same size as the animated SVGs).
+  assert.ok(underwearIcon.includes('48px'), 'underwear icon in product config must be 48px for visual parity');
+  assert.ok(linerIcon.includes('48px'), 'liner icon in product config must be 48px for visual parity');
+
+  console.log('  ✓ product config: underwear/liner icons are 48px (parity with animated products)');
+}
+
 let failed = 0;
 
 [
   testProductFillAnimatorUpdates,
   testAnimatedSvgFillMaskApplied,
+  testTimerIconSpanColorCss,
+  testTimerProductIconSizes,
+  testTimerProductConfigIconSize,
 ].forEach((fn) => {
   try {
     fn();

@@ -322,6 +322,168 @@ function testRerenderOnCountdownChange() {
 }
 
 // ---------------------------------------------------------------------------
+// E) Pregnancy mode UI: field visibility in symptom modal
+// ---------------------------------------------------------------------------
+
+function testPregnancyModeSymptomModalFields() {
+  const card = makeCard();
+  card.setConfig({ entity: 'sensor.menstruation' });
+  const hass = pregnancyHass(12);
+  card._hass = hass;
+  // Build a model with is_pregnant=true so _symptomConfig receives correct flags.
+  card._config = { entity: 'sensor.menstruation' };
+  // Access _symptomConfig directly to verify filtering.
+  const GC = GaugeCard;
+  const proto = GC.prototype;
+
+  // Verify bleeding_strength is excluded when pregnant.
+  const pregConfig = proto._symptomConfig.call(card, 'pregnant', true);
+  const keys = pregConfig.map((c) => c.key);
+  assert.ok(!keys.includes('bleeding_strength'), 'bleeding_strength must be hidden in pregnancy mode');
+
+  // Verify pregnancy_symptoms category is present.
+  assert.ok(keys.includes('pregnancy_symptoms'), 'pregnancy_symptoms category must be present in pregnancy mode');
+
+  // Verify hygiene does not include tampon or cup.
+  const hygieneConfig = pregConfig.find((c) => c.key === 'hygiene');
+  assert.ok(hygieneConfig, 'hygiene category must still be present in pregnancy mode');
+  assert.ok(!hygieneConfig.options.includes('tampon'), 'tampon must be hidden in pregnancy hygiene');
+  assert.ok(!hygieneConfig.options.includes('cup'), 'cup must be hidden in pregnancy hygiene');
+  assert.ok(hygieneConfig.options.includes('pad'), 'pad must still be visible in pregnancy hygiene');
+  assert.ok(hygieneConfig.options.includes('period_underwear'), 'period_underwear must still be visible in pregnancy hygiene');
+
+  console.log('  ✓ pregnancy mode symptom config: bleeding_strength hidden, tampon/cup hidden, pregnancy_symptoms present');
+}
+
+// ---------------------------------------------------------------------------
+// E2) Pregnancy mode: period toggle hidden in rendered modal HTML
+// ---------------------------------------------------------------------------
+
+function testPregnancyModeModalHidesPeriodToggle() {
+  const card = makeCard();
+  card.setConfig({ entity: 'sensor.menstruation' });
+  card._hass = pregnancyHass(10);
+
+  // Build model to get palette and use _renderSymptomModal.
+  const model = card._buildModel();
+  const palette = card._palette(model.state);
+  const iso = new Date().toISOString().slice(0, 10);
+  const modalHtml = card._renderSymptomModal(iso, model, palette);
+
+  // Period toggle must not be rendered when pregnant.
+  assert.ok(
+    !modalHtml.includes('data-cat="_period"'),
+    'Period start toggle must be hidden in pregnancy mode modal',
+  );
+
+  // bleeding_strength options must not appear.
+  assert.ok(
+    !modalHtml.includes('name="bleeding_strength"'),
+    'bleeding_strength inputs must be hidden in pregnancy mode modal',
+  );
+
+  // tampon and cup must not appear.
+  assert.ok(
+    !modalHtml.includes('value="tampon"'),
+    'tampon option must be hidden in pregnancy mode modal',
+  );
+  assert.ok(
+    !modalHtml.includes('value="cup"'),
+    'cup option must be hidden in pregnancy mode modal',
+  );
+
+  // pregnancy_symptoms category must be present.
+  assert.ok(
+    modalHtml.includes('name="pregnancy_symptoms"'),
+    'pregnancy_symptoms inputs must be present in pregnancy mode modal',
+  );
+
+  // Save button must be enabled (no disabled attribute).
+  assert.ok(
+    !modalHtml.includes('class="btn sym-save" disabled'),
+    'Save button must not be disabled in pregnancy mode',
+  );
+
+  console.log('  ✓ pregnancy mode modal: period toggle hidden, fields correct, save enabled');
+}
+
+// ---------------------------------------------------------------------------
+// E3) Pregnancy mode: symptom logging saves correctly (no early return)
+// ---------------------------------------------------------------------------
+
+function testPregnancyModeSymptomSave() {
+  const card = makeCard();
+  card.setConfig({ entity: 'sensor.menstruation' });
+
+  const savedCalls = [];
+  card._hass = {
+    ...pregnancyHass(10),
+    callService: async (domain, service, payload) => {
+      savedCalls.push({ domain, service, payload });
+    },
+  };
+
+  // Simulate modal open state.
+  const iso = new Date().toISOString().slice(0, 10);
+  card._modalIso = iso;
+
+  // Stub shadowRoot to return checked pregnancy symptom.
+  const fakeRoot = {
+    querySelector: (sel) => {
+      // No period toggle, no bleeding_strength in pregnancy mode.
+      if (sel.includes('_period')) return null;
+      if (sel.includes('bleeding_strength')) return null;
+      return null;
+    },
+    querySelectorAll: (sel) => {
+      if (sel === '.sym-multi[name="pregnancy_symptoms"]:checked') {
+        return [{ value: 'preg_nausea' }, { value: 'preg_fatigue' }];
+      }
+      return [];
+    },
+    getElementById: (id) => {
+      if (id === 'sym-basal-temp') return { value: '' };
+      return null;
+    },
+    addEventListener: () => {},
+    get innerHTML() { return ''; },
+    set innerHTML(_v) {},
+  };
+  Object.defineProperty(card, 'shadowRoot', { get: () => fakeRoot, configurable: true });
+
+  // Run save handler (async but we only need to verify it doesn't early-return).
+  const savePromise = card._handleModalSave();
+
+  // _modalIso should have been cleared immediately (synchronous part).
+  assert.strictEqual(card._modalIso, null, '_modalIso must be cleared after save call');
+
+  console.log('  ✓ pregnancy mode symptom save: no early return, _modalIso cleared');
+
+  // Return promise so any async errors propagate (optional await in runner).
+  return savePromise;
+}
+
+// ---------------------------------------------------------------------------
+// E4) Non-pregnancy mode: config unchanged (regression guard)
+// ---------------------------------------------------------------------------
+
+function testNonPregnancySymptomConfig() {
+  const card = makeCard();
+  card.setConfig({ entity: 'sensor.menstruation' });
+  const proto = GaugeCard.prototype;
+
+  const normalConfig = proto._symptomConfig.call(card, 'period', false);
+  const keys = normalConfig.map((c) => c.key);
+  assert.ok(keys.includes('bleeding_strength'), 'bleeding_strength must be present in non-pregnant mode');
+  const hygieneConfig = normalConfig.find((c) => c.key === 'hygiene');
+  assert.ok(hygieneConfig.options.includes('tampon'), 'tampon must be present in non-pregnant hygiene');
+  assert.ok(hygieneConfig.options.includes('cup'), 'cup must be present in non-pregnant hygiene');
+  assert.ok(!keys.includes('pregnancy_symptoms'), 'pregnancy_symptoms must NOT be present in non-pregnant mode');
+
+  console.log('  ✓ non-pregnancy mode: symptom config unchanged (regression guard)');
+}
+
+// ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
 
@@ -333,21 +495,27 @@ const tests = [
   ['pregnancy-gauge-regression', testPregnancyGaugeRegression],
   ['rerender-on-state-change', testRerenderOnStateChange],
   ['rerender-on-countdown-change', testRerenderOnCountdownChange],
+  ['pregnancy-mode-symptom-config', testPregnancyModeSymptomModalFields],
+  ['pregnancy-mode-modal-field-visibility', testPregnancyModeModalHidesPeriodToggle],
+  ['pregnancy-mode-symptom-save', testPregnancyModeSymptomSave],
+  ['non-pregnancy-symptom-config-regression', testNonPregnancySymptomConfig],
 ];
 
-let failed = 0;
-for (const [name, fn] of tests) {
-  try {
-    fn();
-  } catch (err) {
-    console.error(`  ✗ ${name}:`, err.message);
-    failed += 1;
+(async () => {
+  let failed = 0;
+  for (const [name, fn] of tests) {
+    try {
+      await fn();
+    } catch (err) {
+      console.error(`  ✗ ${name}:`, err.message);
+      failed += 1;
+    }
   }
-}
 
-if (failed) {
-  console.error(`\n${failed} test(s) failed.`);
-  process.exit(1);
-} else {
-  console.log('\nAll tests passed.');
-}
+  if (failed) {
+    console.error(`\n${failed} test(s) failed.`);
+    process.exit(1);
+  } else {
+    console.log('\nAll tests passed.');
+  }
+})();
