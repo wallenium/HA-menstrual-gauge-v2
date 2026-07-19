@@ -1069,12 +1069,10 @@ class MenstruationGaugeCard extends HTMLElement {
         .countdown.passive { cursor: default; pointer-events: none; opacity: .92; }
         .center-panel {
           pointer-events: auto;
-          border-radius: 24px;
-          border: 1px solid ${palette.buttonBorder};
-          background: ${palette.countdownBg};
-          color: ${palette.countdownColor};
-          padding: 12px 14px;
-          min-width: 138px;
+          background: transparent;
+          border: none;
+          box-shadow: none;
+          padding: 0;
           max-width: 100%;
           display: flex;
           flex-direction: column;
@@ -1082,6 +1080,7 @@ class MenstruationGaugeCard extends HTMLElement {
           gap: 6px;
           text-align: center;
           cursor: pointer;
+          color: ${palette.countdownColor};
         }
         .center-panel.passive { cursor: default; pointer-events: none; opacity: .92; }
         .center-icon { width: 52px; height: 52px; display: inline-flex; align-items: center; justify-content: center; }
@@ -1124,7 +1123,6 @@ class MenstruationGaugeCard extends HTMLElement {
         .sym-disabled { opacity: .62; }
         @media (max-width: 420px) {
           .center { padding: 64px; }
-          .center-panel { min-width: 124px; padding: 10px 12px; }
           .center-icon { width: 44px; height: 44px; }
           .center-icon svg { width: 44px; height: 44px; }
           .center-primary { font-size: .92rem; }
