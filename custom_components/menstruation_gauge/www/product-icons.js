@@ -24,19 +24,6 @@ const PREGNANCY_ASSET_FILENAMES = {
   9: 'preg_09.svg',
 };
 
-const PRODUCT_ICON_PATHS = {
-  // tampon.svg
-  tampon: '<path d="M9.5 3.1C9.5 2.22 10.22 1.5 11.1 1.5H12.9C13.78 1.5 14.5 2.22 14.5 3.1V14.4C14.5 15.96 13.23 17.22 11.68 17.22H12.32C10.77 17.22 9.5 15.96 9.5 14.4V3.1Z" fill="currentColor" stroke="none"/><path d="M12 17.2V20.8"/><path d="M12 20.8C12 22.2 13.15 23.35 14.55 23.35"/>',
-  // pad.svg
-  pad: '<path d="M12 2.6C9.86 2.6 8.12 4.34 8.12 6.48V17.52C8.12 19.66 9.86 21.4 12 21.4C14.14 21.4 15.88 19.66 15.88 17.52V6.48C15.88 4.34 14.14 2.6 12 2.6Z" fill="currentColor" stroke="none"/><path d="M8.2 8.2C6.38 8.2 4.9 9.68 4.9 11.5C4.9 13.32 6.38 14.8 8.2 14.8"/><path d="M15.8 8.2C17.62 8.2 19.1 9.68 19.1 11.5C19.1 13.32 17.62 14.8 15.8 14.8"/>',
-  // menstrual_cup.svg
-  cup: '<path d="M8.4 2.7H15.6V4.3C15.6 6.19 15.11 8.05 14.19 9.7L13.5 10.93V14.1C13.5 15.76 12.16 17.1 10.5 17.1H13.5C11.84 17.1 10.5 15.76 10.5 14.1V10.93L9.81 9.7C8.89 8.05 8.4 6.19 8.4 4.3V2.7Z" fill="currentColor" stroke="none"/><path d="M12 17.1V21.1"/><path d="M10.7 21.1H13.3"/>',
-  // pantyliner.svg
-  liner: '<path d="M12 7.3C8.46 7.3 5.6 9.34 5.6 11.86C5.6 14.39 8.46 16.43 12 16.43C15.54 16.43 18.4 14.39 18.4 11.86C18.4 9.34 15.54 7.3 12 7.3Z" fill="currentColor" stroke="none"/><path d="M8.8 11.9H15.2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity="0.45"/>',
-  // period_panty.svg
-  underwear: '<path d="M4 5.3H20L19.14 10.58C18.56 14.13 15.49 16.74 11.9 16.74H12.1C8.51 16.74 5.44 14.13 4.86 10.58L4 5.3Z"/><path d="M4 5.3H8.2L9.8 10.56C10.12 11.6 11.08 12.31 12.17 12.31H11.83C12.92 12.31 13.88 11.6 14.2 10.56L15.8 5.3H20"/><path d="M8.65 6.7H15.35L14.16 10.1C13.87 10.95 13.07 11.52 12.17 11.52H11.83C10.93 11.52 10.13 10.95 9.84 10.1L8.65 6.7Z" fill="currentColor" opacity="0.45" stroke="none"/>',
-};
-
 const PRODUCT_KEY_ALIASES = {
   period_underwear: 'underwear',
 };
@@ -352,18 +339,73 @@ function createAnimatedSvgElement(productName, size = 'default') {
     return null;
   }
 
-  const productKey = normalizeProductKey(productName);
-  const iconPath = PRODUCT_ICON_PATHS[productKey];
-  if (!iconPath) {
+  const src = getProductAssetUrl(productName);
+  if (!src) {
     return null;
   }
 
+  const ns = 'http://www.w3.org/2000/svg';
+  const xlinkNs = 'http://www.w3.org/1999/xlink';
   const iconSize = resolveSize(size);
-  const strokeWidth = resolveStrokeWidth(size);
-  const svgMarkup = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${iconSize}" height="${iconSize}" fill="none" stroke="currentColor" stroke-width="${strokeWidth.toFixed(2)}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${iconPath}</svg>`;
-  const template = document.createElement('template');
-  template.innerHTML = svgMarkup.trim();
-  return template.content.firstElementChild;
+  const maskId = `pi-asset-mask-${Math.random().toString(36).slice(2, 10)}`;
+
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('xmlns', ns);
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', String(iconSize));
+  svg.setAttribute('height', String(iconSize));
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  svg.dataset.assetSrc = src;
+  svg.dataset.fillMask = `url(#${maskId})`;
+
+  const defs = document.createElementNS(ns, 'defs');
+  const mask = document.createElementNS(ns, 'mask');
+  mask.setAttribute('id', maskId);
+  mask.setAttribute('x', '0');
+  mask.setAttribute('y', '0');
+  mask.setAttribute('width', '24');
+  mask.setAttribute('height', '24');
+  mask.setAttribute('maskUnits', 'userSpaceOnUse');
+
+  const maskImage = document.createElementNS(ns, 'image');
+  maskImage.setAttribute('x', '0');
+  maskImage.setAttribute('y', '0');
+  maskImage.setAttribute('width', '24');
+  maskImage.setAttribute('height', '24');
+  maskImage.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  maskImage.setAttribute('href', src);
+  maskImage.setAttributeNS(xlinkNs, 'xlink:href', src);
+  maskImage.addEventListener('error', () => {
+    svg.dispatchEvent(new CustomEvent('product-icon-asset-error', {
+      bubbles: false,
+      detail: { product: productName, src },
+    }));
+  }, { once: true });
+  mask.appendChild(maskImage);
+  defs.appendChild(mask);
+  svg.appendChild(defs);
+
+  const baseImage = document.createElementNS(ns, 'image');
+  baseImage.setAttribute('x', '0');
+  baseImage.setAttribute('y', '0');
+  baseImage.setAttribute('width', '24');
+  baseImage.setAttribute('height', '24');
+  baseImage.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  baseImage.setAttribute('href', src);
+  baseImage.setAttributeNS(xlinkNs, 'xlink:href', src);
+  baseImage.setAttribute('class', 'anim-product-asset');
+  baseImage.setAttribute('opacity', '0.95');
+  baseImage.addEventListener('error', () => {
+    svg.dispatchEvent(new CustomEvent('product-icon-asset-error', {
+      bubbles: false,
+      detail: { product: productName, src },
+    }));
+  }, { once: true });
+  svg.appendChild(baseImage);
+
+  return svg;
 }
 
 function getPregnancyAssetUrl(month) {
