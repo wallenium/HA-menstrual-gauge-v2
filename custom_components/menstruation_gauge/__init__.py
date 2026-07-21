@@ -829,9 +829,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         pre_menarche_data=stored.get("pre_menarche_data", {"signs": {}, "tanner_stage": None}),
     )
 
+    async def _async_handle_midnight_refresh(_now: datetime) -> None:
+        await _async_refresh_cycle_model(hass, {entry.entry_id})
+
     runtime.unregister_midnight_listener = async_track_time_change(
         hass,
-        lambda now: hass.async_create_task(_async_refresh_cycle_model(hass, {entry.entry_id})),
+        _async_handle_midnight_refresh,
         hour=0,
         minute=0,
         second=5,
