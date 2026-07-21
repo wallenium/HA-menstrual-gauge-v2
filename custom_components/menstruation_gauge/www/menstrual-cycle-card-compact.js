@@ -91,7 +91,7 @@ class MenstrualCycleCard extends HTMLElement {
         label: this._t('period'),
       },
       fertile: {
-        icon: animatedIcon('ovulation'),
+        icon: animatedIcon('fertile'),
         color: "var(--success-color, #27ae60)",
         badgeBg: "rgba(39, 174, 96, 0.14)",
         badgeGlow: "rgba(39, 174, 96, 0.30)",

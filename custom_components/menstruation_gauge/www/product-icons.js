@@ -24,6 +24,15 @@ const PREGNANCY_ASSET_FILENAMES = {
   9: 'preg_09.svg',
 };
 
+const STATE_ASSET_FILENAMES = {
+  period: 'period.svg',
+  fertile: 'fertile.svg',
+  ovulation: 'ovulation.svg',
+  pms: 'pms.svg',
+  pre_menarche: 'premenarche.svg',
+  menarche: 'premenarche.svg',
+};
+
 const PRODUCT_KEY_ALIASES = {
   period_underwear: 'underwear',
 };
@@ -141,6 +150,23 @@ function getPregnancyIcon(monthOrWeeks, size = 'default') {
   const pregnancyInfo = resolvePregnancyInfo(monthOrWeeks);
   const assetFilename = PREGNANCY_ASSET_FILENAMES[pregnancyInfo.month] || PREGNANCY_ASSET_FILENAMES[1];
   const src = `${ASSET_BASE_URL}/pregnancy/${assetFilename}`;
+  return buildMaskedAssetIcon(src, size);
+}
+
+function getStateAssetUrl(statusKey) {
+  const normalized = String(statusKey || '').toLowerCase();
+  const assetFilename = STATE_ASSET_FILENAMES[normalized];
+  if (!assetFilename) {
+    return '';
+  }
+  return `${ASSET_BASE_URL}/state/${assetFilename}`;
+}
+
+function getStateIcon(statusKey, size = 'default') {
+  const src = getStateAssetUrl(statusKey);
+  if (!src) {
+    return '';
+  }
   return buildMaskedAssetIcon(src, size);
 }
 
@@ -300,25 +326,24 @@ function getNeutralStatusIcon(size = 'default') {
 
 function getStatusIcon(statusKey, size = 'default') {
   const normalized = String(statusKey || '').toLowerCase();
+  const stateAssetIcon = getStateIcon(normalized, size);
+  if (stateAssetIcon) return stateAssetIcon;
 
-  if (normalized === 'period') return getPeriodIcon(size);
-  if (normalized === 'ovulation' || normalized === 'fertile') return getOvulationIcon(size);
-  if (normalized === 'pms') return getPMSIcon(size);
   if (normalized === 'pregnant') return getPregnancyIcon(undefined, size);
   if (normalized === 'postpartum') return getPostpartumIcon(size);
-  if (normalized === 'pre_menarche' || normalized === 'menarche') return getMenarcheIcon(size);
   if (normalized === 'menopause') return getMenopauseIcon(size);
   return getNeutralStatusIcon(size);
 }
 
 function getStatusAnimatedIcon(statusKey, attrs, size = 'default') {
   const normalized = String(statusKey || '').toLowerCase();
+  const stateAssetIcon = getStateIcon(normalized, size);
+  if (stateAssetIcon) return stateAssetIcon;
 
   if (normalized === 'pregnant') {
     return getPregnancyIcon(attrs, size);
   }
   if (normalized === 'postpartum') return getPostpartumIcon(size);
-  if (normalized === 'pre_menarche' || normalized === 'menarche') return getMenarcheIcon(size);
   if (normalized === 'menopause') return getMenopauseIcon(size);
   return getStatusIcon(normalized, size);
 }
@@ -425,6 +450,8 @@ const ProductIcons = {
   createAnimatedSvgElement,
   getStatusIcon,
   getStatusAnimatedIcon,
+  getStateAssetUrl,
+  getStateIcon,
   getPeriodIcon,
   getOvulationIcon,
   getPMSIcon,
