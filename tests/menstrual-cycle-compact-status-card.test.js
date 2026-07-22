@@ -339,6 +339,17 @@ test('pre_menarche mode: renders progress-layout, no icon-right-wrap', () => {
   assert.ok(!bodyOf(html).includes('icon-right-wrap'), 'icon-right-wrap should not appear in pre_menarche mode');
 });
 
+test('pre_menarche mode: uses static premenarche.svg asset (no animation)', () => {
+  const html = renderCard('pre_menarche', {
+    awaiting_menarche: true,
+    days_until_menarche: 100,
+  });
+  assert.ok(html.includes('premenarche.svg'), 'pre_menarche must reference premenarche.svg static asset');
+  // getMenarcheIcon injects pi-flower-bloom and pi-petal-unfold; neither must appear
+  assert.ok(!html.includes('pi-flower-bloom'), 'pre_menarche must NOT use animated flower (pi-flower-bloom)');
+  assert.ok(!html.includes('pi-petal-unfold'), 'pre_menarche must NOT use animated petal (pi-petal-unfold)');
+});
+
 test('postpartum mode: renders progress-layout, no icon-right-wrap', () => {
   const html = renderCard('postpartum', {
     is_postpartum: true,
