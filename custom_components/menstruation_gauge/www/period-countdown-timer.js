@@ -1431,6 +1431,7 @@ class PeriodCountdownTimer extends HTMLElement {
         // Symptom fields
         bleeding_strength: "Blutungsstärke",
         pain: "Schmerz",
+        discharge: "Ausfluss",
         cervical_mucus: "Zervixschleim",
         basal_temp: "Basaltemperatur",
         mood: "Stimmung",
@@ -1494,6 +1495,7 @@ class PeriodCountdownTimer extends HTMLElement {
         // Symptom fields
         bleeding_strength: "Bleeding Strength",
         pain: "Pain",
+        discharge: "Discharge",
         cervical_mucus: "Cervical Mucus",
         basal_temp: "Basal Temperature",
         mood: "Mood",

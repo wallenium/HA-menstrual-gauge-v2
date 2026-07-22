@@ -363,7 +363,7 @@ def _summarize_symptoms_for_period(
         )
         summary["bleeding_strength"] = strongest_bleeding
 
-    for key in ("spotting", "intercourse", "cervical_mucus"):
+    for key in ("spotting", "discharge", "intercourse", "cervical_mucus"):
         values = [str(entry[key]) for entry in period_entries if entry.get(key) not in (None, "")]
         if values:
             summary[key] = Counter(values).most_common(1)[0][0]
@@ -438,6 +438,7 @@ def _build_symptom_statistics(
     pain_days_per_cycle: list[int] = []
     pain_types: Counter[str] = Counter()
     bleeding_strengths: Counter[str] = Counter()
+    discharge: Counter[str] = Counter()
     cervical_mucus: Counter[str] = Counter()
     basal_temps: list[float] = []
 
@@ -457,6 +458,10 @@ def _build_symptom_statistics(
             mucus = entry.get("cervical_mucus")
             if isinstance(mucus, str) and mucus:
                 cervical_mucus[mucus] += 1
+
+            discharge_value = entry.get("discharge")
+            if isinstance(discharge_value, str) and discharge_value:
+                discharge[discharge_value] += 1
 
             temp_value = entry.get("basal_temp")
             if temp_value not in (None, ""):
@@ -490,6 +495,7 @@ def _build_symptom_statistics(
             key: round((count / bleeding_total) * 100)
             for key, count in bleeding_strengths.items()
         } if bleeding_total else {},
+        "typical_discharge": discharge.most_common(1)[0][0] if discharge else None,
         "typical_cervical_mucus": cervical_mucus.most_common(1)[0][0] if cervical_mucus else None,
         "average_basal_temp": round(mean(basal_temps), 1) if basal_temps else None,
         "cycles_analyzed": cycles_analyzed,
