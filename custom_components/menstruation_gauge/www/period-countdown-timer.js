@@ -2016,7 +2016,7 @@ class PeriodCountdownTimer extends HTMLElement {
       }
 
       .timer-icon span {
-        color: var(--primary-color, #8e44ad);
+        color: var(--primary-text-color, currentColor);
         max-width: 100%;
         max-height: 100%;
       }

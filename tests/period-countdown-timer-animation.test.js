@@ -122,20 +122,21 @@ function testAnimatedSvgFillMaskApplied() {
 }
 
 // ---------------------------------------------------------------------------
-// A1) Product icon color: .timer-icon span CSS uses --primary-color
+// A1) Product icon color: .timer-icon span CSS uses --primary-text-color
 // ---------------------------------------------------------------------------
 
 function testTimerIconSpanColorCss() {
   const timer = new PeriodCountdownTimer();
   const styles = timer.getStyles();
 
-  // Must have a span rule inside .timer-icon that sets color to --primary-color.
+  // Must have a span rule inside .timer-icon that sets color to --primary-text-color
+  // so that currentColor in the mask adapts to dark/light mode automatically.
   assert.ok(
-    styles.includes('.timer-icon span') && styles.includes('--primary-color'),
-    '.timer-icon span must use --primary-color for theme-adaptive icon rendering',
+    styles.includes('.timer-icon span') && styles.includes('--primary-text-color'),
+    '.timer-icon span must use --primary-text-color for dark/light mode adaptive icon rendering',
   );
 
-  console.log('  ✓ .timer-icon span CSS: --primary-color present for theme-adaptive icons');
+  console.log('  ✓ .timer-icon span CSS: --primary-text-color present for dark/light mode adaptive icons');
 }
 
 // ---------------------------------------------------------------------------
