@@ -45,7 +45,9 @@ class MenstrualProductInventoryCardEditor extends HTMLElement {
       de: {
         visible_products: "Sichtbare Produkte",
         product_order: "Produktreihenfolge (Ziehen zum Sortieren)",
-        show_thresholds: "Schwellenwerte anzeigen",
+        thresholds: "Schwellenwerte",
+        warning: "Warnung",
+        critical: "Kritisch",
         options: "Optionen",
         tampon: "Tampons",
         pad: "Binden",
@@ -56,7 +58,9 @@ class MenstrualProductInventoryCardEditor extends HTMLElement {
       en: {
         visible_products: "Visible Products",
         product_order: "Product Order (Drag to reorder)",
-        show_thresholds: "Show Threshold Controls",
+        thresholds: "Thresholds",
+        warning: "Warning",
+        critical: "Critical",
         options: "Options",
         tampon: "Tampons",
         pad: "Pads",
@@ -111,7 +115,6 @@ class MenstrualProductInventoryCardEditor extends HTMLElement {
   _render() {
     const ordered = this._getOrderedProducts();
     const visible = this._getVisibleSet();
-    const showThresholds = this._config.show_thresholds !== false;
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -183,21 +186,35 @@ class MenstrualProductInventoryCardEditor extends HTMLElement {
           line-height: 1;
           pointer-events: none;
         }
-        .toggle-row {
+        .threshold-item {
+          margin-bottom: 12px;
+        }
+        .threshold-label {
+          font-weight: 500;
+          font-size: 0.9rem;
+          margin-bottom: 4px;
+          color: var(--primary-text-color, #1f2937);
+        }
+        .threshold-inputs {
+          display: flex;
+          gap: 16px;
+          align-items: center;
+          flex-wrap: wrap;
+        }
+        .threshold-inputs label {
           display: flex;
           align-items: center;
-          gap: 10px;
-          padding: 4px 0;
+          gap: 6px;
+          font-size: 0.9rem;
+          color: var(--secondary-text-color, #6b7280);
         }
-        .toggle-row input[type="checkbox"] {
-          width: 16px;
-          height: 16px;
-          cursor: pointer;
-          accent-color: var(--primary-color, #6200ea);
-        }
-        .toggle-row label {
-          cursor: pointer;
-          font-size: 0.95rem;
+        .threshold-inputs input[type="number"] {
+          width: 70px;
+          padding: 5px 7px;
+          border: 1px solid var(--divider-color, rgba(127, 127, 127, 0.35));
+          border-radius: 6px;
+          background: var(--ha-card-background, var(--card-background-color, #fff));
+          color: var(--primary-text-color, #1f2937);
         }
       </style>
 
@@ -228,11 +245,21 @@ class MenstrualProductInventoryCardEditor extends HTMLElement {
       </div>
 
       <div class="section">
-        <div class="section-title">${this._escapeHtml(this._t("options"))}</div>
-        <div class="toggle-row">
-          <input type="checkbox" id="show-thresholds" ${showThresholds ? "checked" : ""}>
-          <label for="show-thresholds">${this._escapeHtml(this._t("show_thresholds"))}</label>
-        </div>
+        <div class="section-title">${this._escapeHtml(this._t("thresholds"))}</div>
+        ${ordered.map((product) => {
+          const t = this._config.thresholds?.[product] || {};
+          const warning = t.warning !== undefined ? t.warning : 10;
+          const critical = t.critical !== undefined ? t.critical : 5;
+          return `
+            <div class="threshold-item">
+              <div class="threshold-label">${this._escapeHtml(this._t(product))}</div>
+              <div class="threshold-inputs">
+                <label>${this._escapeHtml(this._t("warning"))}: <input type="number" min="0" max="5000" data-threshold-product="${product}" data-threshold-role="warning" value="${warning}"></label>
+                <label>${this._escapeHtml(this._t("critical"))}: <input type="number" min="0" max="5000" data-threshold-product="${product}" data-threshold-role="critical" value="${critical}"></label>
+              </div>
+            </div>
+          `;
+        }).join("")}
       </div>
     `;
 
@@ -257,8 +284,16 @@ class MenstrualProductInventoryCardEditor extends HTMLElement {
         return;
       }
 
-      if (target.id === "show-thresholds") {
-        this._fireConfigChanged({ ...this._config, show_thresholds: !!target.checked });
+      if (target.matches("[data-threshold-product][data-threshold-role]")) {
+        const product = target.dataset.thresholdProduct;
+        const role = target.dataset.thresholdRole;
+        const value = Math.max(0, Number(target.value || 0));
+        const currentThresholds = { ...(this._config.thresholds || {}) };
+        const productThreshold = { ...(currentThresholds[product] || { warning: 10, critical: 5 }) };
+        productThreshold[role] = value;
+        currentThresholds[product] = productThreshold;
+        this._fireConfigChanged({ ...this._config, thresholds: currentThresholds });
+        return;
       }
     };
 
