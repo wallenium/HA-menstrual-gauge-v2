@@ -32,6 +32,7 @@ const STATE_ASSET_FILENAMES = {
   pre_menarche: 'premenarche.svg',
   menarche: 'premenarche.svg',
   menopause: 'menopause.svg',
+  postpartum: 'postpartum.svg',
   neutral: 'neutral.svg',
 };
 
@@ -177,21 +178,6 @@ function getStateIcon(statusKey, size = 'default') {
   return buildImageAssetIcon(src, size);
 }
 
-function getPostpartumIcon(size = 'default') {
-  const iconContent = `
-    <circle cx="12" cy="6.3" r="3"/>
-    <path d="M7.4 20.4V18.8C7.4 16.1 9.6 13.9 12.3 13.9H11.7C14.4 13.9 16.6 16.1 16.6 18.8V20.4"/>
-    <path d="M9.6 11.3H14.4"/>
-    <circle cx="10.8" cy="6.3" r="0.25" fill="currentColor"/>
-    <circle cx="13.2" cy="6.3" r="0.25" fill="currentColor"/>
-  `;
-  return buildIconSvg(iconContent, size);
-}
-
-function getMenopauseIcon(size = 'default') {
-  return getStateIcon('menopause', size);
-}
-
 function getNeutralStatusIcon(size = 'default') {
   return getStateIcon('neutral', size);
 }
@@ -202,8 +188,6 @@ function getStatusIcon(statusKey, size = 'default') {
   if (stateAssetIcon) return stateAssetIcon;
 
   if (normalized === 'pregnant') return getPregnancyIcon(undefined, size);
-  if (normalized === 'postpartum') return getPostpartumIcon(size);
-  if (normalized === 'menopause') return getMenopauseIcon(size);
   return getNeutralStatusIcon(size);
 }
 
@@ -215,8 +199,6 @@ function getStatusAnimatedIcon(statusKey, attrs, size = 'default') {
   if (normalized === 'pregnant') {
     return getPregnancyIcon(attrs, size);
   }
-  if (normalized === 'postpartum') return getPostpartumIcon(size);
-  if (normalized === 'menopause') return getMenopauseIcon(size);
   return getStatusIcon(normalized, size);
 }
 
@@ -329,8 +311,6 @@ const ProductIcons = {
   getPregnancyIcon,
   getPregnancyAssetUrl,
   getProductAssetUrl,
-  getPostpartumIcon,
-  getMenopauseIcon,
   getIcon(productKey) {
     return getSvgIcon(productKey);
   },
