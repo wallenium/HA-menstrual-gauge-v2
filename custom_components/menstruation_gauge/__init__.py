@@ -895,6 +895,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return unload_ok
 
 
+async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload config entry."""
+    await async_unload_entry(hass, entry)
+    await async_setup_entry(hass, entry)
+
+
 async def _async_load_timer_state(hass: HomeAssistant, profile: str) -> None:
     """Load persisted timer state and expose it as a virtual HA state for the frontend."""
     store = Store(hass, STORAGE_VERSION, f"{STORAGE_KEY}.timer_state.{profile}")
