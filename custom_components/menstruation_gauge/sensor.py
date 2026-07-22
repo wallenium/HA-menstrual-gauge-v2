@@ -41,6 +41,7 @@ from .const import (
     ATTR_PREGNANCY_START_DATE,
     ATTR_SYMPTOM_HISTORY,
     ATTR_WEEKS_PREGNANT,
+    ATTR_MENOPAUSE_DATA,
     DOMAIN,
     SIGNAL_HISTORY_UPDATED,
 )
@@ -690,6 +691,7 @@ class MenstruationGaugeSensor(SensorEntity):
             pregnancy_data=runtime.pregnancy_data,
             menarche_data=runtime.menarche_data,
             pre_menarche_data=runtime.pre_menarche_data,
+            menopause_data=runtime.menopause_data,
             today=today,
         )
         usage_stats = _build_product_usage_stats(
@@ -764,6 +766,7 @@ class MenstruationGaugeSensor(SensorEntity):
             ATTR_DAYS_UNTIL_MENARCHE: self._calculate_days_until_menarche(model.menarche_data),
             "menarche_data": model.menarche_data,
             ATTR_PRE_MENARCHE_DATA: model.pre_menarche_data,
+            ATTR_MENOPAUSE_DATA: model.menopause_data,
             "profile": runtime.profile,
             "entry_id": self._entry.entry_id,
             "friendly_name": runtime.friendly_name,

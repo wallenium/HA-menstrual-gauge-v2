@@ -28,7 +28,9 @@
           "pregnancy_start_date": "Schwangerschafts-Startdatum (JJJJ-MM-TT)",
           "pre_menarche_enabled": "Prä-Menarche-Tracking aktivieren",
           "estimated_menarche_date": "Voraussichtliches Menarche-Datum (JJJJ-MM-TT)",
-          "family_menarche_age": "Menarche-Alter in der Familie (8–20, optional)"
+          "family_menarche_age": "Menarche-Alter in der Familie (8–20, optional)",
+          "menopause_enabled": "Menopause-Modus aktivieren",
+          "menopause_start_date": "Menopause-Startdatum (JJJJ-MM-TT)"
         },
         "data_description": {
           "period_duration_days": "Typische Anzahl der Periodentage (1–14).",
@@ -36,7 +38,9 @@
           "pregnancy_start_date": "Erster Tag der letzten Menstruation (LMP). Leer lassen, um den letzten erfassten Zyklus-Start zu verwenden.",
           "pre_menarche_enabled": "Pubertätszeichen vor der ersten Periode (Menarche) verfolgen.",
           "estimated_menarche_date": "Voraussichtliches Datum der ersten Periode. Wird für das Countdown-Tracking verwendet.",
-          "family_menarche_age": "Menarche-Alter in der Familie (Mutter/Schwester) zur Schätzung des erwarteten Alters."
+          "family_menarche_age": "Menarche-Alter in der Familie (Mutter/Schwester) zur Schätzung des erwarteten Alters.",
+          "menopause_enabled": "Aktiviert den Menopause-Tracking-Modus.",
+          "menopause_start_date": "Datum des Menopause-Beginns (JJJJ-MM-TT). Leer lassen, falls unbekannt."
         }
       }
     },

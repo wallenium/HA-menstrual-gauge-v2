@@ -16,6 +16,8 @@ from .const import (
     CONF_FAMILY_MENARCHE_AGE,
     CONF_FRIENDLY_NAME,
     CONF_ICON,
+    CONF_MENOPAUSE_ENABLED,
+    CONF_MENOPAUSE_START_DATE,
     CONF_PERIOD_DURATION_DAYS,
     CONF_PRE_MENARCHE_ENABLED,
     CONF_PREGNANCY_ENABLED,
@@ -112,6 +114,7 @@ class MenstruationGaugeOptionsFlow(config_entries.OptionsFlow):
             current_icon: str = runtime.icon
             pregnancy_data: dict = runtime.pregnancy_data
             menarche_data: dict = runtime.menarche_data
+            menopause_data: dict = runtime.menopause_data
         else:
             # Fallback: load from storage when runtime is not yet available
             profile = slugify(str(self._entry.data.get(CONF_PROFILE, ""))).strip("_") or "default"
@@ -135,19 +138,24 @@ class MenstruationGaugeOptionsFlow(config_entries.OptionsFlow):
                     "family_menarche_age": None,
                 },
             )
+            menopause_data = stored.get("menopause_data", {"is_menopause": False, "start_date": None})
 
         if user_input is not None:
             # Validate optional date fields
             preg_date_raw = str(user_input.get(CONF_PREGNANCY_START_DATE, "")).strip()
             men_date_raw = str(user_input.get(CONF_ESTIMATED_MENARCHE_DATE, "")).strip()
+            meno_date_raw = str(user_input.get(CONF_MENOPAUSE_START_DATE, "")).strip()
 
             preg_date_parsed = _parse_date_opt(preg_date_raw)
             men_date_parsed = _parse_date_opt(men_date_raw)
+            meno_date_parsed = _parse_date_opt(meno_date_raw)
 
             if preg_date_parsed is _INVALID_DATE_SENTINEL:
                 errors[CONF_PREGNANCY_START_DATE] = "invalid_date"
             if men_date_parsed is _INVALID_DATE_SENTINEL:
                 errors[CONF_ESTIMATED_MENARCHE_DATE] = "invalid_date"
+            if meno_date_parsed is _INVALID_DATE_SENTINEL:
+                errors[CONF_MENOPAUSE_START_DATE] = "invalid_date"
 
             # Validate family menarche age
             family_age_raw = str(user_input.get(CONF_FAMILY_MENARCHE_AGE, "")).strip()
@@ -167,6 +175,7 @@ class MenstruationGaugeOptionsFlow(config_entries.OptionsFlow):
                 new_period_duration = max(1, min(14, int(user_input.get(CONF_PERIOD_DURATION_DAYS, DEFAULT_PERIOD_DURATION_DAYS))))
                 pregnancy_enabled = bool(user_input.get(CONF_PREGNANCY_ENABLED, False))
                 pre_menarche_enabled = bool(user_input.get(CONF_PRE_MENARCHE_ENABLED, False))
+                menopause_enabled = bool(user_input.get(CONF_MENOPAUSE_ENABLED, False))
 
                 # Auto-populate pregnancy start date from last cycle if not provided
                 new_preg_start: str | None = preg_date_parsed if preg_date_parsed is not _INVALID_DATE_SENTINEL else None
@@ -184,6 +193,10 @@ class MenstruationGaugeOptionsFlow(config_entries.OptionsFlow):
                     "estimated_date": men_date_parsed if men_date_parsed is not _INVALID_DATE_SENTINEL else None,
                     "family_menarche_age": new_family_menarche_age,
                 }
+                new_menopause_data = {
+                    "is_menopause": menopause_enabled,
+                    "start_date": meno_date_parsed if meno_date_parsed is not _INVALID_DATE_SENTINEL else None,
+                }
 
                 if runtime is not None:
                     # Update in-memory runtime
@@ -192,6 +205,7 @@ class MenstruationGaugeOptionsFlow(config_entries.OptionsFlow):
                     runtime.period_duration_days = new_period_duration
                     runtime.pregnancy_data = new_pregnancy_data
                     runtime.menarche_data = new_menarche_data
+                    runtime.menopause_data = new_menopause_data
 
                     # Persist to storage
                     await runtime.storage.async_save(
@@ -202,6 +216,7 @@ class MenstruationGaugeOptionsFlow(config_entries.OptionsFlow):
                         runtime.pregnancy_data,
                         runtime.menarche_data,
                         runtime.pre_menarche_data,
+                        runtime.menopause_data,
                     )
                     async_dispatcher_send(self.hass, SIGNAL_HISTORY_UPDATED)
                 else:
@@ -221,6 +236,7 @@ class MenstruationGaugeOptionsFlow(config_entries.OptionsFlow):
                         new_pregnancy_data,
                         new_menarche_data,
                         stored_full.get("pre_menarche_data"),
+                        new_menopause_data,
                     )
 
                 # Keep entry.data in sync for basic info fields
@@ -264,6 +280,14 @@ class MenstruationGaugeOptionsFlow(config_entries.OptionsFlow):
                 vol.Optional(
                     CONF_FAMILY_MENARCHE_AGE,
                     default=str(menarche_data.get("family_menarche_age") or ""),
+                ): str,
+                vol.Optional(
+                    CONF_MENOPAUSE_ENABLED,
+                    default=bool(menopause_data.get("is_menopause", False)),
+                ): bool,
+                vol.Optional(
+                    CONF_MENOPAUSE_START_DATE,
+                    default=menopause_data.get("start_date") or "",
                 ): str,
             }
         )

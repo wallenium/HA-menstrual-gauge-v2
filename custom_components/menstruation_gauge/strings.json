@@ -28,7 +28,9 @@
           "pregnancy_start_date": "Pregnancy start date (YYYY-MM-DD)",
           "pre_menarche_enabled": "Enable pre-menarche tracking",
           "estimated_menarche_date": "Estimated menarche date (YYYY-MM-DD)",
-          "family_menarche_age": "Family menarche age (8–20, optional)"
+          "family_menarche_age": "Family menarche age (8–20, optional)",
+          "menopause_enabled": "Enable menopause mode",
+          "menopause_start_date": "Menopause start date (YYYY-MM-DD)"
         },
         "data_description": {
           "period_duration_days": "Number of days the period typically lasts (1–14).",
@@ -36,7 +38,9 @@
           "pregnancy_start_date": "First day of last menstruation (LMP). Leave empty to use the last recorded cycle start.",
           "pre_menarche_enabled": "Track puberty signs before the first period (menarche).",
           "estimated_menarche_date": "Estimated date of the first period. Used for countdown tracking.",
-          "family_menarche_age": "Age of menarche in the family (mother/sister) used to estimate the expected age."
+          "family_menarche_age": "Age of menarche in the family (mother/sister) used to estimate the expected age.",
+          "menopause_enabled": "Activates menopause tracking mode.",
+          "menopause_start_date": "Date when menopause started (YYYY-MM-DD). Leave empty if unknown."
         }
       }
     },

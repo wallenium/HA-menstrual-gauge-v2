@@ -34,6 +34,7 @@ class CycleModel:
     due_date: str | None
     menarche_data: dict[str, Any]
     pre_menarche_data: dict[str, Any]
+    menopause_data: dict[str, Any]
 
 
 def normalize_history(history: list[str]) -> list[str]:
@@ -181,6 +182,7 @@ def build_cycle_model(
     pregnancy_data: dict[str, Any] | None = None,
     menarche_data: dict[str, Any] | None = None,
     pre_menarche_data: dict[str, Any] | None = None,
+    menopause_data: dict[str, Any] | None = None,
     today: date | None = None,
 ) -> CycleModel:
     """Build complete cycle model for sensor state + attributes."""
@@ -199,6 +201,10 @@ def build_cycle_model(
     pre_men_data: dict[str, Any] = {"signs": {}, "tanner_stage": None}
     if isinstance(pre_menarche_data, dict):
         pre_men_data.update(pre_menarche_data)
+
+    meno_data: dict[str, Any] = {"is_menopause": False, "start_date": None}
+    if isinstance(menopause_data, dict):
+        meno_data.update(menopause_data)
 
     # If pregnant, return pregnancy state
     if is_pregnant:
@@ -223,6 +229,7 @@ def build_cycle_model(
             due_date=due_date,
             menarche_data=men_data,
             pre_menarche_data=pre_men_data,
+            menopause_data=meno_data,
         )
 
     # If in pre-menarche mode (tracking explicitly enabled, awaiting first period)
@@ -247,6 +254,7 @@ def build_cycle_model(
             due_date=None,
             menarche_data=men_data,
             pre_menarche_data=pre_men_data,
+            menopause_data=meno_data,
         )
 
     # If menarche has been recorded, check if we're in the menarche transition state
@@ -277,6 +285,7 @@ def build_cycle_model(
                     due_date=None,
                     menarche_data=men_data,
                     pre_menarche_data=pre_men_data,
+                    menopause_data=meno_data,
                 )
         except ValueError:
             pass
@@ -339,4 +348,5 @@ def build_cycle_model(
         due_date=None,
         menarche_data=men_data,
         pre_menarche_data=pre_men_data,
+        menopause_data=meno_data,
     )
