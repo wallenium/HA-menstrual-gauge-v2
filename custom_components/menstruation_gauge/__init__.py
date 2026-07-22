@@ -97,6 +97,8 @@ from .const import (
     STORAGE_KEY,
     STORAGE_VERSION,
     SYMPTOM_BASAL_TEMP,
+    SYMPTOM_CLOTS,
+    SYMPTOM_CLOT_SIZE,
     SYMPTOM_OPTIONS,
     TANNER_STAGE_1,
     TANNER_STAGE_2,
@@ -1241,6 +1243,12 @@ async def _async_handle_add_symptom(hass: HomeAssistant, call: ServiceCall) -> N
     if not isinstance(symptom_data, dict):
         raise HomeAssistantError("Symptom data must be a dictionary.")
 
+    existing = None
+    for entry in runtime.symptom_history:
+        if entry.get("date") == date_iso:
+            existing = entry
+            break
+
     valid_fields = set(SYMPTOM_OPTIONS.keys()) | {SYMPTOM_BASAL_TEMP}
     for key, value in symptom_data.items():
         if key not in valid_fields:
@@ -1261,17 +1269,29 @@ async def _async_handle_add_symptom(hass: HomeAssistant, call: ServiceCall) -> N
                         f"Invalid value '{item}' for symptom field '{key}'. Allowed: {', '.join(allowed)}"
                     )
 
-    existing = None
-    for entry in runtime.symptom_history:
-        if entry.get("date") == date_iso:
-            existing = entry
-            break
+    next_symptom_data = dict(symptom_data)
+    if SYMPTOM_CLOTS in next_symptom_data and next_symptom_data.get(SYMPTOM_CLOTS) != "yes":
+        next_symptom_data.pop(SYMPTOM_CLOT_SIZE, None)
+
+    if SYMPTOM_CLOT_SIZE in next_symptom_data:
+        clots_value = next_symptom_data.get(SYMPTOM_CLOTS)
+        if clots_value is None and existing is not None:
+            clots_value = existing.get(SYMPTOM_CLOTS)
+        if clots_value != "yes":
+            raise HomeAssistantError(f"Symptom field '{SYMPTOM_CLOT_SIZE}' can only be set when '{SYMPTOM_CLOTS}' is 'yes'.")
 
     if existing:
-        existing.update(symptom_data)
-        existing["date"] = date_iso
+        merged = dict(existing)
+        merged.update(next_symptom_data)
+        if merged.get(SYMPTOM_CLOTS) != "yes":
+            merged.pop(SYMPTOM_CLOT_SIZE, None)
+        merged["date"] = date_iso
+        existing.clear()
+        existing.update(merged)
     else:
-        new_entry = dict(symptom_data)
+        new_entry = dict(next_symptom_data)
+        if new_entry.get(SYMPTOM_CLOTS) != "yes":
+            new_entry.pop(SYMPTOM_CLOT_SIZE, None)
         new_entry["date"] = date_iso
         runtime.symptom_history.append(new_entry)
 

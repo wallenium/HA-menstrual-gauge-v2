@@ -278,6 +278,8 @@ class MenstruationStorage:
                 continue
             normalized_symptom = dict(symptom)
             normalized_symptom["date"] = normalized_date
+            if normalized_symptom.get("clots") != "yes":
+                normalized_symptom.pop("clot_size", None)
             seen[normalized_date] = normalized_symptom
         return sorted(seen.values(), key=lambda item: item.get("date", ""))
 
