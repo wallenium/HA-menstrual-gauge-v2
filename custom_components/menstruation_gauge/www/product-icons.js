@@ -317,16 +317,12 @@ const ProductIcons = {
   getStatusAnimatedIcon,
   getStateAssetUrl,
   getStateIcon,
-  getPeriodIcon,
-  getOvulationIcon,
-  getPMSIcon,
   weeksToPregnancyMonth,
   resolvePregnancyInfo,
   getPregnancyIcon,
   getPregnancyAssetUrl,
   getProductAssetUrl,
   getPostpartumIcon,
-  getMenarcheIcon,
   getMenopauseIcon,
   getIcon(productKey) {
     return getSvgIcon(productKey);
