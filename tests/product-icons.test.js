@@ -155,6 +155,10 @@ function testGetPregnancyIcon() {
     iconFilename(html).endsWith('preg_02.svg'),
     'object { weeks_pregnant: 6 } → preg_02.svg',
   );
+  assert.ok(
+    html.includes('background-color:currentColor'),
+    'pregnancy icon remains currentColor-masked',
+  );
 
   console.log('  ✓ getPregnancyIcon');
 }
@@ -300,9 +304,12 @@ function testPremenarcheStateMapping() {
     'menarche → premenarche.svg',
   );
 
-  // getStateIcon returns a masked-asset span (static), not an inline SVG with keyframes
+  // getStateIcon returns a static image asset with original colors (no currentColor mask)
   const icon = getStateIcon('pre_menarche');
   assert.ok(icon.includes('premenarche.svg'), 'getStateIcon(pre_menarche) references premenarche.svg');
+  assert.ok(icon.includes('<img '), 'getStateIcon(pre_menarche) renders as image');
+  assert.ok(!icon.includes('background-color:currentColor'), 'getStateIcon(pre_menarche) should not use currentColor mask');
+  assert.ok(!icon.includes('-webkit-mask'), 'getStateIcon(pre_menarche) should not use CSS mask');
   assert.ok(!icon.includes('pi-flower-bloom'), 'getStateIcon(pre_menarche) must NOT contain animated flower classes');
 
   // getStatusIcon and getStatusAnimatedIcon must also return the static icon

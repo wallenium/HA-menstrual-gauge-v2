@@ -81,6 +81,11 @@ function buildMaskedAssetIcon(src, size = 'default') {
   return `<span aria-hidden="true" style="display:block;width:${iconSize}px;height:${iconSize}px;flex:0 0 auto;background-color:currentColor;-webkit-mask:url('${src}') center / contain no-repeat;mask:url('${src}') center / contain no-repeat;"></span>`;
 }
 
+function buildImageAssetIcon(src, size = 'default') {
+  const iconSize = resolveSize(size);
+  return `<img aria-hidden="true" alt="" src="${src}" style="display:block;width:${iconSize}px;height:${iconSize}px;flex:0 0 auto;" />`;
+}
+
 function buildIconSvg(content, size = 'default', options = {}) {
   const iconSize = resolveSize(size);
   const strokeWidth = resolveStrokeWidth(size);
@@ -167,7 +172,7 @@ function getStateIcon(statusKey, size = 'default') {
   if (!src) {
     return '';
   }
-  return buildMaskedAssetIcon(src, size);
+  return buildImageAssetIcon(src, size);
 }
 
 function getPostpartumIcon(size = 'default') {
