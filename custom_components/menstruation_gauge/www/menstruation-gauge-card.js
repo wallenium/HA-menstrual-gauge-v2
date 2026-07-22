@@ -100,6 +100,14 @@ class MenstruationGaugeCard extends HTMLElement {
         cat_hygiene: 'Hygiene',
         cat_test: 'Test',
         cat_cervical_mucus: 'Zervixschleim',
+        cat_smell: 'Geruch',
+        cat_clots: 'Klumpen',
+        cat_clot_size: 'Klumpengröße',
+        cat_bleeding_type: 'Blutungstyp',
+        cat_cervix_position: 'Zervixposition',
+        cat_cervix_texture: 'Zervixbeschaffenheit',
+        cat_libido: 'Libido',
+        cat_training_intensity: 'Trainingsintensität',
         cat_pregnancy_symptoms: 'Schwangerschaft',
         // Symptom option labels
         opt_light: 'Gering',
@@ -135,6 +143,28 @@ class MenstruationGaugeCard extends HTMLElement {
         opt_cremig: 'Cremig',
         opt_fadenziehend: 'Fadenziehend',
         opt_untypisch: 'Untypisch',
+        opt_normal: 'Normal',
+        opt_inconspicuous: 'Unauffällig',
+        opt_unpleasant: 'Unangenehm',
+        opt_fishy: 'Fischartig',
+        opt_yes: 'Ja',
+        opt_no: 'Nein',
+        opt_small: 'Klein',
+        opt_large: 'Groß',
+        opt_continuous: 'Kontinuierlich',
+        opt_intermittent: 'Intermittierend',
+        opt_drops: 'Tropfen',
+        opt_cervix_high: 'Oben',
+        opt_cervix_mid: 'Mitte',
+        opt_cervix_low: 'Unten',
+        opt_firm: 'Hart',
+        opt_soft: 'Weich',
+        opt_open: 'Offen',
+        opt_libido_low: 'Niedrig',
+        opt_libido_high: 'Erhöht',
+        opt_training_light: 'Leicht',
+        opt_training_moderate: 'Moderat',
+        opt_training_intense: 'Intensiv',
         // Pregnancy symptom options
         opt_preg_nausea: 'Übelkeit',
         opt_preg_fatigue: 'Erschöpfung',
@@ -170,6 +200,14 @@ class MenstruationGaugeCard extends HTMLElement {
         cat_hygiene: 'Hygiene',
         cat_test: 'Test',
         cat_cervical_mucus: 'Cervical Mucus',
+        cat_smell: 'Smell',
+        cat_clots: 'Clots',
+        cat_clot_size: 'Clot Size',
+        cat_bleeding_type: 'Bleeding Type',
+        cat_cervix_position: 'Cervix Position',
+        cat_cervix_texture: 'Cervix Texture',
+        cat_libido: 'Libido',
+        cat_training_intensity: 'Training Intensity',
         cat_pregnancy_symptoms: 'Pregnancy',
         // Symptom option labels
         opt_light: 'Light',
@@ -205,6 +243,28 @@ class MenstruationGaugeCard extends HTMLElement {
         opt_cremig: 'Creamy',
         opt_fadenziehend: 'Stretchy',
         opt_untypisch: 'Atypical',
+        opt_normal: 'Normal',
+        opt_inconspicuous: 'Inconspicuous',
+        opt_unpleasant: 'Unpleasant',
+        opt_fishy: 'Fishy',
+        opt_yes: 'Yes',
+        opt_no: 'No',
+        opt_small: 'Small',
+        opt_large: 'Large',
+        opt_continuous: 'Continuous',
+        opt_intermittent: 'Intermittent',
+        opt_drops: 'Drops',
+        opt_cervix_high: 'High',
+        opt_cervix_mid: 'Mid',
+        opt_cervix_low: 'Low',
+        opt_firm: 'Firm',
+        opt_soft: 'Soft',
+        opt_open: 'Open',
+        opt_libido_low: 'Low',
+        opt_libido_high: 'High',
+        opt_training_light: 'Light',
+        opt_training_moderate: 'Moderate',
+        opt_training_intense: 'Intense',
         // Pregnancy symptom options
         opt_preg_nausea: 'Nausea',
         opt_preg_fatigue: 'Fatigue',
@@ -432,6 +492,14 @@ class MenstruationGaugeCard extends HTMLElement {
       { key: 'hygiene', icon: 'mdi:medical-bag', multi: true, options: ['pad', 'liner', 'tampon', 'cup', 'period_underwear'] },
       { key: 'test', icon: 'mdi:test-tube', multi: true, options: ['positive_ovulation', 'negative_ovulation', 'positive_pregnancy', 'negative_pregnancy'] },
       { key: 'cervical_mucus', icon: 'mdi:water', multi: false, options: ['keinen', 'klebrig', 'cremig', 'fadenziehend', 'untypisch'] },
+      { key: 'smell', icon: 'mdi:nose', multi: false, options: ['normal', 'inconspicuous', 'unpleasant', 'fishy'] },
+      { key: 'clots', icon: 'mdi:water-alert', multi: false, options: ['yes', 'no'] },
+      { key: 'clot_size', icon: 'mdi:ruler-square', multi: false, options: ['small', 'medium', 'large'], dependsOn: { key: 'clots', value: 'yes' } },
+      { key: 'bleeding_type', icon: 'mdi:waves', multi: false, options: ['continuous', 'intermittent', 'drops'] },
+      { key: 'cervix_position', icon: 'mdi:grid', multi: false, options: ['cervix_high', 'cervix_mid', 'cervix_low'], renderAs: 'cervix-grid' },
+      { key: 'cervix_texture', icon: 'mdi:grid', multi: false, options: ['firm', 'soft', 'open'], hiddenInModal: true },
+      { key: 'libido', icon: 'mdi:heart-pulse', multi: false, options: ['libido_low', 'normal', 'libido_high'] },
+      { key: 'training_intensity', icon: 'mdi:run-fast', multi: false, options: ['training_light', 'training_moderate', 'training_intense'] },
     ];
     if (String(state || '') === 'pre_menarche') {
       const allowed = new Set(['spotting', 'discharge', 'cervical_mucus', 'pain', 'hygiene']);
@@ -874,7 +942,38 @@ class MenstruationGaugeCard extends HTMLElement {
     const symptomConfig = this._symptomConfig(model.state, isPregnant);
 
     const categoryRows = symptomConfig.map((cat) => {
+      if (cat.hiddenInModal) {
+        return '';
+      }
       const catLabel = this._t(`cat_${cat.key}`);
+      if (cat.renderAs === 'cervix-grid') {
+        const positionValue = existing.cervix_position || '';
+        const textureValue = existing.cervix_texture || '';
+        const positionButtons = cat.options.map((opt) => {
+          const sel = positionValue === opt ? ' sym-selected' : '';
+          return `<button type="button" class="sym-opt-btn${sel}" data-cat="cervix_position" data-val="${opt}">${this._t(`opt_${opt}`)}</button>`;
+        }).join('');
+        const textureConfig = symptomConfig.find((entry) => entry.key === 'cervix_texture');
+        const textureButtons = (textureConfig?.options || []).map((opt) => {
+          const sel = textureValue === opt ? ' sym-selected' : '';
+          return `<button type="button" class="sym-opt-btn${sel}" data-cat="cervix_texture" data-val="${opt}">${this._t(`opt_${opt}`)}</button>`;
+        }).join('');
+        return `
+          <div class="sym-row">
+            <div class="sym-cat-head"><ha-icon icon="${cat.icon}"></ha-icon><span>${catLabel}</span></div>
+            <div class="sym-cervix-grid">
+              <div class="sym-cervix-col">
+                <div class="sym-cervix-title">${this._t('cat_cervix_position')}</div>
+                <div class="sym-options sym-cervix-opts">${positionButtons}</div>
+              </div>
+              <div class="sym-cervix-col">
+                <div class="sym-cervix-title">${this._t('cat_cervix_texture')}</div>
+                <div class="sym-options sym-cervix-opts">${textureButtons}</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
       if (cat.multi) {
         const currentValues = Array.isArray(existing[cat.key]) ? existing[cat.key] : [];
         const checkboxes = cat.options.map((opt) => {
@@ -888,7 +987,8 @@ class MenstruationGaugeCard extends HTMLElement {
         const sel = currentValue === opt ? ' sym-selected' : '';
         return `<button type="button" class="sym-opt-btn${sel}" data-cat="${cat.key}" data-val="${opt}">${this._t(`opt_${opt}`)}</button>`;
       }).join('');
-      return `<div class="sym-row"><div class="sym-cat-head"><ha-icon icon="${cat.icon}"></ha-icon><span>${catLabel}</span></div><div class="sym-options sym-single-opts">${buttons}</div></div>`;
+      const hiddenClass = cat.dependsOn && existing[cat.dependsOn.key] !== cat.dependsOn.value ? ' sym-hidden' : '';
+      return `<div class="sym-row${hiddenClass}" data-sym-row="${cat.key}"><div class="sym-cat-head"><ha-icon icon="${cat.icon}"></ha-icon><span>${catLabel}</span></div><div class="sym-options sym-single-opts">${buttons}</div></div>`;
     }).join('');
 
     const basalTemp = existing.basal_temp != null ? existing.basal_temp : '';
@@ -947,6 +1047,9 @@ class MenstruationGaugeCard extends HTMLElement {
     // Collect symptom data from modal inputs
     const symptomData = {};
     this._symptomConfig(model.state, model.pregnancyInfo?.isPregnant).forEach((cat) => {
+      if (cat.hiddenInModal) {
+        return;
+      }
       if (cat.multi) {
         const checked = Array.from(root.querySelectorAll(`.sym-multi[name="${cat.key}"]:checked`)).map((el) => el.value);
         if (checked.length > 0) symptomData[cat.key] = checked;
@@ -955,6 +1058,9 @@ class MenstruationGaugeCard extends HTMLElement {
         if (selected) symptomData[cat.key] = selected.getAttribute('data-val');
       }
     });
+    if (symptomData.clots !== 'yes') {
+      delete symptomData.clot_size;
+    }
     const rawTemp = root.getElementById('sym-basal-temp')?.value;
     const basalTemp = parseFloat(rawTemp);
     if (!Number.isNaN(basalTemp) && rawTemp !== '') symptomData.basal_temp = basalTemp;
@@ -1063,6 +1169,16 @@ class MenstruationGaugeCard extends HTMLElement {
         const modal = this.shadowRoot.getElementById('sym-modal');
         modal?.querySelectorAll(`.sym-opt-btn[data-cat="${cat}"]`).forEach((b) => b.classList.remove('sym-selected'));
         optBtn.classList.add('sym-selected');
+        if (cat === 'clots') {
+          const showSize = optBtn.getAttribute('data-val') === 'yes';
+          const clotSizeRow = modal?.querySelector('[data-sym-row="clot_size"]');
+          if (clotSizeRow) {
+            clotSizeRow.classList.toggle('sym-hidden', !showSize);
+          }
+          if (!showSize) {
+            modal?.querySelectorAll('.sym-opt-btn[data-cat="clot_size"]').forEach((b) => b.classList.remove('sym-selected'));
+          }
+        }
       }
     });
   }
@@ -1207,6 +1323,11 @@ class MenstruationGaugeCard extends HTMLElement {
         .sym-cat-head { display: flex; align-items: center; gap: 6px; font-size: .82rem; font-weight: 600; opacity: .85; }
         .sym-cat-head ha-icon { --mdc-icon-size: 16px; }
         .sym-options { display: flex; flex-wrap: wrap; gap: 5px; }
+        .sym-hidden { display: none; }
+        .sym-cervix-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+        .sym-cervix-col { display: grid; gap: 4px; }
+        .sym-cervix-title { font-size: .72rem; opacity: .75; }
+        .sym-cervix-opts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
         .sym-opt-btn { border: 1px solid rgba(128,128,128,.35); border-radius: 6px; padding: 4px 9px; cursor: pointer; font-size: .8rem; background: transparent; color: inherit; transition: background 120ms, border-color 120ms; }
         .sym-opt-btn:hover { border-color: rgba(190,18,60,.45); }
         .sym-opt-btn.sym-selected { background: ${palette.confirmed}; color: #fff; border-color: ${palette.confirmed}; }

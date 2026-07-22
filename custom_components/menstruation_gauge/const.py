@@ -118,6 +118,14 @@ SYMPTOM_BASAL_TEMP = "basal_temp"
 SYMPTOM_HYGIENE = "hygiene"
 SYMPTOM_TEST = "test"
 SYMPTOM_CERVICAL_MUCUS = "cervical_mucus"
+SYMPTOM_SMELL = "smell"
+SYMPTOM_CLOTS = "clots"
+SYMPTOM_CLOT_SIZE = "clot_size"
+SYMPTOM_BLEEDING_TYPE = "bleeding_type"
+SYMPTOM_CERVIX_POSITION = "cervix_position"
+SYMPTOM_CERVIX_TEXTURE = "cervix_texture"
+SYMPTOM_LIBIDO = "libido"
+SYMPTOM_TRAINING_INTENSITY = "training_intensity"
 SYMPTOM_PREGNANCY = "pregnancy_symptoms"
 
 # Symptom options for reference (used in UI)
@@ -130,6 +138,14 @@ SYMPTOM_OPTIONS = {
     SYMPTOM_HYGIENE: ["pad", "liner", "tampon", "cup", "period_underwear"],
     SYMPTOM_TEST: ["positive_ovulation", "negative_ovulation", "positive_pregnancy", "negative_pregnancy"],
     SYMPTOM_CERVICAL_MUCUS: ["keinen", "klebrig", "cremig", "fadenziehend", "untypisch"],
+    SYMPTOM_SMELL: ["normal", "inconspicuous", "unpleasant", "fishy"],
+    SYMPTOM_CLOTS: ["yes", "no"],
+    SYMPTOM_CLOT_SIZE: ["small", "medium", "large"],
+    SYMPTOM_BLEEDING_TYPE: ["continuous", "intermittent", "drops"],
+    SYMPTOM_CERVIX_POSITION: ["cervix_high", "cervix_mid", "cervix_low"],
+    SYMPTOM_CERVIX_TEXTURE: ["firm", "soft", "open"],
+    SYMPTOM_LIBIDO: ["libido_low", "normal", "libido_high"],
+    SYMPTOM_TRAINING_INTENSITY: ["training_light", "training_moderate", "training_intense"],
     SYMPTOM_PREGNANCY: ["nausea", "fatigue", "heartburn", "swelling", "headache", "back_pain"],
 }
 

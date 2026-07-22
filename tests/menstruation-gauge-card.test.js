@@ -530,6 +530,83 @@ function testDischargeSymptomConfigAndOrdering() {
 }
 
 // ---------------------------------------------------------------------------
+// E5) New categories available in all configured cycle modes
+// ---------------------------------------------------------------------------
+
+function testNewSymptomCategoriesAcrossModes() {
+  const card = makeCard();
+  card.setConfig({ entity: 'sensor.menstruation' });
+  const proto = GaugeCard.prototype;
+  const required = ['smell', 'clots', 'clot_size', 'bleeding_type', 'cervix_position', 'cervix_texture', 'libido', 'training_intensity'];
+
+  [
+    ['period', false],
+    ['pregnant', true],
+    ['postpartum', false],
+    ['menopause', false],
+    ['menarche', false],
+  ].forEach(([state, isPregnant]) => {
+    const config = proto._symptomConfig.call(card, state, isPregnant);
+    const keys = config.map((c) => c.key);
+    required.forEach((key) => {
+      assert.ok(keys.includes(key), `${key} must be available in ${state} mode`);
+    });
+  });
+
+  console.log('  ✓ new symptom categories present across cycle modes');
+}
+
+// ---------------------------------------------------------------------------
+// E6) Clot size remains dependent on clots=yes in saved payload
+// ---------------------------------------------------------------------------
+
+async function testClotSizeDependencyOnSave() {
+  const card = makeCard();
+  card.setConfig({ entity: 'sensor.menstruation' });
+
+  const savedCalls = [];
+  card._hass = {
+    ...makeHass({ state: 'period' }),
+    callService: async (domain, service, payload) => {
+      savedCalls.push({ domain, service, payload });
+    },
+  };
+
+  const iso = new Date().toISOString().slice(0, 10);
+  card._modalIso = iso;
+
+  const selectedMap = new Map([
+    ['clots', 'no'],
+    ['clot_size', 'large'],
+    ['bleeding_type', 'continuous'],
+  ]);
+  const fakeRoot = {
+    querySelector: (sel) => {
+      const m = sel.match(/data-cat="([^"]+)"/);
+      if (!m) return null;
+      const key = m[1];
+      const selected = selectedMap.get(key);
+      return selected ? { getAttribute: () => selected, classList: { contains: () => false } } : null;
+    },
+    querySelectorAll: () => [],
+    getElementById: (id) => (id === 'sym-basal-temp' ? { value: '' } : null),
+    addEventListener: () => {},
+    get innerHTML() { return ''; },
+    set innerHTML(_v) {},
+  };
+  Object.defineProperty(card, 'shadowRoot', { get: () => fakeRoot, configurable: true });
+
+  await card._handleModalSave();
+
+  const symptomCall = savedCalls.find((c) => c.domain === 'menstruation_gauge' && c.service === 'add_symptom');
+  assert.ok(symptomCall, 'add_symptom service must be called');
+  assert.strictEqual(symptomCall.payload.symptom_data.clots, 'no', 'clots must be saved');
+  assert.ok(!('clot_size' in symptomCall.payload.symptom_data), 'clot_size must be omitted when clots is no');
+
+  console.log('  ✓ clot size dependency enforced on modal save');
+}
+
+// ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
 
@@ -546,6 +623,8 @@ const tests = [
   ['pregnancy-mode-symptom-save', testPregnancyModeSymptomSave],
   ['non-pregnancy-symptom-config-regression', testNonPregnancySymptomConfig],
   ['discharge-symptom-config-ordering', testDischargeSymptomConfigAndOrdering],
+  ['new-symptom-categories-across-modes', testNewSymptomCategoriesAcrossModes],
+  ['clot-size-dependency-save', testClotSizeDependencyOnSave],
 ];
 
 (async () => {
