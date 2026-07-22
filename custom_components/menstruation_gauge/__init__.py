@@ -192,6 +192,19 @@ HOUSEHOLD_INVENTORY_STORE_KEY = f"{STORAGE_KEY}.household_inventory"
 HOUSEHOLD_CONSUMPTION_LOG_LIMIT = 50
 HOUSEHOLD_PRODUCTS = ("tampon", "pad", "cup", "liner", "underwear")
 
+# Products that should NOT trigger a shopping list entry (cup is emptied/reused;
+# underwear is washed, not purchased).
+_SKIP_SHOPPING_PRODUCTS: frozenset[str] = frozenset({"cup", "underwear"})
+
+# Display names used when adding items to the HA shopping list.
+_SHOPPING_PRODUCT_NAMES: dict[str, str] = {
+    "tampon": "Tampons",
+    "pad": "Pads",
+    "liner": "Liners",
+}
+
+_TODO_SHOPPING_LIST_ENTITY = "todo.shopping_list"
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -387,6 +400,84 @@ async def _async_register_consumption(
         household_data["consumption_log"] = log[-HOUSEHOLD_CONSUMPTION_LOG_LIMIT:]
 
     await _async_save_household_inventory(hass)
+
+
+def _apply_optional_thresholds(
+    household_data: dict,
+    product: str,
+    warning: int | None,
+    critical: int | None,
+) -> None:
+    """Persist threshold values supplied by the card config, if any."""
+    if warning is None and critical is None:
+        return
+    stored = household_data.setdefault("thresholds", {}).setdefault(
+        product, {"warning": 10, "critical": 5}
+    )
+    if warning is not None:
+        stored["warning"] = max(0, int(warning))
+    if critical is not None:
+        stored["critical"] = max(0, int(critical))
+
+
+async def _async_check_and_update_todo_list(hass: HomeAssistant, household_data: dict, product: str) -> None:
+    """Add a product to the HA shopping list when its stock reaches the warning threshold.
+
+    Cup and underwear are intentionally excluded: cups are reusable (only emptied)
+    and underwear needs washing rather than purchasing.
+    """
+    if product in _SKIP_SHOPPING_PRODUCTS:
+        return
+
+    display_name = _SHOPPING_PRODUCT_NAMES.get(product)
+    if not display_name:
+        return
+
+    inventory = household_data.get("inventory", {})
+    quantity = max(0, int(inventory.get(product, 0)))
+    thresholds = household_data.get("thresholds", {})
+    threshold = thresholds.get(product, {})
+    warning = max(0, int(threshold.get("warning", 10) if isinstance(threshold, dict) else 10))
+
+    if quantity > warning:
+        return
+
+    # Check for duplicate entry before adding.
+    already_listed = False
+    try:
+        response = await hass.services.async_call(
+            "todo",
+            "get_items",
+            {"entity_id": _TODO_SHOPPING_LIST_ENTITY},
+            blocking=True,
+            return_response=True,
+        )
+        if isinstance(response, dict):
+            items = response.get(_TODO_SHOPPING_LIST_ENTITY, {}).get("items", [])
+            for item in (items if isinstance(items, list) else []):
+                if str(item.get("summary", "")).strip().lower() == display_name.lower():
+                    already_listed = True
+                    break
+    except Exception as ex:  # noqa: BLE001
+        _LOGGER.debug("Could not read shopping list to check for duplicates: %s", ex)
+
+    if already_listed:
+        _LOGGER.debug("'%s' is already on the shopping list; skipping.", display_name)
+        return
+
+    try:
+        await hass.services.async_call(
+            "todo",
+            "add_item",
+            {"entity_id": _TODO_SHOPPING_LIST_ENTITY, "item": display_name},
+            blocking=True,
+        )
+        _LOGGER.info(
+            "Added '%s' to shopping list (stock: %d, warning threshold: %d).",
+            display_name, quantity, warning,
+        )
+    except Exception as ex:  # noqa: BLE001
+        _LOGGER.warning("Could not add '%s' to shopping list: %s", display_name, ex)
 
 
 def _profile_from_entry(entry: ConfigEntry) -> str:
@@ -1096,13 +1187,24 @@ async def _async_handle_manage_household_inventory(hass: HomeAssistant, call: Se
     if action != "reset" and product not in HOUSEHOLD_PRODUCTS:
         raise HomeAssistantError(f"Unsupported product '{product}'.")
 
+    # Optional threshold values sent from the card config so the backend stays in
+    # sync with whatever the user configured in the Lovelace card editor.
+    threshold_warning = call.data.get(SERVICE_FIELD_WARNING_THRESHOLD)
+    threshold_critical = call.data.get(SERVICE_FIELD_CRITICAL_THRESHOLD)
+
     if action == "set":
         household_data["inventory"][product] = max(0, quantity)
+        _apply_optional_thresholds(household_data, product, threshold_warning, threshold_critical)
     elif action == "add":
         current = max(0, int(household_data["inventory"].get(product, 0)))
         household_data["inventory"][product] = current + max(0, quantity)
+        _apply_optional_thresholds(household_data, product, threshold_warning, threshold_critical)
     elif action == "consume":
+        _apply_optional_thresholds(household_data, product, threshold_warning, threshold_critical)
         await _async_register_consumption(hass, product, max(1, quantity), member, source="inventory_service")
+        # household_data is updated in-place by _async_register_consumption; reload ref.
+        household_data = hass.data.get(HOUSEHOLD_INVENTORY_DATA_KEY, {})
+        await _async_check_and_update_todo_list(hass, household_data, product)
         return
     elif action == "set_thresholds":
         warning = call.data.get(SERVICE_FIELD_WARNING_THRESHOLD)
@@ -1123,6 +1225,11 @@ async def _async_handle_manage_household_inventory(hass: HomeAssistant, call: Se
         )
 
     await _async_save_household_inventory(hass)
+
+    # After reducing or explicitly setting stock, check whether the shopping list
+    # needs an entry (consume already handled above).
+    if action == "set":
+        await _async_check_and_update_todo_list(hass, household_data, product)
 
 
 async def _async_handle_add_symptom(hass: HomeAssistant, call: ServiceCall) -> None:

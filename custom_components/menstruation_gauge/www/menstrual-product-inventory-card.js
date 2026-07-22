@@ -7,7 +7,7 @@ class MenstrualProductInventoryCard extends HTMLElement {
       member: "",
       visible_products: ["tampon", "pad", "cup", "liner", "underwear"],
       product_order: ["tampon", "pad", "cup", "liner", "underwear"],
-      show_thresholds: true,
+      thresholds: {},
     };
   }
 
@@ -20,7 +20,7 @@ class MenstrualProductInventoryCard extends HTMLElement {
       inventory_entity: "sensor.household_product_stock",
       title: "",
       member: "",
-      show_thresholds: true,
+      thresholds: {},
       ...config,
     };
     this._ensureRoot();
@@ -67,15 +67,10 @@ class MenstrualProductInventoryCard extends HTMLElement {
         product: "Produkt",
         stock: "Bestand",
         actions: "Aktionen",
-        quick_minus: "-1",
-        quick_plus: "+1",
         quantity: "Menge",
-        set: "Setzen",
-        add: "Auffüllen",
         consume: "Verbrauch",
-        warning: "Warnung",
-        critical: "Kritisch",
-        save_thresholds: "Schwellen speichern",
+        refill: "Auffüllen",
+        wash_needed: "Dringend waschen!",
         recent_usage: "Letzte Verbräuche",
         no_logs: "Keine Verbrauchseinträge",
         status_good: "Gut",
@@ -103,15 +98,10 @@ class MenstrualProductInventoryCard extends HTMLElement {
         product: "Product",
         stock: "Stock",
         actions: "Actions",
-        quick_minus: "-1",
-        quick_plus: "+1",
         quantity: "Qty",
-        set: "Set",
-        add: "Add stock",
         consume: "Consume",
-        warning: "Warning",
-        critical: "Critical",
-        save_thresholds: "Save thresholds",
+        refill: "Refill",
+        wash_needed: "Washing needed urgently!",
         recent_usage: "Recent usage",
         no_logs: "No consumption logs",
         status_good: "Good",
@@ -178,6 +168,16 @@ class MenstrualProductInventoryCard extends HTMLElement {
     };
     if (product) serviceData.product = product;
     if (quantity !== undefined && quantity !== null) serviceData.quantity = Number(quantity) || 0;
+
+    // Forward card-configured thresholds so the backend keeps its stored thresholds in
+    // sync and can use them for shopping-list checks.
+    if (product && action !== "set_thresholds") {
+      const configThreshold = this.config?.thresholds?.[product];
+      if (configThreshold) {
+        if (configThreshold.warning !== undefined) serviceData.warning_threshold = Number(configThreshold.warning);
+        if (configThreshold.critical !== undefined) serviceData.critical_threshold = Number(configThreshold.critical);
+      }
+    }
 
     try {
       await this._hass.callService("menstruation_gauge", "manage_household_inventory", serviceData);
@@ -320,20 +320,13 @@ class MenstrualProductInventoryCard extends HTMLElement {
         const product = button.dataset.product;
         if (!action || !product) return;
 
-        const inputQuantity = Number(this._inputValues?.[product] ?? 1);
-        let quantity = Number(button.dataset.quantity || inputQuantity || 1);
-        if (["set-input", "add-input", "consume-input"].includes(button.dataset.role)) {
-          quantity = inputQuantity;
-        }
-
-        if (action === "set_thresholds") {
-          const warning = Number(this._thresholdValues?.[product]?.warning);
-          const critical = Number(this._thresholdValues?.[product]?.critical);
-          await this._callInventory("set_thresholds", product, null, {
-            warning_threshold: Number.isFinite(warning) ? warning : undefined,
-            critical_threshold: Number.isFinite(critical) ? critical : undefined,
-          });
-          return;
+        let quantity;
+        if (button.dataset.role === "consume-input") {
+          quantity = Math.max(1, Number(this._consumeValues?.[product] ?? 1));
+        } else if (button.dataset.role === "refill-input") {
+          quantity = Math.max(0, Number(this._refillValues?.[product] ?? 1));
+        } else {
+          quantity = Math.max(1, Number(button.dataset.quantity || 1));
         }
 
         const member = this._selectedMember || this.config.member || "";
@@ -343,7 +336,7 @@ class MenstrualProductInventoryCard extends HTMLElement {
       }
     });
 
-    // Delegated input handler for qty and threshold inputs
+    // Delegated input handler for consume and refill qty inputs
     this.shadowRoot.addEventListener("input", (ev) => {
       const input = ev.target;
       if (!input) return;
@@ -352,18 +345,12 @@ class MenstrualProductInventoryCard extends HTMLElement {
       const product = input.dataset?.product;
       if (!role || !product) return;
 
-      if (role === "qty") {
-        const value = Number(input.value || 0);
-        this._inputValues = { ...(this._inputValues || {}), [product]: value };
-      } else if (role === "warning" || role === "critical") {
-        const value = Number(input.value || 0);
-        this._thresholdValues = {
-          ...(this._thresholdValues || {}),
-          [product]: {
-            ...(this._thresholdValues?.[product] || {}),
-            [role]: value,
-          },
-        };
+      if (role === "consume-qty") {
+        const value = Math.max(1, Number(input.value || 1));
+        this._consumeValues = { ...(this._consumeValues || {}), [product]: value };
+      } else if (role === "refill-qty") {
+        const value = Math.max(0, Number(input.value || 1));
+        this._refillValues = { ...(this._refillValues || {}), [product]: value };
       }
     });
 
@@ -407,16 +394,20 @@ class MenstrualProductInventoryCard extends HTMLElement {
     const pregnancyMetaText = pregnancyInfo.isPregnant
       ? `${this._t("week")} ${pregnancyInfo.week} · ${this._t("trimester")} ${pregnancyInfo.trimester}`
       : "";
-    const showThresholds = this.config.show_thresholds !== false;
 
     const rows = this._products(pregnancyInfo)
       .map((product) => {
         const quantity = Math.max(0, Number(inventory[product] || 0));
-        const threshold = thresholds[product] || { warning: 10, critical: 5 };
+        // Prefer card-config thresholds (set in editor) over entity-attribute thresholds.
+        const configThreshold = this.config.thresholds?.[product] || {};
+        const threshold = {
+          warning: configThreshold.warning !== undefined ? Number(configThreshold.warning) : (thresholds[product]?.warning ?? 10),
+          critical: configThreshold.critical !== undefined ? Number(configThreshold.critical) : (thresholds[product]?.critical ?? 5),
+        };
         const status = this._stockStatus(quantity, threshold);
-        const qtyValue = this._inputValues?.[product] ?? 1;
-        const warningValue = this._thresholdValues?.[product]?.warning ?? threshold.warning;
-        const criticalValue = this._thresholdValues?.[product]?.critical ?? threshold.critical;
+        const consumeQtyValue = this._consumeValues?.[product] ?? 1;
+        const refillQtyValue = this._refillValues?.[product] ?? 1;
+        const showWashNeeded = product === "underwear" && (status === "warning" || status === "critical");
 
         return `
           <div class="row">
@@ -425,18 +416,16 @@ class MenstrualProductInventoryCard extends HTMLElement {
               <div class="product-icon">${this._getProductIconSvg(product)}</div>
             </div>
             <div class="stock ${status}">${quantity}<span>${this._t(`status_${status}`)}</span></div>
+            ${showWashNeeded ? `<div class="wash-needed">🧺 ${this._t("wash_needed")}</div>` : ""}
             <div class="controls">
-              <button class="btn" data-action="consume" data-product="${product}" data-quantity="1">${this._t("quick_minus")}</button>
-              <button class="btn" data-action="add" data-product="${product}" data-quantity="1">${this._t("quick_plus")}</button>
-              <input class="qty" type="number" min="0" data-role="qty" data-product="${product}" value="${qtyValue}">
-              <button class="btn" data-action="set" data-product="${product}" data-role="set-input">${this._t("set")}</button>
-              <button class="btn" data-action="add" data-product="${product}" data-role="add-input">${this._t("add")}</button>
-              <button class="btn warn" data-action="consume" data-product="${product}" data-role="consume-input">${this._t("consume")}</button>
-              ${showThresholds ? `
-              <input class="thr" type="number" min="0" data-role="warning" data-product="${product}" value="${warningValue}" placeholder="${this._t("warning")}">
-              <input class="thr" type="number" min="0" data-role="critical" data-product="${product}" value="${criticalValue}" placeholder="${this._t("critical")}">
-              <button class="btn" data-action="set_thresholds" data-product="${product}">${this._t("save_thresholds")}</button>
-              ` : ""}
+              <div class="action-group">
+                <input class="qty" type="number" min="1" data-role="consume-qty" data-product="${product}" value="${consumeQtyValue}">
+                <button class="btn warn" data-action="consume" data-product="${product}" data-role="consume-input">${this._t("consume")}</button>
+              </div>
+              <div class="action-group">
+                <input class="qty" type="number" min="0" data-role="refill-qty" data-product="${product}" value="${refillQtyValue}">
+                <button class="btn" data-action="add" data-product="${product}" data-role="refill-input">${this._t("refill")}</button>
+              </div>
             </div>
           </div>
         `;
@@ -472,10 +461,13 @@ class MenstrualProductInventoryCard extends HTMLElement {
         .stock.good { color: var(--mg-status-success); }
         .stock.warning { color: var(--mg-status-warning); }
         .stock.critical { color: var(--mg-status-error); }
-        .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 8px; }
+        .controls { display: flex; flex-wrap: wrap; gap: 10px; }
+        .action-group { display: flex; gap: 6px; align-items: center; }
+        .action-group .qty { width: 64px; }
         button, select { border: 1px solid var(--mg-border); border-radius: 8px; padding: 7px 9px; cursor: pointer; background: var(--mg-card-bg); color: var(--mg-text-primary); }
         button.warn { border-color: color-mix(in srgb, var(--mg-status-error) 55%, transparent); }
         input { border: 1px solid var(--mg-border); border-radius: 8px; padding: 7px; min-width: 0; background: transparent; color: var(--mg-text-primary); }
+        .wash-needed { display: flex; align-items: center; gap: 6px; background: color-mix(in srgb, var(--mg-status-warning) 15%, transparent); border: 1px solid var(--mg-status-warning); border-radius: 8px; padding: 6px 10px; color: var(--mg-status-warning); font-size: 0.9rem; margin-bottom: 8px; }
         .logs { margin-top: 12px; border-top: 1px solid var(--mg-border); padding-top: 10px; }
         .log-item { display: flex; justify-content: space-between; gap: 8px; font-size: 0.88rem; margin-top: 6px; }
         .empty { padding: 16px; color: var(--mg-text-secondary); }
