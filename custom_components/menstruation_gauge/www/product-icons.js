@@ -185,68 +185,6 @@ function getMenopauseIcon(size = 'default') {
   return buildIconSvg('<path d="M20.5 13.2A8.8 8.8 0 1 1 10.8 3.5A7 7 0 0 0 20.5 13.2Z"/>', size);
 }
 
-function getPeriodIcon(size = 'default') {
-  const iconStyle = `
-    @keyframes pi-period-float {
-      0%, 100% { transform: translateY(0); opacity: 1; }
-      50% { transform: translateY(-2px); opacity: 0.85; }
-    }
-    @keyframes pi-period-pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.7; }
-    }
-    .pi-period-root {
-      transform-origin: 12px 12px;
-      animation: pi-period-float 2.5s ease-in-out infinite;
-    }
-    .pi-period-drop {
-      animation: pi-period-pulse 2.5s ease-in-out infinite;
-    }
-  `;
-  const iconContent = `
-    <g class="pi-period-root">
-      <path class="pi-period-drop" d="M12 2.2C12 2.2 6.9 9.2 6.9 13.2A5.1 5.1 0 1 0 17.1 13.2C17.1 9.2 12 2.2 12 2.2Z"/>
-    </g>
-  `;
-  return buildIconSvg(iconContent, size, {
-    style: iconStyle,
-    svgStyle: 'color: var(--error-color, #e74c3c);',
-  });
-}
-
-function getMenarcheIcon(size = 'default') {
-  const iconStyle = `
-    @keyframes pi-flower-bloom {
-      0%, 100% { transform: scale(0.3); opacity: 0.8; }
-      50% { transform: scale(1); opacity: 1; }
-    }
-    @keyframes pi-petal-unfold {
-      0%, 100% { transform: rotate(var(--petal-rot)) translateY(0); }
-      50% { transform: rotate(calc(var(--petal-rot) + 45deg)) translateY(-4px); }
-    }
-    .pi-flower-group {
-      transform-origin: 12px 12px;
-      animation: pi-flower-bloom 3.8s ${ANIMATION_EASING} infinite;
-    }
-    .pi-petal {
-      transform-origin: 12px 12px;
-      animation: pi-petal-unfold 3.8s ${ANIMATION_EASING} infinite;
-    }
-  `;
-  const iconContent = `
-    <g class="pi-flower-group">
-      <g class="pi-petal" style="--petal-rot:0deg"><ellipse cx="12" cy="8" rx="1.7" ry="3.6"/></g>
-      <g class="pi-petal" style="--petal-rot:60deg"><ellipse cx="12" cy="8" rx="1.7" ry="3.6"/></g>
-      <g class="pi-petal" style="--petal-rot:120deg"><ellipse cx="12" cy="8" rx="1.7" ry="3.6"/></g>
-      <g class="pi-petal" style="--petal-rot:180deg"><ellipse cx="12" cy="8" rx="1.7" ry="3.6"/></g>
-      <g class="pi-petal" style="--petal-rot:240deg"><ellipse cx="12" cy="8" rx="1.7" ry="3.6"/></g>
-      <g class="pi-petal" style="--petal-rot:300deg"><ellipse cx="12" cy="8" rx="1.7" ry="3.6"/></g>
-      <circle cx="12" cy="12" r="1.45" fill="currentColor" stroke="none"/>
-    </g>
-  `;
-  return buildIconSvg(iconContent, size, { style: iconStyle });
-}
-
 function getNeutralStatusIcon(size = 'default') {
   return buildIconSvg('<circle cx="12" cy="12" r="7.4"/><path d="M8.7 12h6.6"/>', size);
 }
