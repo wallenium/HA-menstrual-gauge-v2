@@ -94,6 +94,7 @@ class MenstruationGaugeCard extends HTMLElement {
         // Symptom category labels
         cat_bleeding_strength: 'Blutungsstärke',
         cat_spotting: 'Schmierblutung',
+        cat_discharge: 'Ausfluss',
         cat_intercourse: 'Geschlechtsverkehr',
         cat_pain: 'Schmerzen',
         cat_hygiene: 'Hygiene',
@@ -107,6 +108,10 @@ class MenstruationGaugeCard extends HTMLElement {
         opt_very_heavy: 'Sehr stark',
         opt_red: 'Rot',
         opt_brown: 'Braun',
+        opt_reddish: 'Rötlich',
+        opt_white: 'Weiß',
+        opt_clear: 'Klar',
+        opt_other: 'Sonstiges',
         opt_protected: 'Geschützt',
         opt_unprotected: 'Ungeschützt',
         opt_mittelschmerz: 'Mittelschmerz',
@@ -159,6 +164,7 @@ class MenstruationGaugeCard extends HTMLElement {
         // Symptom category labels
         cat_bleeding_strength: 'Bleeding Strength',
         cat_spotting: 'Spotting',
+        cat_discharge: 'Discharge',
         cat_intercourse: 'Intercourse',
         cat_pain: 'Pain',
         cat_hygiene: 'Hygiene',
@@ -172,6 +178,10 @@ class MenstruationGaugeCard extends HTMLElement {
         opt_very_heavy: 'Very Heavy',
         opt_red: 'Red',
         opt_brown: 'Brown',
+        opt_reddish: 'Reddish',
+        opt_white: 'White',
+        opt_clear: 'Clear',
+        opt_other: 'Other',
         opt_protected: 'Protected',
         opt_unprotected: 'Unprotected',
         opt_mittelschmerz: 'Mittelschmerz',
@@ -416,6 +426,7 @@ class MenstruationGaugeCard extends HTMLElement {
     const all = [
       { key: 'bleeding_strength', icon: 'mdi:water-opacity', multi: false, options: ['light', 'medium', 'heavy', 'very_heavy'] },
       { key: 'spotting', icon: 'mdi:blood-bag', multi: false, options: ['red', 'brown'] },
+      { key: 'discharge', icon: 'mdi:water-outline', multi: false, options: ['reddish', 'brown', 'white', 'clear', 'other'] },
       { key: 'intercourse', icon: 'mdi:heart', multi: false, options: ['protected', 'unprotected'] },
       { key: 'pain', icon: 'mdi:emoticon-sad-outline', multi: true, options: ['mittelschmerz', 'cramps', 'tender_breasts', 'headache', 'migraine', 'lower_back', 'vulva'] },
       { key: 'hygiene', icon: 'mdi:medical-bag', multi: true, options: ['pad', 'liner', 'tampon', 'cup', 'period_underwear'] },
@@ -423,7 +434,7 @@ class MenstruationGaugeCard extends HTMLElement {
       { key: 'cervical_mucus', icon: 'mdi:water', multi: false, options: ['keinen', 'klebrig', 'cremig', 'fadenziehend', 'untypisch'] },
     ];
     if (String(state || '') === 'pre_menarche') {
-      const allowed = new Set(['spotting', 'pain', 'hygiene']);
+      const allowed = new Set(['spotting', 'discharge', 'cervical_mucus', 'pain', 'hygiene']);
       return all.filter((cat) => allowed.has(cat.key));
     }
     if (pregnant) {

@@ -483,6 +483,52 @@ function testNonPregnancySymptomConfig() {
   console.log('  ✓ non-pregnancy mode: symptom config unchanged (regression guard)');
 }
 
+function testDischargeSymptomConfigAndOrdering() {
+  const card = makeCard();
+  card.setConfig({ entity: 'sensor.menstruation' });
+  const proto = GaugeCard.prototype;
+
+  const periodConfig = proto._symptomConfig.call(card, 'period', false);
+  const periodKeys = periodConfig.map((c) => c.key);
+  const spottingIndex = periodKeys.indexOf('spotting');
+  const dischargeIndex = periodKeys.indexOf('discharge');
+  const mucusIndex = periodKeys.indexOf('cervical_mucus');
+  assert.ok(dischargeIndex !== -1, 'discharge must be present in period mode');
+  assert.ok(spottingIndex !== -1, 'spotting must be present in period mode');
+  assert.ok(mucusIndex !== -1, 'cervical_mucus must be present in period mode');
+  assert.strictEqual(dischargeIndex, spottingIndex + 1, 'discharge must be directly after spotting');
+  assert.ok(mucusIndex > dischargeIndex, 'cervical_mucus must come after discharge');
+
+  const preMenarcheConfig = proto._symptomConfig.call(card, 'pre_menarche', false);
+  const preMenarcheKeys = preMenarcheConfig.map((c) => c.key);
+  assert.ok(preMenarcheKeys.includes('discharge'), 'discharge must be present in pre_menarche mode');
+  assert.ok(preMenarcheKeys.includes('cervical_mucus'), 'cervical_mucus must be present in pre_menarche mode');
+  assert.strictEqual(
+    preMenarcheKeys.indexOf('discharge'),
+    preMenarcheKeys.indexOf('spotting') + 1,
+    'pre_menarche: discharge must be directly after spotting',
+  );
+
+  const pregnantConfig = proto._symptomConfig.call(card, 'pregnant', true);
+  const pregnantKeys = pregnantConfig.map((c) => c.key);
+  assert.ok(pregnantKeys.includes('discharge'), 'discharge must be present in pregnancy mode');
+  assert.strictEqual(
+    pregnantKeys.indexOf('discharge'),
+    pregnantKeys.indexOf('spotting') + 1,
+    'pregnancy: discharge must be directly after spotting',
+  );
+
+  card._hass = { locale: { language: 'de' } };
+  assert.strictEqual(proto._t.call(card, 'cat_discharge'), 'Ausfluss', 'German discharge category translation should exist');
+  assert.strictEqual(proto._t.call(card, 'opt_reddish'), 'Rötlich', 'German reddish option translation should exist');
+
+  card._hass = { locale: { language: 'en' } };
+  assert.strictEqual(proto._t.call(card, 'cat_discharge'), 'Discharge', 'English discharge category translation should exist');
+  assert.strictEqual(proto._t.call(card, 'opt_reddish'), 'Reddish', 'English reddish option translation should exist');
+
+  console.log('  ✓ discharge symptom config/order/translations');
+}
+
 // ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
@@ -499,6 +545,7 @@ const tests = [
   ['pregnancy-mode-modal-field-visibility', testPregnancyModeModalHidesPeriodToggle],
   ['pregnancy-mode-symptom-save', testPregnancyModeSymptomSave],
   ['non-pregnancy-symptom-config-regression', testNonPregnancySymptomConfig],
+  ['discharge-symptom-config-ordering', testDischargeSymptomConfigAndOrdering],
 ];
 
 (async () => {

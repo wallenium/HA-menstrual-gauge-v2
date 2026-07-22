@@ -111,6 +111,7 @@ STATE_MENARCHE = "menarche"
 # Symptom field definitions
 SYMPTOM_BLEEDING_STRENGTH = "bleeding_strength"
 SYMPTOM_SPOTTING = "spotting"
+SYMPTOM_DISCHARGE = "discharge"
 SYMPTOM_INTERCOURSE = "intercourse"
 SYMPTOM_PAIN = "pain"
 SYMPTOM_BASAL_TEMP = "basal_temp"
@@ -123,6 +124,7 @@ SYMPTOM_PREGNANCY = "pregnancy_symptoms"
 SYMPTOM_OPTIONS = {
     SYMPTOM_BLEEDING_STRENGTH: ["light", "medium", "heavy", "very_heavy"],
     SYMPTOM_SPOTTING: ["red", "brown"],
+    SYMPTOM_DISCHARGE: ["reddish", "brown", "white", "clear", "other"],
     SYMPTOM_INTERCOURSE: ["protected", "unprotected"],
     SYMPTOM_PAIN: ["mittelschmerz", "cramps", "tender_breasts", "headache", "migraine", "lower_back", "vulva"],
     SYMPTOM_HYGIENE: ["pad", "liner", "tampon", "cup", "period_underwear"],
