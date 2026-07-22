@@ -46,6 +46,9 @@ class MenstrualProductInventoryCardEditor extends HTMLElement {
         visible_products: "Sichtbare Produkte",
         product_order: "Produktreihenfolge (Ziehen zum Sortieren)",
         thresholds: "Schwellenwerte",
+        underwear_settings: "Unterwäsche Einstellungen",
+        total_owned: "Gesamt besessen",
+        washing_threshold: "Wasch-Schwelle",
         warning: "Warnung",
         critical: "Kritisch",
         options: "Optionen",
@@ -59,6 +62,9 @@ class MenstrualProductInventoryCardEditor extends HTMLElement {
         visible_products: "Visible Products",
         product_order: "Product Order (Drag to reorder)",
         thresholds: "Thresholds",
+        underwear_settings: "Underwear Settings",
+        total_owned: "Total Owned",
+        washing_threshold: "Washing Threshold",
         warning: "Warning",
         critical: "Critical",
         options: "Options",
@@ -246,7 +252,7 @@ class MenstrualProductInventoryCardEditor extends HTMLElement {
 
       <div class="section">
         <div class="section-title">${this._escapeHtml(this._t("thresholds"))}</div>
-        ${ordered.map((product) => {
+        ${ordered.filter((product) => product !== "cup" && product !== "underwear").map((product) => {
           const t = this._config.thresholds?.[product] || {};
           const warning = t.warning !== undefined ? t.warning : 10;
           const critical = t.critical !== undefined ? t.critical : 5;
@@ -260,6 +266,16 @@ class MenstrualProductInventoryCardEditor extends HTMLElement {
             </div>
           `;
         }).join("")}
+      </div>
+      <div class="section">
+        <div class="section-title">${this._escapeHtml(this._t("underwear_settings"))}</div>
+        <div class="threshold-item">
+          <div class="threshold-label">${this._escapeHtml(this._t("underwear"))}</div>
+          <div class="threshold-inputs">
+            <label>${this._escapeHtml(this._t("total_owned"))}: <input type="number" min="1" max="5000" data-underwear-setting="total_owned" value="${Math.max(1, Number(this._config.underwear_total_owned ?? 12))}"></label>
+            <label>${this._escapeHtml(this._t("washing_threshold"))}: <input type="number" min="0" max="5000" data-underwear-setting="washing_threshold" value="${Math.max(0, Number(this._config.underwear_washing_threshold ?? this._config.thresholds?.underwear?.warning ?? 3))}"></label>
+          </div>
+        </div>
       </div>
     `;
 
@@ -294,6 +310,30 @@ class MenstrualProductInventoryCardEditor extends HTMLElement {
         currentThresholds[product] = productThreshold;
         this._fireConfigChanged({ ...this._config, thresholds: currentThresholds });
         return;
+      }
+
+      if (target.matches("[data-underwear-setting]")) {
+        const setting = target.dataset.underwearSetting;
+        if (setting === "total_owned") {
+          const totalOwned = Math.max(1, Number(target.value || 1));
+          this._fireConfigChanged({ ...this._config, underwear_total_owned: totalOwned });
+          return;
+        }
+        if (setting === "washing_threshold") {
+          const washingThreshold = Math.max(0, Number(target.value || 0));
+          const currentThresholds = { ...(this._config.thresholds || {}) };
+          const currentUnderwear = { ...(currentThresholds.underwear || {}) };
+          currentUnderwear.warning = washingThreshold;
+          if (currentUnderwear.critical === undefined || Number(currentUnderwear.critical) > washingThreshold) {
+            currentUnderwear.critical = Math.max(0, washingThreshold - 1);
+          }
+          currentThresholds.underwear = currentUnderwear;
+          this._fireConfigChanged({
+            ...this._config,
+            underwear_washing_threshold: washingThreshold,
+            thresholds: currentThresholds,
+          });
+        }
       }
     };
 

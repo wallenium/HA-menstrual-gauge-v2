@@ -21,6 +21,8 @@ class MenstrualProductInventoryCard extends HTMLElement {
       title: "",
       member: "",
       thresholds: {},
+      underwear_total_owned: 12,
+      underwear_washing_threshold: 3,
       ...config,
     };
     this._ensureRoot();
@@ -69,8 +71,15 @@ class MenstrualProductInventoryCard extends HTMLElement {
         actions: "Aktionen",
         quantity: "Menge",
         consume: "Verbrauch",
+        use: "Verwenden",
+        emptied_dried: "Geleert/Trocken",
         refill: "Auffüllen",
+        washed: "Gereinigt",
         wash_needed: "Dringend waschen!",
+        available: "Verfügbar",
+        in_use: "In Nutzung",
+        buy_recommendation: "Kaufempfehlung",
+        add_to_shopping: "Zur Einkaufsliste",
         recent_usage: "Letzte Verbräuche",
         no_logs: "Keine Verbrauchseinträge",
         status_good: "Gut",
@@ -100,8 +109,15 @@ class MenstrualProductInventoryCard extends HTMLElement {
         actions: "Actions",
         quantity: "Qty",
         consume: "Consume",
+        use: "Use",
+        emptied_dried: "Emptied/Dried",
         refill: "Refill",
+        washed: "Washed",
         wash_needed: "Washing needed urgently!",
+        available: "Available",
+        in_use: "In use",
+        buy_recommendation: "Buy recommendation",
+        add_to_shopping: "Add to shopping list",
         recent_usage: "Recent usage",
         no_logs: "No consumption logs",
         status_good: "Good",
@@ -161,6 +177,24 @@ class MenstrualProductInventoryCard extends HTMLElement {
     return "good";
   }
 
+  _averageDailyUsageFromLog(log, product) {
+    const entries = Array.isArray(log)
+      ? log.filter((entry) => String(entry?.product || "").toLowerCase() === product)
+      : [];
+    if (!entries.length) return 0;
+
+    const dates = entries
+      .map((entry) => String(entry?.timestamp || "").trim().slice(0, 10))
+      .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value))
+      .sort();
+    if (!dates.length) return 0;
+    const totalQuantity = entries.reduce((sum, entry) => sum + Math.max(1, Number(entry?.quantity || 1)), 0);
+    const start = new Date(`${dates[0]}T00:00:00Z`).getTime();
+    const end = new Date(`${dates[dates.length - 1]}T00:00:00Z`).getTime();
+    const daysSpan = Math.max(1, Math.floor((end - start) / 86400000) + 1);
+    return totalQuantity / daysSpan;
+  }
+
   async _callInventory(action, product, quantity, extra = {}) {
     const serviceData = {
       inventory_action: action,
@@ -171,11 +205,19 @@ class MenstrualProductInventoryCard extends HTMLElement {
 
     // Forward card-configured thresholds so the backend keeps its stored thresholds in
     // sync and can use them for shopping-list checks.
-    if (product && action !== "set_thresholds") {
+    if (product && action !== "set_thresholds" && product !== "cup") {
       const configThreshold = this.config?.thresholds?.[product];
       if (configThreshold) {
         if (configThreshold.warning !== undefined) serviceData.warning_threshold = Number(configThreshold.warning);
         if (configThreshold.critical !== undefined) serviceData.critical_threshold = Number(configThreshold.critical);
+      }
+    }
+
+    if (product === "underwear") {
+      const totalOwned = Math.max(1, Number(this.config?.underwear_total_owned ?? 12));
+      serviceData.underwear_total_owned = totalOwned;
+      if (this.config?.underwear_washing_threshold !== undefined) {
+        serviceData.warning_threshold = Math.min(totalOwned, Math.max(0, Number(this.config.underwear_washing_threshold)));
       }
     }
 
@@ -385,6 +427,13 @@ class MenstrualProductInventoryCard extends HTMLElement {
     const selectedMember = (this._selectedMember ?? this.config.member) || "";
     const lastUsage = attrs.last_usage;
     const recentLogs = Array.isArray(attrs.consumption_log) ? attrs.consumption_log.slice(-5).reverse() : [];
+    const fullLog = Array.isArray(attrs.consumption_log) ? attrs.consumption_log : [];
+    const underwearTotalOwned = Math.max(1, Number(this.config.underwear_total_owned ?? attrs.underwear_total_owned ?? 12));
+    const underwearWashingThreshold = Math.max(0, Number(this.config.underwear_washing_threshold ?? attrs.underwear_washing_threshold ?? this.config.thresholds?.underwear?.warning ?? 3));
+    const underwearInUse = Math.max(0, Number(inventory.underwear || 0));
+    const underwearAvailable = Math.max(0, Math.min(underwearTotalOwned, Number(attrs.underwear_available ?? (underwearTotalOwned - underwearInUse))));
+    const underwearDailyUsage = this._averageDailyUsageFromLog(fullLog, "underwear");
+    const underwearRecommendedBuy = Math.max(0, Math.ceil((underwearDailyUsage * 7) - underwearTotalOwned));
     const title = this._escapeHtml(this.config.title || this._t("title"));
     const memberList = memberNames.length ? memberNames.map((name) => this._escapeHtml(name)).join(", ") : "-";
     const lastUsageText = lastUsage
@@ -404,10 +453,14 @@ class MenstrualProductInventoryCard extends HTMLElement {
           warning: configThreshold.warning !== undefined ? Number(configThreshold.warning) : (thresholds[product]?.warning ?? 10),
           critical: configThreshold.critical !== undefined ? Number(configThreshold.critical) : (thresholds[product]?.critical ?? 5),
         };
-        const status = this._stockStatus(quantity, threshold);
+        const displayQuantity = product === "underwear" ? underwearAvailable : (product === "cup" ? 1 : quantity);
+        const status = product === "underwear"
+          ? (displayQuantity <= underwearWashingThreshold ? "warning" : "good")
+          : this._stockStatus(displayQuantity, threshold);
         const consumeQtyValue = this._consumeValues?.[product] ?? 1;
         const refillQtyValue = this._refillValues?.[product] ?? 1;
-        const showWashNeeded = product === "underwear" && (status === "warning" || status === "critical");
+        const showWashNeeded = product === "underwear" && displayQuantity <= underwearWashingThreshold;
+        const showUnderwearBuyRecommendation = product === "underwear" && underwearRecommendedBuy > 0;
 
         return `
           <div class="row">
@@ -415,17 +468,38 @@ class MenstrualProductInventoryCard extends HTMLElement {
               <div class="product-name">${this._t(product)}</div>
               <div class="product-icon">${this._getProductIconSvg(product)}</div>
             </div>
-            <div class="stock ${status}">${quantity}<span>${this._t(`status_${status}`)}</span></div>
+            <div class="stock ${status}">${displayQuantity}<span>${product === "underwear" ? this._t("available") : this._t(`status_${status}`)}</span></div>
+            ${product === "underwear" ? `<div class="meta-inline">${this._t("in_use")}: ${Math.max(0, Math.min(underwearTotalOwned, underwearInUse))} / ${underwearTotalOwned}</div>` : ""}
             ${showWashNeeded ? `<div class="wash-needed">🧺 ${this._t("wash_needed")}</div>` : ""}
+            ${showUnderwearBuyRecommendation ? `<div class="meta-inline">${this._t("buy_recommendation")}: ${underwearRecommendedBuy}</div>` : ""}
             <div class="controls">
-              <div class="action-group">
-                <input class="qty" type="number" min="1" data-role="consume-qty" data-product="${product}" value="${consumeQtyValue}">
-                <button class="btn warn" data-action="consume" data-product="${product}" data-role="consume-input">${this._t("consume")}</button>
-              </div>
-              <div class="action-group">
-                <input class="qty" type="number" min="0" data-role="refill-qty" data-product="${product}" value="${refillQtyValue}">
-                <button class="btn" data-action="add" data-product="${product}" data-role="refill-input">${this._t("refill")}</button>
-              </div>
+              ${product === "cup" ? `
+                <div class="action-group">
+                  <button class="btn warn" data-action="consume" data-product="${product}" data-quantity="1">${this._t("emptied_dried")}</button>
+                </div>
+              ` : product === "underwear" ? `
+                <div class="action-group">
+                  <button class="btn warn" data-action="consume" data-product="${product}" data-quantity="1">${this._t("use")}</button>
+                </div>
+                <div class="action-group">
+                  <input class="qty" type="number" min="0" data-role="refill-qty" data-product="${product}" value="${refillQtyValue}">
+                  <button class="btn" data-action="add" data-product="${product}" data-role="refill-input">${this._t("washed")}</button>
+                </div>
+                ${showUnderwearBuyRecommendation ? `
+                  <div class="action-group">
+                    <button class="btn" data-action="add_to_shopping_list" data-product="${product}" data-quantity="${underwearRecommendedBuy}">${this._t("add_to_shopping")}</button>
+                  </div>
+                ` : ""}
+              ` : `
+                <div class="action-group">
+                  <input class="qty" type="number" min="1" data-role="consume-qty" data-product="${product}" value="${consumeQtyValue}">
+                  <button class="btn warn" data-action="consume" data-product="${product}" data-role="consume-input">${this._t("consume")}</button>
+                </div>
+                <div class="action-group">
+                  <input class="qty" type="number" min="0" data-role="refill-qty" data-product="${product}" value="${refillQtyValue}">
+                  <button class="btn" data-action="add" data-product="${product}" data-role="refill-input">${this._t("refill")}</button>
+                </div>
+              `}
             </div>
           </div>
         `;
@@ -469,6 +543,7 @@ class MenstrualProductInventoryCard extends HTMLElement {
         input { border: 1px solid var(--mg-border); border-radius: 8px; padding: 7px; min-width: 0; background: transparent; color: var(--mg-text-primary); }
         .wash-needed { display: flex; align-items: center; gap: 6px; background: color-mix(in srgb, var(--mg-status-warning) 15%, transparent); border: 1px solid var(--mg-status-warning); border-radius: 8px; padding: 6px 10px; color: var(--mg-status-warning); font-size: 0.9rem; margin-bottom: 8px; }
         .logs { margin-top: 12px; border-top: 1px solid var(--mg-border); padding-top: 10px; }
+        .meta-inline { margin-bottom: 8px; font-size: 0.9rem; color: var(--mg-text-secondary); }
         .log-item { display: flex; justify-content: space-between; gap: 8px; font-size: 0.88rem; margin-top: 6px; }
         .empty { padding: 16px; color: var(--mg-text-secondary); }
         @media (prefers-color-scheme: dark) {

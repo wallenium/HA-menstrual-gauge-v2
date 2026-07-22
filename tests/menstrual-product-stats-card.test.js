@@ -329,6 +329,38 @@ function testProductLabelLinerUnderwear() {
   console.log('  ✓ productLabel – liner + underwear labels (DE/EN)');
 }
 
+function testUnderwearWashPlan() {
+  const card = makeCard();
+  card.config = { entity: 'sensor.test', underwear_total_owned: 12, target_wash_days: 7 };
+  const plan = card.calculateUnderwearWashPlan(1);
+  assert.strictEqual(plan.washEveryDays, 12);
+  assert.strictEqual(plan.buyMore, 0);
+  const planHigherUsage = card.calculateUnderwearWashPlan(2);
+  assert.strictEqual(planHigherUsage.buyMore, 2);
+  console.log('  ✓ calculateUnderwearWashPlan – usage-based cadence and buy recommendation');
+}
+
+function testCupSavingsCalculation() {
+  const card = makeCard();
+  card.config = {
+    entity: 'sensor.test',
+    tampon_price: 0.12,
+    pad_price: 0.10,
+    cup_price: 30,
+    tampon_co2_g: 1.5,
+    pad_co2_g: 2.5,
+    cup_co2_g: 18,
+  };
+  const savings = card.calculateCupSavings(new Array(30).fill(0).map((_, idx) => ({
+    date: `2026-07-${String((idx % 30) + 1).padStart(2, '0')}`,
+    product: 'cup',
+    quantity: 1,
+  })));
+  assert.ok(savings.costSavingsEur > 0, 'cost savings should be positive with daily cup usage');
+  assert.ok(savings.co2SavingsKg > 0, 'co2 savings should be positive with daily cup usage');
+  console.log('  ✓ calculateCupSavings – computes annualized savings from cup usage');
+}
+
 // ---------------------------------------------------------------------------
 // Run
 // ---------------------------------------------------------------------------
@@ -350,6 +382,8 @@ let failed = 0;
   testNormalizeQuantityHandlesNumbersAndStrings,
   testNormalizeQuantityFallbacks,
   testProductLabelLinerUnderwear,
+  testUnderwearWashPlan,
+  testCupSavingsCalculation,
 ].forEach((fn) => {
   try {
     fn();
