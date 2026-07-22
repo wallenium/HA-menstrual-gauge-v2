@@ -201,9 +201,14 @@ _SHOPPING_PRODUCT_NAMES: dict[str, str] = {
     "tampon": "Tampons",
     "pad": "Pads",
     "liner": "Liners",
+    "underwear": "Period underwear",
 }
 
 _TODO_SHOPPING_LIST_ENTITY = "todo.shopping_list"
+_UNDERWEAR_WASH_TODO_ITEM = "Underwear washing needed"
+_DEFAULT_UNDERWEAR_TOTAL_OWNED = 12
+_DEFAULT_UNDERWEAR_WASHING_THRESHOLD = 3
+_SERVICE_FIELD_UNDERWEAR_TOTAL_OWNED = "underwear_total_owned"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -232,12 +237,22 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 def _default_household_inventory_data() -> dict[str, Any]:
     inventory = {product: 0 for product in HOUSEHOLD_PRODUCTS}
+    inventory["cup"] = 1
     thresholds = {product: {"warning": 10, "critical": 5} for product in HOUSEHOLD_PRODUCTS}
+    thresholds["underwear"] = {
+        "warning": _DEFAULT_UNDERWEAR_WASHING_THRESHOLD,
+        "critical": max(0, _DEFAULT_UNDERWEAR_WASHING_THRESHOLD - 1),
+    }
+    thresholds["cup"] = {"warning": 0, "critical": 0}
     return {
         "inventory": inventory,
         "thresholds": thresholds,
         "consumption_log": [],
         "last_usage": None,
+        "underwear_settings": {
+            "total_owned": _DEFAULT_UNDERWEAR_TOTAL_OWNED,
+            "washing_threshold": _DEFAULT_UNDERWEAR_WASHING_THRESHOLD,
+        },
     }
 
 
@@ -248,15 +263,38 @@ def _normalize_household_inventory_data(data: Any) -> dict[str, Any]:
 
     inventory_raw = data.get("inventory", {})
     thresholds_raw = data.get("thresholds", {})
+    underwear_settings_raw = data.get("underwear_settings", {})
     inventory: dict[str, int] = {}
     thresholds: dict[str, dict[str, int]] = {}
+    default_underwear = defaults["underwear_settings"]
+    if isinstance(underwear_settings_raw, dict):
+        total_owned_raw = underwear_settings_raw.get("total_owned", default_underwear["total_owned"])
+        washing_threshold_raw = underwear_settings_raw.get("washing_threshold", default_underwear["washing_threshold"])
+    else:
+        total_owned_raw = default_underwear["total_owned"]
+        washing_threshold_raw = default_underwear["washing_threshold"]
+
+    try:
+        total_owned = max(1, int(total_owned_raw))
+    except (TypeError, ValueError):
+        total_owned = default_underwear["total_owned"]
+    try:
+        washing_threshold = max(0, int(washing_threshold_raw))
+    except (TypeError, ValueError):
+        washing_threshold = default_underwear["washing_threshold"]
+    washing_threshold = min(washing_threshold, total_owned)
 
     for product in HOUSEHOLD_PRODUCTS:
         try:
             quantity = int(inventory_raw.get(product, defaults["inventory"][product])) if isinstance(inventory_raw, dict) else defaults["inventory"][product]
         except (TypeError, ValueError):
             quantity = defaults["inventory"][product]
-        inventory[product] = max(0, quantity)
+        normalized_quantity = max(0, quantity)
+        if product == "cup":
+            normalized_quantity = 1
+        elif product == "underwear":
+            normalized_quantity = min(normalized_quantity, total_owned)
+        inventory[product] = normalized_quantity
 
         product_thresholds = thresholds_raw.get(product, {}) if isinstance(thresholds_raw, dict) else {}
         try:
@@ -270,6 +308,12 @@ def _normalize_household_inventory_data(data: Any) -> dict[str, Any]:
         if warning < critical:
             warning = critical
         thresholds[product] = {"warning": max(0, warning), "critical": max(0, critical)}
+
+    thresholds["cup"] = {"warning": 0, "critical": 0}
+    thresholds["underwear"] = {
+        "warning": washing_threshold,
+        "critical": max(0, min(washing_threshold, washing_threshold - 1)),
+    }
 
     normalized_log: list[dict[str, Any]] = []
     for entry in data.get("consumption_log", []) if isinstance(data.get("consumption_log"), list) else []:
@@ -304,6 +348,10 @@ def _normalize_household_inventory_data(data: Any) -> dict[str, Any]:
         "thresholds": thresholds,
         "consumption_log": normalized_log[-HOUSEHOLD_CONSUMPTION_LOG_LIMIT:],
         "last_usage": last_usage,
+        "underwear_settings": {
+            "total_owned": total_owned,
+            "washing_threshold": washing_threshold,
+        },
     }
 
 
@@ -317,6 +365,29 @@ def _household_members(hass: HomeAssistant) -> list[dict[str, str]]:
     return members
 
 
+def _underwear_settings(household_data: dict[str, Any]) -> dict[str, int]:
+    defaults = _default_household_inventory_data()["underwear_settings"]
+    raw = household_data.get("underwear_settings", {})
+    if not isinstance(raw, dict):
+        raw = {}
+    try:
+        total_owned = max(1, int(raw.get("total_owned", defaults["total_owned"])))
+    except (TypeError, ValueError):
+        total_owned = defaults["total_owned"]
+    try:
+        washing_threshold = max(0, int(raw.get("washing_threshold", defaults["washing_threshold"])))
+    except (TypeError, ValueError):
+        washing_threshold = defaults["washing_threshold"]
+    washing_threshold = min(washing_threshold, total_owned)
+    return {"total_owned": total_owned, "washing_threshold": washing_threshold}
+
+
+def _underwear_available(household_data: dict[str, Any]) -> int:
+    settings = _underwear_settings(household_data)
+    in_use = max(0, int((household_data.get("inventory") or {}).get("underwear", 0)))
+    return max(0, settings["total_owned"] - min(in_use, settings["total_owned"]))
+
+
 async def _async_update_household_inventory_state(hass: HomeAssistant) -> None:
     household_data = hass.data.get(HOUSEHOLD_INVENTORY_DATA_KEY)
     if not isinstance(household_data, dict):
@@ -324,6 +395,10 @@ async def _async_update_household_inventory_state(hass: HomeAssistant) -> None:
 
     inventory = household_data.get("inventory", {})
     thresholds = household_data.get("thresholds", {})
+    underwear_settings = _underwear_settings(household_data)
+    underwear_in_use = max(0, min(int(inventory.get("underwear", 0)), underwear_settings["total_owned"]))
+    inventory["underwear"] = underwear_in_use
+    inventory["cup"] = 1
     total_stock = sum(max(0, int(inventory.get(product, 0))) for product in HOUSEHOLD_PRODUCTS)
 
     hass.states.async_set(
@@ -342,6 +417,9 @@ async def _async_update_household_inventory_state(hass: HomeAssistant) -> None:
             "consumption_log": list(household_data.get("consumption_log", []))[-HOUSEHOLD_CONSUMPTION_LOG_LIMIT:],
             "last_usage": household_data.get("last_usage"),
             "household_members": _household_members(hass),
+            "underwear_total_owned": underwear_settings["total_owned"],
+            "underwear_washing_threshold": underwear_settings["washing_threshold"],
+            "underwear_available": max(0, underwear_settings["total_owned"] - underwear_in_use),
         },
     )
 
@@ -384,11 +462,18 @@ async def _async_register_consumption(
 
     inventory = household_data.setdefault("inventory", {})
     current = max(0, int(inventory.get(product, 0)))
-    inventory[product] = max(0, current - max(1, int(quantity)))
+    qty = max(1, int(quantity))
+    if product == "cup":
+        inventory[product] = 1
+    elif product == "underwear":
+        total_owned = _underwear_settings(household_data)["total_owned"]
+        inventory[product] = min(total_owned, current + qty)
+    else:
+        inventory[product] = max(0, current - qty)
 
     entry = {
         "product": product,
-        "quantity": max(1, int(quantity)),
+        "quantity": qty,
         "member": member.strip() or "unknown",
         "timestamp": dt_util.now().isoformat(),
         "source": source,
@@ -409,6 +494,8 @@ def _apply_optional_thresholds(
     critical: int | None,
 ) -> None:
     """Persist threshold values supplied by the card config, if any."""
+    if product == "cup":
+        return
     if warning is None and critical is None:
         return
     stored = household_data.setdefault("thresholds", {}).setdefault(
@@ -418,6 +505,10 @@ def _apply_optional_thresholds(
         stored["warning"] = max(0, int(warning))
     if critical is not None:
         stored["critical"] = max(0, int(critical))
+    if product == "underwear":
+        settings = _underwear_settings(household_data)
+        settings["washing_threshold"] = min(settings["total_owned"], max(0, int(stored.get("warning", settings["washing_threshold"]))))
+        household_data["underwear_settings"] = settings
 
 
 async def _async_check_and_update_todo_list(hass: HomeAssistant, household_data: dict, product: str) -> None:
@@ -442,6 +533,25 @@ async def _async_check_and_update_todo_list(hass: HomeAssistant, household_data:
     if quantity > warning:
         return
 
+    added = await _async_add_todo_item_if_missing(hass, display_name)
+    if added:
+        _LOGGER.info(
+            "Added '%s' to shopping list (stock: %d, warning threshold: %d).",
+            display_name, quantity, warning,
+        )
+
+
+async def _async_add_todo_item_if_missing(
+    hass: HomeAssistant,
+    item: str,
+    *,
+    duplicate_contains: str | None = None,
+) -> bool:
+    """Add an item to todo.shopping_list unless an equivalent item already exists."""
+    normalized_item = item.strip().lower()
+    if not normalized_item:
+        return False
+
     # Check for duplicate entry before adding.
     already_listed = False
     try:
@@ -454,30 +564,39 @@ async def _async_check_and_update_todo_list(hass: HomeAssistant, household_data:
         )
         if isinstance(response, dict):
             items = response.get(_TODO_SHOPPING_LIST_ENTITY, {}).get("items", [])
-            for item in (items if isinstance(items, list) else []):
-                if str(item.get("summary", "")).strip().lower() == display_name.lower():
+            for todo_item in (items if isinstance(items, list) else []):
+                summary = str(todo_item.get("summary", "")).strip().lower()
+                if summary == normalized_item:
+                    already_listed = True
+                    break
+                if duplicate_contains and duplicate_contains.strip().lower() in summary:
                     already_listed = True
                     break
     except Exception as ex:  # noqa: BLE001
         _LOGGER.debug("Could not read shopping list to check for duplicates: %s", ex)
 
     if already_listed:
-        _LOGGER.debug("'%s' is already on the shopping list; skipping.", display_name)
-        return
+        _LOGGER.debug("'%s' is already on the shopping list; skipping.", item)
+        return False
 
     try:
         await hass.services.async_call(
             "todo",
             "add_item",
-            {"entity_id": _TODO_SHOPPING_LIST_ENTITY, "item": display_name},
+            {"entity_id": _TODO_SHOPPING_LIST_ENTITY, "item": item},
             blocking=True,
         )
-        _LOGGER.info(
-            "Added '%s' to shopping list (stock: %d, warning threshold: %d).",
-            display_name, quantity, warning,
-        )
+        return True
     except Exception as ex:  # noqa: BLE001
-        _LOGGER.warning("Could not add '%s' to shopping list: %s", display_name, ex)
+        _LOGGER.warning("Could not add '%s' to shopping list: %s", item, ex)
+        return False
+
+
+async def _async_check_underwear_washing_todo(hass: HomeAssistant, household_data: dict[str, Any]) -> None:
+    settings = _underwear_settings(household_data)
+    if _underwear_available(household_data) > settings["washing_threshold"]:
+        return
+    await _async_add_todo_item_if_missing(hass, _UNDERWEAR_WASH_TODO_ITEM)
 
 
 def _profile_from_entry(entry: ConfigEntry) -> str:
@@ -772,12 +891,15 @@ def _register_domain_services(hass: HomeAssistant) -> None:
         schema=vol.Schema(
             {
                 **common_profile_field,
-                vol.Required(SERVICE_FIELD_INVENTORY_ACTION): vol.In(["set", "add", "consume", "set_thresholds", "reset"]),
+                vol.Required(SERVICE_FIELD_INVENTORY_ACTION): vol.In(
+                    ["set", "add", "consume", "set_thresholds", "add_to_shopping_list", "reset"]
+                ),
                 vol.Optional(SERVICE_FIELD_PRODUCT): vol.In(HOUSEHOLD_PRODUCTS),
                 vol.Optional(SERVICE_FIELD_QUANTITY, default=1): vol.All(vol.Coerce(int), vol.Range(min=0, max=5000)),
                 vol.Optional(SERVICE_FIELD_WARNING_THRESHOLD): vol.All(vol.Coerce(int), vol.Range(min=0, max=5000)),
                 vol.Optional(SERVICE_FIELD_CRITICAL_THRESHOLD): vol.All(vol.Coerce(int), vol.Range(min=0, max=5000)),
                 vol.Optional(SERVICE_FIELD_MEMBER): cv.string,
+                vol.Optional(_SERVICE_FIELD_UNDERWEAR_TOTAL_OWNED): vol.All(vol.Coerce(int), vol.Range(min=1, max=5000)),
             }
         ),
     )
@@ -1191,13 +1313,34 @@ async def _async_handle_manage_household_inventory(hass: HomeAssistant, call: Se
     # sync with whatever the user configured in the Lovelace card editor.
     threshold_warning = call.data.get(SERVICE_FIELD_WARNING_THRESHOLD)
     threshold_critical = call.data.get(SERVICE_FIELD_CRITICAL_THRESHOLD)
+    underwear_total_owned = call.data.get(_SERVICE_FIELD_UNDERWEAR_TOTAL_OWNED)
+    if underwear_total_owned is not None:
+        settings = _underwear_settings(household_data)
+        settings["total_owned"] = max(1, int(underwear_total_owned))
+        settings["washing_threshold"] = min(settings["washing_threshold"], settings["total_owned"])
+        household_data["underwear_settings"] = settings
+        household_data["inventory"]["underwear"] = min(
+            max(0, int(household_data["inventory"].get("underwear", 0))),
+            settings["total_owned"],
+        )
 
     if action == "set":
-        household_data["inventory"][product] = max(0, quantity)
+        if product == "cup":
+            household_data["inventory"][product] = 1
+        elif product == "underwear":
+            settings = _underwear_settings(household_data)
+            household_data["inventory"][product] = min(settings["total_owned"], max(0, quantity))
+        else:
+            household_data["inventory"][product] = max(0, quantity)
         _apply_optional_thresholds(household_data, product, threshold_warning, threshold_critical)
     elif action == "add":
         current = max(0, int(household_data["inventory"].get(product, 0)))
-        household_data["inventory"][product] = current + max(0, quantity)
+        if product == "cup":
+            household_data["inventory"][product] = 1
+        elif product == "underwear":
+            household_data["inventory"][product] = max(0, current - max(0, quantity))
+        else:
+            household_data["inventory"][product] = current + max(0, quantity)
         _apply_optional_thresholds(household_data, product, threshold_warning, threshold_critical)
     elif action == "consume":
         _apply_optional_thresholds(household_data, product, threshold_warning, threshold_critical)
@@ -1205,8 +1348,12 @@ async def _async_handle_manage_household_inventory(hass: HomeAssistant, call: Se
         # household_data is updated in-place by _async_register_consumption; reload ref.
         household_data = hass.data.get(HOUSEHOLD_INVENTORY_DATA_KEY, {})
         await _async_check_and_update_todo_list(hass, household_data, product)
+        if product == "underwear":
+            await _async_check_underwear_washing_todo(hass, household_data)
         return
     elif action == "set_thresholds":
+        if product == "cup":
+            raise HomeAssistantError("Cup thresholds are not supported.")
         warning = call.data.get(SERVICE_FIELD_WARNING_THRESHOLD)
         critical = call.data.get(SERVICE_FIELD_CRITICAL_THRESHOLD)
         if warning is None and critical is None:
@@ -1217,11 +1364,26 @@ async def _async_handle_manage_household_inventory(hass: HomeAssistant, call: Se
         if next_warning < next_critical:
             raise HomeAssistantError("warning_threshold must be greater than or equal to critical_threshold.")
         household_data["thresholds"][product] = {"warning": next_warning, "critical": next_critical}
+        if product == "underwear":
+            settings = _underwear_settings(household_data)
+            settings["washing_threshold"] = min(settings["total_owned"], max(0, int(next_warning)))
+            household_data["underwear_settings"] = settings
+    elif action == "add_to_shopping_list":
+        if product not in HOUSEHOLD_PRODUCTS:
+            raise HomeAssistantError("Provide a valid product for add_to_shopping_list.")
+        if product == "cup":
+            raise HomeAssistantError("Cup is reusable and cannot be added to the shopping list.")
+        qty = max(1, int(quantity or 1))
+        display_name = _SHOPPING_PRODUCT_NAMES.get(product) or product.replace("_", " ").title()
+        item_name = f"{display_name} x{qty}" if qty > 1 else display_name
+        duplicate_contains = display_name if product == "underwear" else None
+        await _async_add_todo_item_if_missing(hass, item_name, duplicate_contains=duplicate_contains)
+        return
     elif action == "reset":
         hass.data[HOUSEHOLD_INVENTORY_DATA_KEY] = _default_household_inventory_data()
     else:
         raise HomeAssistantError(
-            "Unsupported inventory_action. Use one of: set, add, consume, set_thresholds, reset."
+            "Unsupported inventory_action. Use one of: set, add, consume, set_thresholds, add_to_shopping_list, reset."
         )
 
     await _async_save_household_inventory(hass)
@@ -1230,6 +1392,8 @@ async def _async_handle_manage_household_inventory(hass: HomeAssistant, call: Se
     # needs an entry (consume already handled above).
     if action == "set":
         await _async_check_and_update_todo_list(hass, household_data, product)
+    if action in {"set", "add", "set_thresholds"} and product == "underwear":
+        await _async_check_underwear_washing_todo(hass, household_data)
 
 
 async def _async_handle_add_symptom(hass: HomeAssistant, call: ServiceCall) -> None:

@@ -3,7 +3,18 @@ class MenstrualProductStatsCard extends HTMLElement {
     if (!config?.entity) {
       throw new Error("Entity is required");
     }
-    this.config = config;
+    this.config = {
+      tampon_price: 0.12,
+      pad_price: 0.10,
+      cup_price: 30,
+      tampon_co2_g: 1.5,
+      pad_co2_g: 2.5,
+      cup_co2_g: 18,
+      co2_source_url: "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10148749/",
+      underwear_total_owned: 12,
+      target_wash_days: 7,
+      ...config,
+    };
   }
 
   set hass(hass) {
@@ -25,6 +36,22 @@ class MenstrualProductStatsCard extends HTMLElement {
       entity: 'sensor.menstruation_gauge',
       title: 'Product usage'
     };
+  }
+
+  connectedCallback() {
+    if (this._handlersAttached) return;
+    this._handlersAttached = true;
+    this.addEventListener("click", async (event) => {
+      const button = event.target?.closest?.("button[data-action]");
+      if (!button || !this._hass) return;
+      if (button.dataset.action !== "add-underwear-shopping") return;
+      const quantity = Math.max(1, Number(button.dataset.quantity || 1));
+      await this._hass.callService("menstruation_gauge", "manage_household_inventory", {
+        inventory_action: "add_to_shopping_list",
+        product: "underwear",
+        quantity,
+      });
+    });
   }
 
   render() {
@@ -49,6 +76,9 @@ class MenstrualProductStatsCard extends HTMLElement {
       ? attrs.product_usage_stats
       : {};
     const stats = this.calculateStats(productUsageThisCycle, productUsageStats, attrs.days_until_next_start);
+    const averageDailyUnderwearUsage = this.calculateAverageDailyUsage(productUsageTimeline, "underwear");
+    const washPlan = this.calculateUnderwearWashPlan(averageDailyUnderwearUsage);
+    const cupSavings = this.calculateCupSavings(productUsageTimeline);
 
     this.innerHTML = `
       <style>
@@ -237,6 +267,20 @@ class MenstrualProductStatsCard extends HTMLElement {
           color: var(--mg-text-secondary);
         }
 
+        .stat-card button {
+          margin-top: 8px;
+          border: 1px solid var(--mg-border);
+          border-radius: 8px;
+          padding: 6px 10px;
+          background: var(--mg-card-bg);
+          color: var(--mg-text-primary);
+          cursor: pointer;
+        }
+
+        .stat-card a {
+          color: inherit;
+        }
+
         @media (prefers-color-scheme: dark) {
           :host {
             --mg-stat-alpha-strong: 24%;
@@ -292,6 +336,27 @@ class MenstrualProductStatsCard extends HTMLElement {
             <div class="stat-value">${stats.planningDays}</div>
             <div class="stat-detail">${this._t("days")}</div>
           </div>
+          <div class="stat-card plan">
+            <div class="stat-label">${this._t("wash_every_x_days")}</div>
+            <div class="stat-value">${washPlan.washEveryDaysText}</div>
+            <div class="stat-detail">${this._t("based_on_daily_usage", { value: this.formatNumber(averageDailyUnderwearUsage) })}</div>
+          </div>
+          <div class="stat-card underwear">
+            <div class="stat-label">${this._t("buy_x_more_underwear")}</div>
+            <div class="stat-value">${washPlan.buyMore}</div>
+            <div class="stat-detail">${this._t("for_wash_goal", { days: washPlan.targetWashDays })}</div>
+            ${washPlan.buyMore > 0 ? `<button data-action="add-underwear-shopping" data-quantity="${washPlan.buyMore}">${this._t("add_to_shopping_list")}</button>` : ""}
+          </div>
+          <div class="stat-card cup">
+            <div class="stat-label">${this._t("cup_cost_savings")}</div>
+            <div class="stat-value">€${this.formatNumber(cupSavings.costSavingsEur)}</div>
+            <div class="stat-detail">${this._t("annual_projection")}</div>
+          </div>
+          <div class="stat-card cup">
+            <div class="stat-label">${this._t("cup_co2_savings")}</div>
+            <div class="stat-value">${this.formatNumber(cupSavings.co2SavingsKg)} kg</div>
+            <div class="stat-detail">${this._t("annual_projection")}${this.config.co2_source_url ? ` · <a href="${this.escapeHtml(this.config.co2_source_url)}" target="_blank" rel="noopener noreferrer">${this._t("source")}</a>` : ""}</div>
+          </div>
         </div>
         <div class="timeline">
           <h3 class="timeline-title">${this._t("last_30_days")}</h3>
@@ -321,6 +386,66 @@ class MenstrualProductStatsCard extends HTMLElement {
       linersPerCycle: getCycleValue("liner", "liner"),
       underwearPerCycle: getCycleValue("underwear", "underwear"),
       planningDays: Math.max(0, Number(daysUntilNextStart || 0)),
+    };
+  }
+
+  calculateAverageDailyUsage(productUsage, product) {
+    const entries = (Array.isArray(productUsage) ? productUsage : [])
+      .map((entry) => ({
+        ...entry,
+        product: this.normalizeProductKey(entry?.product),
+        date: this.normalizeDateKey(entry?.date ?? entry?.created_at ?? entry?.logged_at ?? entry?.timestamp),
+        quantity: this.normalizeQuantity(entry?.quantity),
+      }))
+      .filter((entry) => entry.product === product && entry.date);
+
+    if (!entries.length) return 0;
+    const sortedDates = entries.map((entry) => entry.date).sort();
+    const start = new Date(`${sortedDates[0]}T00:00:00Z`).getTime();
+    const end = new Date(`${sortedDates[sortedDates.length - 1]}T00:00:00Z`).getTime();
+    const daySpan = Math.max(1, Math.floor((end - start) / 86400000) + 1);
+    const total = entries.reduce((sum, entry) => sum + entry.quantity, 0);
+    return total / daySpan;
+  }
+
+  calculateUnderwearWashPlan(averageDailyUsage) {
+    const totalOwned = Math.max(1, Number(this.config?.underwear_total_owned ?? 12));
+    const targetWashDays = Math.max(1, Number(this.config?.target_wash_days ?? 7));
+    if (averageDailyUsage <= 0) {
+      return { washEveryDays: 0, washEveryDaysText: "—", buyMore: 0, targetWashDays };
+    }
+    const washEveryDays = totalOwned / averageDailyUsage;
+    const buyMore = Math.max(0, Math.ceil((averageDailyUsage * targetWashDays) - totalOwned));
+    return {
+      washEveryDays,
+      washEveryDaysText: this.formatNumber(washEveryDays),
+      buyMore,
+      targetWashDays,
+    };
+  }
+
+  calculateCupSavings(productUsage) {
+    const entries = Array.isArray(productUsage) ? productUsage : [];
+    const cupUseTotal = entries
+      .filter((entry) => this.normalizeProductKey(entry?.product) === "cup")
+      .reduce((sum, entry) => sum + this.normalizeQuantity(entry?.quantity), 0);
+    const cupUsesPerDay = cupUseTotal / 30;
+    const annualCupUses = cupUsesPerDay * 365;
+
+    const tamponPrice = Math.max(0, Number(this.config?.tampon_price ?? 0.12));
+    const padPrice = Math.max(0, Number(this.config?.pad_price ?? 0.10));
+    const cupPrice = Math.max(0, Number(this.config?.cup_price ?? 30));
+    const disposableAvgPrice = (tamponPrice + padPrice) / 2;
+
+    const tamponCo2 = Math.max(0, Number(this.config?.tampon_co2_g ?? 1.5));
+    const padCo2 = Math.max(0, Number(this.config?.pad_co2_g ?? 2.5));
+    const cupCo2 = Math.max(0, Number(this.config?.cup_co2_g ?? 18));
+    const disposableAvgCo2 = (tamponCo2 + padCo2) / 2;
+
+    return {
+      annualCupUses,
+      costSavingsEur: (annualCupUses * disposableAvgPrice) - cupPrice,
+      co2SavingsKg: ((annualCupUses * disposableAvgCo2) - cupCo2) / 1000,
     };
   }
 
@@ -568,6 +693,15 @@ class MenstrualProductStatsCard extends HTMLElement {
         last_cycles: `${placeholders.count || 0} Zyklen`,
         last_30_days: "Letzte 30 Tage",
         no_usage_last_30_days: "In den letzten 30 Tagen wurden keine Produkte geloggt.",
+        wash_every_x_days: "Wasche alle X Tage",
+        buy_x_more_underwear: "Kaufe X mehr Slips",
+        based_on_daily_usage: `bei ~${placeholders.value || 0} pro Tag`,
+        for_wash_goal: `für alle ${placeholders.days || 0} Tage Waschrhythmus`,
+        add_to_shopping_list: "Zur Einkaufsliste",
+        cup_cost_savings: "Cup Kostenersparnis",
+        cup_co2_savings: "Cup CO2-Ersparnis",
+        annual_projection: "Jahres-Prognose",
+        source: "Quelle",
         tampon: "Tampon",
         pad: "Binde",
         cup: "Cup",
@@ -588,6 +722,15 @@ class MenstrualProductStatsCard extends HTMLElement {
         last_cycles: `${placeholders.count || 0} cycles`,
         last_30_days: "Last 30 days",
         no_usage_last_30_days: "No products were logged in the last 30 days.",
+        wash_every_x_days: "Wash every X days",
+        buy_x_more_underwear: "Buy X more underwear",
+        based_on_daily_usage: `based on ~${placeholders.value || 0}/day`,
+        for_wash_goal: `for a ${placeholders.days || 0}-day wash routine`,
+        add_to_shopping_list: "Add to shopping list",
+        cup_cost_savings: "Cup cost savings",
+        cup_co2_savings: "Cup CO2 savings",
+        annual_projection: "Annual projection",
+        source: "Source",
         tampon: "Tampon",
         pad: "Pad",
         cup: "Cup",
@@ -602,8 +745,77 @@ class MenstrualProductStatsCard extends HTMLElement {
   }
 }
 
+class MenstrualProductStatsCardEditor extends HTMLElement {
+  setConfig(config) {
+    this._config = { ...config };
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+  }
+
+  _fireConfigChanged(nextConfig) {
+    this._config = { ...nextConfig };
+    this.dispatchEvent(new CustomEvent("config-changed", {
+      detail: { config: this._config },
+      bubbles: true,
+      composed: true,
+    }));
+    this._render();
+  }
+
+  _render() {
+    if (!this.shadowRoot) this.attachShadow({ mode: "open" });
+    const cfg = this._config || {};
+    this.shadowRoot.innerHTML = `
+      <style>
+        :host { display: block; padding: 8px 0; }
+        .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+        input { border: 1px solid var(--divider-color, #ccc); border-radius: 6px; padding: 6px 8px; }
+      </style>
+      <div class="field"><label>Title</label><input data-key="title" value="${this._escape(cfg.title || "")}"></div>
+      <div class="field"><label>Entity</label><input data-key="entity" value="${this._escape(cfg.entity || "")}"></div>
+      <div class="field"><label>Tampon price (€)</label><input type="number" step="0.01" min="0" data-key="tampon_price" value="${Number(cfg.tampon_price ?? 0.12)}"></div>
+      <div class="field"><label>Pad price (€)</label><input type="number" step="0.01" min="0" data-key="pad_price" value="${Number(cfg.pad_price ?? 0.10)}"></div>
+      <div class="field"><label>Cup price (€)</label><input type="number" step="0.01" min="0" data-key="cup_price" value="${Number(cfg.cup_price ?? 30)}"></div>
+      <div class="field"><label>Tampon CO2 (g)</label><input type="number" step="0.1" min="0" data-key="tampon_co2_g" value="${Number(cfg.tampon_co2_g ?? 1.5)}"></div>
+      <div class="field"><label>Pad CO2 (g)</label><input type="number" step="0.1" min="0" data-key="pad_co2_g" value="${Number(cfg.pad_co2_g ?? 2.5)}"></div>
+      <div class="field"><label>Cup CO2 (g one-time)</label><input type="number" step="0.1" min="0" data-key="cup_co2_g" value="${Number(cfg.cup_co2_g ?? 18)}"></div>
+      <div class="field"><label>CO2 source URL</label><input data-key="co2_source_url" value="${this._escape(cfg.co2_source_url || "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10148749/")}"></div>
+      <div class="field"><label>Underwear total owned</label><input type="number" min="1" data-key="underwear_total_owned" value="${Math.max(1, Number(cfg.underwear_total_owned ?? 12))}"></div>
+      <div class="field"><label>Target wash cadence (days)</label><input type="number" min="1" data-key="target_wash_days" value="${Math.max(1, Number(cfg.target_wash_days ?? 7))}"></div>
+    `;
+    this.shadowRoot.querySelectorAll("input[data-key]").forEach((input) => {
+      input.addEventListener("change", (event) => {
+        const key = event.target.dataset.key;
+        const raw = event.target.value;
+        const numericKeys = new Set([
+          "tampon_price", "pad_price", "cup_price",
+          "tampon_co2_g", "pad_co2_g", "cup_co2_g",
+          "underwear_total_owned", "target_wash_days",
+        ]);
+        const value = numericKeys.has(key) ? Number(raw) : raw;
+        this._fireConfigChanged({ ...this._config, [key]: value });
+      });
+    });
+  }
+
+  _escape(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+}
+
 if (!customElements.get("menstrual-product-stats-card")) {
   customElements.define("menstrual-product-stats-card", MenstrualProductStatsCard);
+}
+if (!customElements.get("menstrual-product-stats-card-editor")) {
+  customElements.define("menstrual-product-stats-card-editor", MenstrualProductStatsCardEditor);
 }
 
 window.customCards = window.customCards || [];
