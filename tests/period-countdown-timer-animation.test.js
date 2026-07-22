@@ -189,6 +189,17 @@ function testTimerProductConfigIconSize() {
   console.log('  ✓ product config: underwear/liner icons are 48px (parity with animated products)');
 }
 
+function testDischargeTranslations() {
+  const timer = new PeriodCountdownTimer();
+  timer._hass = { locale: { language: 'de' } };
+  assert.strictEqual(timer._t('discharge'), 'Ausfluss', 'German discharge translation should exist');
+
+  timer._hass = { locale: { language: 'en' } };
+  assert.strictEqual(timer._t('discharge'), 'Discharge', 'English discharge translation should exist');
+
+  console.log('  ✓ period timer discharge translations');
+}
+
 let failed = 0;
 
 [
@@ -197,6 +208,7 @@ let failed = 0;
   testTimerIconSpanColorCss,
   testTimerProductIconSizes,
   testTimerProductConfigIconSize,
+  testDischargeTranslations,
 ].forEach((fn) => {
   try {
     fn();
