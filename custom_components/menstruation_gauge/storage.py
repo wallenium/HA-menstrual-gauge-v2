@@ -67,6 +67,7 @@ class MenstruationStorage:
                 "pregnancy_data": {"is_pregnant": False, "start_date": None},
                 "menarche_data": {"tracking_active": False, "is_menarche": False, "menarche_date": None, "estimated_date": None, "family_menarche_age": None},
                 "pre_menarche_data": {"signs": {}, "tanner_stage": None},
+                "menopause_data": {"is_menopause": False, "start_date": None},
             }
 
         history = data.get("history", [])
@@ -110,6 +111,12 @@ class MenstruationStorage:
         pre_menarche_data.setdefault("signs", {})
         pre_menarche_data.setdefault("tanner_stage", None)
 
+        menopause_data = data.get("menopause_data", {})
+        if not isinstance(menopause_data, dict):
+            menopause_data = {}
+        menopause_data.setdefault("is_menopause", False)
+        menopause_data.setdefault("start_date", None)
+
         return {
             "history": normalized,
             "period_duration_days": days,
@@ -118,6 +125,7 @@ class MenstruationStorage:
             "pregnancy_data": pregnancy_data,
             "menarche_data": menarche_data,
             "pre_menarche_data": pre_menarche_data,
+            "menopause_data": menopause_data,
         }
 
     async def async_save(
@@ -129,6 +137,7 @@ class MenstruationStorage:
         pregnancy_data: dict[str, Any] | None = None,
         menarche_data: dict[str, Any] | None = None,
         pre_menarche_data: dict[str, Any] | None = None,
+        menopause_data: dict[str, Any] | None = None,
     ) -> None:
         """Save data to storage."""
         normalized = sorted({self._normalize_iso(raw) for raw in history if self._normalize_iso(raw)})
@@ -138,6 +147,7 @@ class MenstruationStorage:
         preg_data = pregnancy_data or {"is_pregnant": False, "start_date": None}
         men_data = menarche_data or {"tracking_active": False, "is_menarche": False, "menarche_date": None, "estimated_date": None, "family_menarche_age": None}
         pre_men_data = pre_menarche_data or {"signs": {}, "tanner_stage": None}
+        meno_data = menopause_data or {"is_menopause": False, "start_date": None}
 
         await self._store.async_save(
             {
@@ -148,6 +158,7 @@ class MenstruationStorage:
                 "pregnancy_data": preg_data,
                 "menarche_data": men_data,
                 "pre_menarche_data": pre_men_data,
+                "menopause_data": meno_data,
             }
         )
 
@@ -167,6 +178,7 @@ class MenstruationStorage:
             data.get("pregnancy_data"),
             data.get("menarche_data"),
             data.get("pre_menarche_data"),
+            data.get("menopause_data"),
         )
 
     async def async_load_pregnancy_data(self) -> dict[str, Any]:
@@ -185,6 +197,7 @@ class MenstruationStorage:
             pregnancy_data,
             data.get("menarche_data"),
             data.get("pre_menarche_data"),
+            data.get("menopause_data"),
         )
 
     async def async_load_menarche_data(self) -> dict[str, Any]:
@@ -203,6 +216,7 @@ class MenstruationStorage:
             data.get("pregnancy_data"),
             menarche_data,
             data.get("pre_menarche_data"),
+            data.get("menopause_data"),
         )
 
     @staticmethod

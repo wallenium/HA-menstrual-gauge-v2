@@ -63,6 +63,8 @@ from .const import (
     SERVICE_FIELD_FILENAME,
     SERVICE_FIELD_FORMAT,
     SERVICE_FIELD_IS_PREGNANT,
+    SERVICE_FIELD_IS_MENOPAUSE,
+    SERVICE_FIELD_MENOPAUSE_START_DATE,
     SERVICE_FIELD_PRODUCT,
     SERVICE_FIELD_PREGNANCY_START_DATE,
     SERVICE_FIELD_PRE_MENARCHE_SIGN,
@@ -84,10 +86,12 @@ from .const import (
     SERVICE_REMOVE_SYMPTOM,
     SERVICE_SET_CYCLE_HISTORY,
     SERVICE_SET_MENARCHE_MODE,
+    SERVICE_SET_MENOPAUSE_MODE,
     SERVICE_SET_PERIOD_DURATION,
     SERVICE_SET_PREGNANCY_MODE,
     SERVICE_SAVE_TIMER_STATE,
     SERVICE_UPDATE_MENARCHE_DATE,
+    SERVICE_UPDATE_MENOPAUSE_DATE,
     SERVICE_UPDATE_PREGNANCY_DATE,
     SIGNAL_HISTORY_UPDATED,
     STORAGE_KEY,
@@ -206,6 +210,7 @@ class MenstruationRuntime:
     pregnancy_data: dict[str, Any] = field(default_factory=lambda: {"is_pregnant": False, "start_date": None})
     menarche_data: dict[str, Any] = field(default_factory=lambda: {"tracking_active": False, "is_menarche": False, "menarche_date": None, "estimated_date": None, "family_menarche_age": None})
     pre_menarche_data: dict[str, Any] = field(default_factory=lambda: {"signs": {}, "tanner_stage": None})
+    menopause_data: dict[str, Any] = field(default_factory=lambda: {"is_menopause": False, "start_date": None})
     unregister_midnight_listener: Callable[[], None] | None = None
 
 
@@ -465,6 +470,7 @@ async def _async_save_and_notify(hass: HomeAssistant, runtime: MenstruationRunti
         runtime.pregnancy_data,
         runtime.menarche_data,
         runtime.pre_menarche_data,
+        runtime.menopause_data,
     )
     await _async_refresh_cycle_model(hass, {_entry_id_for_runtime(hass, runtime)})
 
@@ -577,6 +583,12 @@ def _register_domain_services(hass: HomeAssistant) -> None:
 
     async def async_remove_pre_menarche_sign(call: ServiceCall) -> None:
         await _async_handle_remove_pre_menarche_sign(hass, call)
+
+    async def async_set_menopause_mode(call: ServiceCall) -> None:
+        await _async_handle_set_menopause_mode(hass, call)
+
+    async def async_update_menopause_date(call: ServiceCall) -> None:
+        await _async_handle_update_menopause_date(hass, call)
 
     async def async_save_timer_state(call: ServiceCall) -> None:
         await _async_handle_save_timer_state(hass, call)
@@ -763,6 +775,20 @@ def _register_domain_services(hass: HomeAssistant) -> None:
 
     hass.services.async_register(
         DOMAIN,
+        SERVICE_SET_MENOPAUSE_MODE,
+        async_set_menopause_mode,
+        schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_IS_MENOPAUSE): cv.boolean, vol.Optional(SERVICE_FIELD_MENOPAUSE_START_DATE): cv.string}),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_UPDATE_MENOPAUSE_DATE,
+        async_update_menopause_date,
+        schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_MENOPAUSE_START_DATE): cv.string}),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
         SERVICE_SAVE_TIMER_STATE,
         async_save_timer_state,
         schema=vol.Schema({
@@ -827,6 +853,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         pregnancy_data=stored.get("pregnancy_data", {"is_pregnant": False, "start_date": None}),
         menarche_data=stored.get("menarche_data", {"tracking_active": False, "is_menarche": False, "menarche_date": None, "estimated_date": None, "family_menarche_age": None}),
         pre_menarche_data=stored.get("pre_menarche_data", {"signs": {}, "tanner_stage": None}),
+        menopause_data=stored.get("menopause_data", {"is_menopause": False, "start_date": None}),
     )
 
     async def _async_handle_midnight_refresh(_now: datetime) -> None:
@@ -887,6 +914,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_GET_MENARCHE_INFO,
             SERVICE_ADD_PRE_MENARCHE_SIGN,
             SERVICE_REMOVE_PRE_MENARCHE_SIGN,
+            SERVICE_SET_MENOPAUSE_MODE,
+            SERVICE_UPDATE_MENOPAUSE_DATE,
             SERVICE_SAVE_TIMER_STATE,
         ):
             if hass.services.has_service(DOMAIN, service):
@@ -1256,6 +1285,27 @@ async def _async_handle_remove_pre_menarche_sign(hass: HomeAssistant, call: Serv
 
     if isinstance(runtime.pre_menarche_data.get("signs"), dict):
         runtime.pre_menarche_data["signs"].pop(sign, None)
+    await _async_save_and_notify(hass, runtime)
+
+
+async def _async_handle_set_menopause_mode(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Set menopause mode on or off."""
+    runtime = _runtime_for_call(hass, call)
+    is_menopause = bool(call.data.get(SERVICE_FIELD_IS_MENOPAUSE, False))
+    menopause_start_date = call.data.get(SERVICE_FIELD_MENOPAUSE_START_DATE)
+    if menopause_start_date:
+        menopause_start_date = _normalize_date_or_raise(menopause_start_date)
+    else:
+        menopause_start_date = runtime.menopause_data.get("start_date")
+    runtime.menopause_data = {"is_menopause": is_menopause, "start_date": menopause_start_date}
+    await _async_save_and_notify(hass, runtime)
+
+
+async def _async_handle_update_menopause_date(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Update menopause start date."""
+    runtime = _runtime_for_call(hass, call)
+    date_iso = _normalize_date_or_raise(call.data[SERVICE_FIELD_MENOPAUSE_START_DATE])
+    runtime.menopause_data["start_date"] = date_iso
     await _async_save_and_notify(hass, runtime)
 
 

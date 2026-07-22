@@ -31,6 +31,8 @@ const STATE_ASSET_FILENAMES = {
   pms: 'pms.svg',
   pre_menarche: 'premenarche.svg',
   menarche: 'premenarche.svg',
+  menopause: 'menopause.svg',
+  neutral: 'neutral.svg',
 };
 
 const PRODUCT_KEY_ALIASES = {
@@ -187,11 +189,11 @@ function getPostpartumIcon(size = 'default') {
 }
 
 function getMenopauseIcon(size = 'default') {
-  return buildIconSvg('<path d="M20.5 13.2A8.8 8.8 0 1 1 10.8 3.5A7 7 0 0 0 20.5 13.2Z"/>', size);
+  return getStateIcon('menopause', size);
 }
 
 function getNeutralStatusIcon(size = 'default') {
-  return buildIconSvg('<circle cx="12" cy="12" r="7.4"/><path d="M8.7 12h6.6"/>', size);
+  return getStateIcon('neutral', size);
 }
 
 function getStatusIcon(statusKey, size = 'default') {

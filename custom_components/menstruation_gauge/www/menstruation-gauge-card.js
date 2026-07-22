@@ -744,7 +744,7 @@ class MenstruationGaugeCard extends HTMLElement {
 
   _renderCenterContent(model, palette, canEdit, isOverdueSoon, countdown) {
     if (!model.pregnancyInfo?.isPregnant) {
-      const statusIconMarkup = window.ProductIcons?.getStatusIcon?.(model.state, 'large') || '';
+      const statusIconMarkup = window.ProductIcons?.getStatusIcon?.(model.state, 64) || '';
       return `
         <button type="button" class="center-panel ${isOverdueSoon ? 'overdue-soon' : ''} ${canEdit ? '' : 'passive'}" data-action="toggle-editor">
           ${statusIconMarkup ? `<div class="center-icon" aria-hidden="true">${statusIconMarkup}</div>` : ''}
