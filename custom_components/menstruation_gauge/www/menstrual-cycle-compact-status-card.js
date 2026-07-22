@@ -424,7 +424,7 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
         subtitleText = `${this._t('due_date')}: ${dueDateNorm}`;
       }
     } else if (statusKey === 'pre_menarche') {
-      iconMarkup = window.ProductIcons?.getMenarcheIcon?.('default') || this._statusIcon(statusKey, status.color, attrs);
+      iconMarkup = window.ProductIcons?.getStateIcon?.('pre_menarche', 'default') || this._statusIcon(statusKey, status.color, attrs);
       const menarcheData = attrs.menarche_data || {};
       const daysUntil = attrs.days_until_menarche !== undefined ? parseInt(String(attrs.days_until_menarche || '0'), 10) : null;
       const estimatedDate = this._normalizeISO(menarcheData.estimated_date || attrs.estimated_menarche_date);

@@ -26,10 +26,15 @@ const {
   resolvePregnancyInfo,
   getPregnancyIcon,
   getPregnancyAssetUrl,
+  getStateAssetUrl,
+  getStateIcon,
+  getStatusIcon,
+  getStatusAnimatedIcon,
   createAnimatedSvgElement,
 } = global.window.ProductIcons;
 
 const ASSET_BASE = '/menstruation_gauge/assets/pregnancy';
+const STATE_ASSET_BASE = '/menstruation_gauge/assets/state';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -279,6 +284,40 @@ function testCreateAnimatedSvgElementUsesAssets() {
 }
 
 // ---------------------------------------------------------------------------
+// pre_menarche / menarche – must use static state asset, no animation
+// ---------------------------------------------------------------------------
+
+function testPremenarcheStateMapping() {
+  // getStateAssetUrl maps both pre_menarche and menarche to premenarche.svg
+  assert.strictEqual(
+    getStateAssetUrl('pre_menarche'),
+    `${STATE_ASSET_BASE}/premenarche.svg`,
+    'pre_menarche → premenarche.svg',
+  );
+  assert.strictEqual(
+    getStateAssetUrl('menarche'),
+    `${STATE_ASSET_BASE}/premenarche.svg`,
+    'menarche → premenarche.svg',
+  );
+
+  // getStateIcon returns a masked-asset span (static), not an inline SVG with keyframes
+  const icon = getStateIcon('pre_menarche');
+  assert.ok(icon.includes('premenarche.svg'), 'getStateIcon(pre_menarche) references premenarche.svg');
+  assert.ok(!icon.includes('pi-flower-bloom'), 'getStateIcon(pre_menarche) must NOT contain animated flower classes');
+
+  // getStatusIcon and getStatusAnimatedIcon must also return the static icon
+  const statusIcon = getStatusIcon('pre_menarche');
+  assert.ok(statusIcon.includes('premenarche.svg'), 'getStatusIcon(pre_menarche) references premenarche.svg');
+  assert.ok(!statusIcon.includes('pi-flower-bloom'), 'getStatusIcon(pre_menarche) must NOT contain animated flower classes');
+
+  const animatedIcon = getStatusAnimatedIcon('pre_menarche', {});
+  assert.ok(animatedIcon.includes('premenarche.svg'), 'getStatusAnimatedIcon(pre_menarche) references premenarche.svg');
+  assert.ok(!animatedIcon.includes('pi-flower-bloom'), 'getStatusAnimatedIcon(pre_menarche) must NOT contain animated flower classes');
+
+  console.log('  ✓ pre_menarche / menarche state mapping (static, no animation)');
+}
+
+// ---------------------------------------------------------------------------
 // Run
 // ---------------------------------------------------------------------------
 
@@ -292,6 +331,7 @@ let failed = 0;
   testGetPregnancyAssetUrl,
   testExports,
   testCreateAnimatedSvgElementUsesAssets,
+  testPremenarcheStateMapping,
 ].forEach((fn) => {
   try {
     fn();
