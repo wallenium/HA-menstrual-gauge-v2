@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 import sys
 import types
 import unittest
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 
@@ -29,16 +30,39 @@ def _install_homeassistant_stubs() -> None:
     config_entries.ConfigEntry = type("ConfigEntry", (), {})
     sys.modules.setdefault("homeassistant.config_entries", config_entries)
 
+    const_mod = types.ModuleType("homeassistant.const")
+    const_mod.CONF_TYPE = "type"
+    const_mod.Platform = type("Platform", (), {"SENSOR": "sensor"})
+    sys.modules.setdefault("homeassistant.const", const_mod)
+
     core = types.ModuleType("homeassistant.core")
     core.HomeAssistant = type("HomeAssistant", (), {})
+    core.ServiceCall = type("ServiceCall", (), {})
     sys.modules.setdefault("homeassistant.core", core)
+
+    exceptions = types.ModuleType("homeassistant.exceptions")
+    exceptions.HomeAssistantError = type("HomeAssistantError", (Exception,), {})
+    sys.modules.setdefault("homeassistant.exceptions", exceptions)
 
     helpers = types.ModuleType("homeassistant.helpers")
     helpers.__path__ = []
     sys.modules.setdefault("homeassistant.helpers", helpers)
 
+    config_validation = types.ModuleType("homeassistant.helpers.config_validation")
+    config_validation.config_entry_only_config_schema = lambda domain: domain
+    config_validation.string = lambda value: value
+    config_validation.entity_id = lambda value: value
+    config_validation.boolean = lambda value: value
+    sys.modules.setdefault("homeassistant.helpers.config_validation", config_validation)
+
+    entity_registry = types.ModuleType("homeassistant.helpers.entity_registry")
+    entity_registry.async_get = lambda hass: object()
+    entity_registry.async_entries_for_config_entry = lambda registry, entry_id: []
+    sys.modules.setdefault("homeassistant.helpers.entity_registry", entity_registry)
+
     dispatcher = types.ModuleType("homeassistant.helpers.dispatcher")
     dispatcher.async_dispatcher_connect = lambda *args, **kwargs: None
+    dispatcher.async_dispatcher_send = lambda *args, **kwargs: None
     sys.modules.setdefault("homeassistant.helpers.dispatcher", dispatcher)
 
     entity_platform = types.ModuleType("homeassistant.helpers.entity_platform")
@@ -59,10 +83,11 @@ def _install_homeassistant_stubs() -> None:
 
     util = types.ModuleType("homeassistant.util")
     util.__path__ = []
+    util.slugify = lambda value: str(value).strip().lower().replace(" ", "_")
     sys.modules.setdefault("homeassistant.util", util)
 
     dt_mod = types.ModuleType("homeassistant.util.dt")
-    dt_mod.now = lambda: None
+    dt_mod.now = lambda: datetime(2026, 7, 20, 8, 0, 0)
     sys.modules.setdefault("homeassistant.util.dt", dt_mod)
 
 
@@ -83,9 +108,99 @@ const = _load_module("mgtest.const", "const.py")
 model = _load_module("mgtest.model", "model.py")
 sensor = _load_module("mgtest.sensor", "sensor.py")
 storage = _load_module("mgtest.storage", "storage.py")
+integration = _load_module("mgtest.integration", "__init__.py")
+
+
+class _FakeStorage:
+    def __init__(self) -> None:
+        self.saved_args = None
+
+    async def async_save(self, *args) -> None:
+        self.saved_args = args
+
+
+class _FakeServices:
+    def __init__(self) -> None:
+        self.registrations: dict[str, dict[str, object]] = {}
+
+    def async_register(self, domain, service, handler, **kwargs) -> None:
+        self.registrations[service] = {"domain": domain, "handler": handler, **kwargs}
+
+    def has_service(self, domain, service) -> bool:
+        return service in self.registrations
+
+    def async_remove(self, domain, service) -> None:
+        self.registrations.pop(service, None)
+
+    async def async_call(self, domain, service, data, blocking=False) -> None:
+        return None
+
+
+class _FakeHass:
+    def __init__(self, runtime=None) -> None:
+        self.data = {const.DOMAIN: {"entry-1": runtime}} if runtime is not None else {const.DOMAIN: {}}
+        self.services = _FakeServices()
+        self.states = types.SimpleNamespace(get=lambda entity_id: None)
+
+
+class _FakeCall:
+    def __init__(self, data) -> None:
+        self.data = data
 
 
 class ProductUsageBackendTests(unittest.TestCase):
+    def test_register_domain_services_registers_log_first_period_without_required_date(self) -> None:
+        hass = _FakeHass()
+
+        integration._register_domain_services(hass)
+
+        registration = hass.services.registrations[const.SERVICE_LOG_FIRST_PERIOD]
+        self.assertEqual(registration["domain"], const.DOMAIN)
+        self.assertEqual(registration["schema"]({}), {})
+        self.assertEqual(
+            registration["schema"]({const.SERVICE_FIELD_DATE: "2026-07-19"}),
+            {const.SERVICE_FIELD_DATE: "2026-07-19"},
+        )
+
+    def test_log_first_period_defaults_to_today_and_updates_runtime(self) -> None:
+        runtime = integration.MenstruationRuntime(
+            storage=_FakeStorage(),
+            profile="default",
+            friendly_name="Default",
+            icon="",
+            history=[],
+            period_duration_days=5,
+            symptom_history=[],
+            product_usage=[],
+            menarche_data={
+                "tracking_active": False,
+                "is_menarche": False,
+                "menarche_date": None,
+                "estimated_date": "2026-08-01",
+                "family_menarche_age": 12,
+            },
+        )
+        hass = _FakeHass(runtime)
+        refreshed_entry_ids: list[set[str]] = []
+
+        async def _fake_refresh(hass_arg, entry_ids=None) -> None:
+            refreshed_entry_ids.append(set(entry_ids or set()))
+
+        integration._async_refresh_cycle_model = _fake_refresh
+        integration.dt_util.now = lambda: datetime(2026, 7, 20, 8, 0, 0)
+
+        asyncio.run(integration._async_handle_log_first_period(hass, _FakeCall({})))
+
+        self.assertEqual(runtime.history, ["2026-07-20"])
+        self.assertTrue(runtime.menarche_data["tracking_active"])
+        self.assertTrue(runtime.menarche_data["is_menarche"])
+        self.assertEqual(runtime.menarche_data["menarche_date"], "2026-07-20")
+        self.assertEqual(runtime.menarche_data["estimated_date"], "2026-08-01")
+        self.assertEqual(runtime.menarche_data["family_menarche_age"], 12)
+        self.assertIsNotNone(runtime.storage.saved_args)
+        self.assertEqual(runtime.storage.saved_args[5]["menarche_date"], "2026-07-20")
+        self.assertEqual(refreshed_entry_ids, [{"entry-1"}])
+
     def test_build_cycle_model_keeps_period_active_until_duration_limit(self) -> None:
         cycle = model.build_cycle_model(
             history=["2026-07-01"],
