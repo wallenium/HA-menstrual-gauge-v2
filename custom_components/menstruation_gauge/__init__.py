@@ -75,6 +75,7 @@ from .const import (
     SERVICE_FIELD_WARNING_THRESHOLD,
     SERVICE_GET_MENARCHE_INFO,
     SERVICE_GET_SYMPTOM,
+    SERVICE_LOG_FIRST_PERIOD,
     SERVICE_LOG_PRODUCT_USAGE,
     SERVICE_MANAGE_HOUSEHOLD_INVENTORY,
     SERVICE_FIELD_CRITICAL_THRESHOLD,
@@ -982,7 +983,7 @@ def _register_domain_services(hass: HomeAssistant) -> None:
         DOMAIN,
         SERVICE_LOG_FIRST_PERIOD,
         async_log_first_period,
-        schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_DATE): cv.string}),
+        schema=vol.Schema({**common_profile_field, vol.Optional(SERVICE_FIELD_DATE): cv.string}),
     )
 
     _menarche_info_kwargs: dict[str, Any] = {
@@ -1678,7 +1679,8 @@ async def _async_handle_update_menarche_date(hass: HomeAssistant, call: ServiceC
 async def _async_handle_log_first_period(hass: HomeAssistant, call: ServiceCall) -> None:
     """Log the first period: atomically records menarche date and adds cycle start."""
     runtime = _runtime_for_call(hass, call)
-    date_iso = _normalize_date_or_raise(call.data[SERVICE_FIELD_DATE])
+    raw_date = call.data.get(SERVICE_FIELD_DATE)
+    date_iso = _normalize_date_or_raise(raw_date) if raw_date else dt_util.now().date().isoformat()
 
     # Record menarche transition
     runtime.menarche_data["tracking_active"] = True
