@@ -30,6 +30,13 @@ global.HTMLElement = class HTMLElement {
 // Stub ProductIcons so the card doesn't crash when _getSvgIcon is called.
 global.window.ProductIcons = { getSvgIcon: () => '' };
 
+const sharedSrc = fs.readFileSync(
+  path.join(__dirname, '../custom_components/menstruation_gauge/www/menstruation-product-stats-shared.js'),
+  'utf8',
+);
+// eslint-disable-next-line no-eval
+eval(sharedSrc);
+
 const src = fs.readFileSync(
   path.join(__dirname, '../custom_components/menstruation_gauge/www/menstrual-product-stats-card.js'),
   'utf8',
