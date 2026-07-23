@@ -169,6 +169,11 @@ class MenstruationGaugeCard extends HTMLElement {
         opt_training_moderate: 'Moderat',
         opt_training_intense: 'Intensiv',
         // Pregnancy symptom options
+        opt_nausea: 'Übelkeit',
+        opt_fatigue: 'Müdigkeit',
+        opt_heartburn: 'Sodbrennen',
+        opt_swelling: 'Schwellungen',
+        opt_back_pain: 'Rückenschmerz',
         opt_preg_nausea: 'Übelkeit',
         opt_preg_fatigue: 'Erschöpfung',
         opt_preg_heartburn: 'Sodbrennen',
@@ -289,6 +294,11 @@ class MenstruationGaugeCard extends HTMLElement {
         opt_training_moderate: 'Moderate',
         opt_training_intense: 'Intense',
         // Pregnancy symptom options
+        opt_nausea: 'Nausea',
+        opt_fatigue: 'Fatigue',
+        opt_heartburn: 'Heartburn',
+        opt_swelling: 'Swelling',
+        opt_back_pain: 'Back Pain',
         opt_preg_nausea: 'Nausea',
         opt_preg_fatigue: 'Fatigue',
         opt_preg_heartburn: 'Heartburn',
@@ -529,20 +539,20 @@ class MenstruationGaugeCard extends HTMLElement {
     const pregnant = isPregnant || String(state || '') === 'pregnant';
     const all = [
       { key: 'bleeding_strength', icon: 'mdi:water-opacity', multi: false, options: ['none', 'light', 'medium', 'heavy', 'very_heavy'] },
-      { key: 'spotting', icon: 'mdi:blood-bag', multi: false, options: ['red', 'brown'] },
-      { key: 'discharge', icon: 'mdi:water-outline', multi: false, options: ['reddish', 'brown', 'white', 'clear', 'other'] },
-      { key: 'intercourse', icon: 'mdi:heart', multi: false, options: ['protected', 'unprotected'] },
-      { key: 'pain', icon: 'mdi:emoticon-sad-outline', multi: true, options: ['mittelschmerz', 'cramps', 'tender_breasts', 'headache', 'migraine', 'lower_back', 'vulva'] },
-      { key: 'hygiene', icon: 'mdi:medical-bag', multi: true, options: ['pad', 'liner', 'tampon', 'cup', 'period_underwear'] },
-      { key: 'test', icon: 'mdi:test-tube', multi: true, options: ['positive_ovulation', 'negative_ovulation', 'positive_pregnancy', 'negative_pregnancy'] },
-      { key: 'cervical_mucus', icon: 'mdi:water', multi: false, options: ['keinen', 'klebrig', 'cremig', 'fadenziehend', 'untypisch'] },
-      { key: 'smell', icon: 'mdi:nose', multi: false, options: ['normal', 'inconspicuous', 'unpleasant', 'fishy'] },
       { key: 'clots', icon: 'mdi:water-alert', multi: false, options: ['yes', 'no'] },
+      { key: 'smell', icon: 'mdi:nose', multi: false, options: ['normal', 'inconspicuous', 'unpleasant', 'fishy'] },
       { key: 'clot_size', icon: 'mdi:ruler-square', multi: false, options: ['small', 'medium', 'large'], dependsOn: { key: 'clots', value: 'yes' } },
       { key: 'bleeding_type', icon: 'mdi:waves', multi: false, options: ['continuous', 'intermittent', 'drops'] },
+      { key: 'spotting', icon: 'mdi:blood-bag', multi: false, options: ['red', 'brown'] },
+      { key: 'pain', icon: 'mdi:emoticon-sad-outline', multi: true, options: ['mittelschmerz', 'cramps', 'tender_breasts', 'headache', 'migraine', 'lower_back', 'vulva'] },
+      { key: 'discharge', icon: 'mdi:water-outline', multi: false, options: ['reddish', 'brown', 'white', 'clear', 'other'] },
+      { key: 'hygiene', icon: 'mdi:medical-bag', multi: true, options: ['pad', 'liner', 'tampon', 'cup', 'period_underwear'] },
+      { key: 'cervical_mucus', icon: 'mdi:water', multi: false, options: ['keinen', 'klebrig', 'cremig', 'fadenziehend', 'untypisch'] },
       { key: 'cervix_position', icon: 'mdi:grid', multi: false, options: ['cervix_high', 'cervix_mid', 'cervix_low'], renderAs: 'cervix-grid' },
       { key: 'cervix_texture', icon: 'mdi:grid', multi: false, options: ['firm', 'soft', 'open'], hiddenInModal: true },
+      { key: 'intercourse', icon: 'mdi:heart', multi: false, options: ['protected', 'unprotected'] },
       { key: 'libido', icon: 'mdi:heart-pulse', multi: false, options: ['libido_low', 'normal', 'libido_high'] },
+      { key: 'test', icon: 'mdi:test-tube', multi: true, options: ['positive_ovulation', 'negative_ovulation', 'positive_pregnancy', 'negative_pregnancy'] },
       { key: 'training_intensity', icon: 'mdi:run-fast', multi: false, options: ['training_light', 'training_moderate', 'training_intense'] },
     ];
     if (String(state || '') === 'pre_menarche') {
@@ -558,13 +568,12 @@ class MenstruationGaugeCard extends HTMLElement {
           }
           return cat;
         });
-      pregnancyConfig.push({
+      return [{
         key: 'pregnancy_symptoms',
         icon: 'mdi:baby-carriage',
         multi: true,
-        options: ['preg_nausea', 'preg_fatigue', 'preg_heartburn', 'preg_swelling', 'preg_mood_swings', 'preg_frequent_urination', 'preg_braxton_hicks', 'preg_back_pain'],
-      });
-      return pregnancyConfig;
+        options: ['nausea', 'fatigue', 'headache', 'back_pain', 'heartburn', 'swelling'],
+      }, ...pregnancyConfig];
     }
     return all;
   }
