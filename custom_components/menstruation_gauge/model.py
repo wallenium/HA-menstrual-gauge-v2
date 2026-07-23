@@ -26,6 +26,7 @@ class CycleModel:
     days_until_next_start: int | None
     period_duration_days: int
     learned_period_duration_days: int | None
+    current_period: dict[str, Any] | None
     state: str
     symptom_history: list[dict[str, Any]]
     is_pregnant: bool
@@ -103,6 +104,80 @@ def learned_period_duration(default_days: int, blocks: list[list[str]]) -> tuple
     avg_len = round(sum(lengths) / len(lengths))
     learned = max(default_norm, max(1, min(14, avg_len)))
     return learned, avg_len
+
+
+def current_period_details(
+    blocks: list[list[str]],
+    symptom_history: list[dict[str, Any]],
+    period_duration_days: int,
+    today: date,
+) -> dict[str, Any] | None:
+    """Return lifecycle details for the latest period block."""
+    if not blocks:
+        return None
+
+    last_block = blocks[-1]
+    if not last_block:
+        return None
+
+    start_iso = last_block[0]
+    end_iso = last_block[-1]
+    start_date = date.fromisoformat(start_iso)
+    end_date = date.fromisoformat(end_iso)
+    if start_date > today:
+        return None
+
+    max_duration = max(1, min(14, int(period_duration_days)))
+    latest_expected_end = start_date + timedelta(days=max_duration - 1)
+    today_iso = today.isoformat()
+    none_date_iso: str | None = None
+    none_values = {"none", "keine"}
+
+    for entry in normalize_symptoms(symptom_history):
+        entry_date = entry.get("date")
+        bleeding_strength = str(entry.get("bleeding_strength", "")).strip().lower()
+        if not isinstance(entry_date, str):
+            continue
+        if entry_date < start_iso or entry_date > today_iso:
+            continue
+        if bleeding_strength in none_values:
+            none_date_iso = entry_date
+            break
+
+    ended_by: str | None = None
+    ended_on_iso: str | None = None
+    is_active = True
+
+    if none_date_iso is not None:
+        ended_by = "bleeding_none"
+        ended_on_iso = none_date_iso
+        is_active = False
+    elif today > latest_expected_end:
+        ended_by = "duration"
+        ended_on_iso = latest_expected_end.isoformat()
+        is_active = False
+
+    confirmed_days = [day for day in last_block if day <= today_iso]
+    days_elapsed = max(1, (today - start_date).days + 1)
+    today_logged = today_iso in confirmed_days or any(
+        isinstance(entry, dict) and entry.get("date") == today_iso
+        for entry in symptom_history
+    )
+
+    return {
+        "start": start_iso,
+        "end": end_iso,
+        "length": len(last_block),
+        "confirmed_days": confirmed_days,
+        "days_elapsed": days_elapsed,
+        "effective_duration": max_duration,
+        "expected_end": latest_expected_end.isoformat(),
+        "today_logged": today_logged,
+        "is_active": is_active,
+        "ended_by": ended_by,
+        "ended_on": ended_on_iso,
+        "last_confirmed_day": end_date.isoformat(),
+    }
 
 
 def predict_next_start(grouped_starts: list[str]) -> tuple[str | None, int | None]:
@@ -221,6 +296,7 @@ def build_cycle_model(
             days_until_next_start=None,
             period_duration_days=period_duration_days,
             learned_period_duration_days=None,
+            current_period=None,
             state=STATE_PREGNANT,
             symptom_history=symptoms,
             is_pregnant=True,
@@ -246,6 +322,7 @@ def build_cycle_model(
             days_until_next_start=None,
             period_duration_days=period_duration_days,
             learned_period_duration_days=None,
+            current_period=None,
             state=STATE_PRE_MENARCHE,
             symptom_history=symptoms,
             is_pregnant=False,
@@ -277,6 +354,7 @@ def build_cycle_model(
                     days_until_next_start=None,
                     period_duration_days=period_duration_days,
                     learned_period_duration_days=None,
+                    current_period=None,
                     state=STATE_MENARCHE,
                     symptom_history=symptoms,
                     is_pregnant=False,
@@ -306,6 +384,7 @@ def build_cycle_model(
     starts = grouped_cycle_starts(base_history)
     next_start, avg_cycle = predict_next_start(starts)
     effective_duration, learned_avg_duration = learned_period_duration(period_duration_days, blocks)
+    current_period = current_period_details(blocks, symptoms, effective_duration, now)
 
     fertile_start: str | None = None
     fertile_end: str | None = None
@@ -321,7 +400,9 @@ def build_cycle_model(
         days_until = (next_date - now).days
 
     state = STATE_NEUTRAL
-    if now.isoformat() in set(normalized):
+    if current_period and current_period.get("is_active"):
+        state = STATE_PERIOD
+    elif now.isoformat() in set(normalized):
         state = STATE_PERIOD
     elif fertile_start and fertile_end and fertile_start <= now.isoformat() <= fertile_end:
         state = STATE_FERTILE
@@ -340,6 +421,7 @@ def build_cycle_model(
         days_until_next_start=days_until,
         period_duration_days=effective_duration,
         learned_period_duration_days=learned_avg_duration,
+        current_period=current_period,
         state=state,
         symptom_history=symptoms,
         is_pregnant=False,

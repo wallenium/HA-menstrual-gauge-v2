@@ -88,6 +88,8 @@ class MenstruationGaugeCard extends HTMLElement {
         // Modal UI
         modal_edit_day: 'Tag bearbeiten',
         period_toggle: 'Periode',
+        period_start: 'Periode Start',
+        log_today: 'Heute loggen',
         save: 'Speichern',
         cancel: 'Abbrechen',
         basal_temp_label: 'Basaltemperatur (°C)',
@@ -114,6 +116,7 @@ class MenstruationGaugeCard extends HTMLElement {
         opt_medium: 'Mittel',
         opt_heavy: 'Stark',
         opt_very_heavy: 'Sehr stark',
+        opt_none: 'Keine',
         opt_red: 'Rot',
         opt_brown: 'Braun',
         opt_reddish: 'Rötlich',
@@ -188,6 +191,8 @@ class MenstruationGaugeCard extends HTMLElement {
         // Modal UI
         modal_edit_day: 'Edit Day',
         period_toggle: 'Period',
+        period_start: 'Period Start',
+        log_today: 'Log Today',
         save: 'Save',
         cancel: 'Cancel',
         basal_temp_label: 'Basal Temperature (°C)',
@@ -214,6 +219,7 @@ class MenstruationGaugeCard extends HTMLElement {
         opt_medium: 'Medium',
         opt_heavy: 'Heavy',
         opt_very_heavy: 'Very Heavy',
+        opt_none: 'None',
         opt_red: 'Red',
         opt_brown: 'Brown',
         opt_reddish: 'Reddish',
@@ -428,6 +434,9 @@ class MenstruationGaugeCard extends HTMLElement {
       this._normalizedSymptomByDate = symptomByDateBuilt;
     }
     const symptomByDate = this._normalizedSymptomByDate || {};
+    const currentBleedingBlock = attrs.current_bleeding_block && typeof attrs.current_bleeding_block === 'object'
+      ? attrs.current_bleeding_block
+      : null;
 
     const viewDate = this._viewDate || new Date();
     const daysInMonth = this._monthDays(viewDate);
@@ -459,6 +468,7 @@ class MenstruationGaugeCard extends HTMLElement {
       daysUntilMenarche,
       pregnancyInfo,
       symptomByDate,
+      currentBleedingBlock,
       daysInMonth,
       series,
       todayIso: this._isoFromDate(new Date())
@@ -484,7 +494,7 @@ class MenstruationGaugeCard extends HTMLElement {
   _symptomConfig(state, isPregnant = false) {
     const pregnant = isPregnant || String(state || '') === 'pregnant';
     const all = [
-      { key: 'bleeding_strength', icon: 'mdi:water-opacity', multi: false, options: ['light', 'medium', 'heavy', 'very_heavy'] },
+      { key: 'bleeding_strength', icon: 'mdi:water-opacity', multi: false, options: ['none', 'light', 'medium', 'heavy', 'very_heavy'] },
       { key: 'spotting', icon: 'mdi:blood-bag', multi: false, options: ['red', 'brown'] },
       { key: 'discharge', icon: 'mdi:water-outline', multi: false, options: ['reddish', 'brown', 'white', 'clear', 'other'] },
       { key: 'intercourse', icon: 'mdi:heart', multi: false, options: ['protected', 'unprotected'] },
@@ -992,6 +1002,7 @@ class MenstruationGaugeCard extends HTMLElement {
     }).join('');
 
     const basalTemp = existing.basal_temp != null ? existing.basal_temp : '';
+    const saveLabel = this._periodSaveLabel(iso, model);
 
     return `
       <div class="sym-overlay" id="sym-modal">
@@ -1004,7 +1015,7 @@ class MenstruationGaugeCard extends HTMLElement {
           <div class="sym-body">
             ${isPreMenarche || isPregnant || !periodModalContext.showPeriodToggle ? '' : `
             <div class="sym-row">
-              <div class="sym-cat-head"><ha-icon icon="mdi:calendar-heart"></ha-icon><span>${this._t('period_toggle')}</span></div>
+              <div class="sym-cat-head"><ha-icon icon="mdi:calendar-heart"></ha-icon><span>${this._t('period_start')}</span></div>
               <div class="sym-options sym-single-opts">
                 <button type="button" class="sym-opt-btn${isPeriodDay ? ' sym-selected' : ''}" data-cat="_period" data-val="yes">✔</button>
                 <button type="button" class="sym-opt-btn${!isPeriodDay ? ' sym-selected' : ''}" data-cat="_period" data-val="no">✗</button>
@@ -1017,12 +1028,22 @@ class MenstruationGaugeCard extends HTMLElement {
             </div>
           </div>
           <div class="sym-footer">
-            <button type="button" class="btn sym-save">${this._t('save')}</button>
+            <button type="button" class="btn sym-save">${saveLabel}</button>
             <button type="button" class="btn sym-cancel">${this._t('cancel')}</button>
           </div>
         </div>
       </div>
     `;
+  }
+
+  _periodSaveLabel(iso, model) {
+    if (iso !== model?.todayIso) {
+      return this._t('save');
+    }
+    if (model?.currentBleedingBlock?.is_active) {
+      return this._t('log_today');
+    }
+    return this._t('period_start');
   }
 
   async _handleModalSave() {
@@ -1064,7 +1085,7 @@ class MenstruationGaugeCard extends HTMLElement {
     const rawTemp = root.getElementById('sym-basal-temp')?.value;
     const basalTemp = parseFloat(rawTemp);
     if (!Number.isNaN(basalTemp) && rawTemp !== '') symptomData.basal_temp = basalTemp;
-    const autoConfirmDays = symptomData.bleeding_strength
+    const autoConfirmDays = symptomData.bleeding_strength && symptomData.bleeding_strength !== 'none'
       ? this._daysToAutoConfirm(iso, model, periodModalContext.continuationBlock)
       : [];
 

@@ -606,6 +606,43 @@ async function testClotSizeDependencyOnSave() {
   console.log('  ✓ clot size dependency enforced on modal save');
 }
 
+function testTodaySaveButtonUsesPeriodLifecycleLabels() {
+  const todayIso = new Date().toISOString().slice(0, 10);
+
+  const activeCard = makeCard();
+  activeCard.setConfig({ entity: 'sensor.menstruation' });
+  activeCard._hass = makeHass({
+    state: 'period',
+    attributes: {
+      history: ['2026-07-01'],
+      current_bleeding_block: {
+        start: '2026-07-01',
+        end: '2026-07-01',
+        is_active: true,
+        today_logged: false,
+      },
+    },
+  });
+  const activeModel = activeCard._buildModel();
+  assert.strictEqual(
+    activeCard._periodSaveLabel(todayIso, activeModel),
+    'Heute loggen',
+    'active period should use the log-today action label',
+  );
+
+  const startCard = makeCard();
+  startCard.setConfig({ entity: 'sensor.menstruation' });
+  startCard._hass = makeHass({ state: 'neutral' });
+  const startModel = startCard._buildModel();
+  assert.strictEqual(
+    startCard._periodSaveLabel(todayIso, startModel),
+    'Periode Start',
+    'new period day should use the period-start action label',
+  );
+
+  console.log('  ✓ period lifecycle save labels');
+}
+
 // ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
@@ -625,6 +662,7 @@ const tests = [
   ['discharge-symptom-config-ordering', testDischargeSymptomConfigAndOrdering],
   ['new-symptom-categories-across-modes', testNewSymptomCategoriesAcrossModes],
   ['clot-size-dependency-save', testClotSizeDependencyOnSave],
+  ['period-lifecycle-save-labels', testTodaySaveButtonUsesPeriodLifecycleLabels],
 ];
 
 (async () => {

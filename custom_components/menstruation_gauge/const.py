@@ -130,7 +130,7 @@ SYMPTOM_PREGNANCY = "pregnancy_symptoms"
 
 # Symptom options for reference (used in UI)
 SYMPTOM_OPTIONS = {
-    SYMPTOM_BLEEDING_STRENGTH: ["light", "medium", "heavy", "very_heavy"],
+    SYMPTOM_BLEEDING_STRENGTH: ["none", "light", "medium", "heavy", "very_heavy"],
     SYMPTOM_SPOTTING: ["red", "brown"],
     SYMPTOM_DISCHARGE: ["reddish", "brown", "white", "clear", "other"],
     SYMPTOM_INTERCOURSE: ["protected", "unprotected"],
