@@ -569,7 +569,7 @@ class MenstruationGaugeCard extends HTMLElement {
     }
     if (pregnant) {
       const pregnancyConfig = all
-        .filter((cat) => (cat.key !== 'bleeding_strength' && & cat.key !== 'clots' && cat.key !== 'clot_size' && cat.key !== 'bleeding_type'))
+        .filter((cat) => (cat.key !== 'bleeding_strength' && cat.key !== 'clots' && cat.key !== 'clot_size' && cat.key !== 'bleeding_type'))
         .map((cat) => {
           if (cat.key === 'hygiene') {
             return { ...cat, options: cat.options.filter((opt) => opt !== 'tampon' && opt !== 'cup') };
