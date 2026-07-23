@@ -90,6 +90,11 @@ from .const import (
     SERVICE_SET_PERIOD_DURATION,
     SERVICE_SET_PREGNANCY_MODE,
     SERVICE_SAVE_TIMER_STATE,
+    SERVICE_EXPORT_DOCTOR_REPORT,
+    SERVICE_FIELD_DAYS_BACK,
+    SERVICE_FIELD_PATIENT_NAME,
+    SERVICE_FIELD_PATIENT_BIRTHDATE,
+    SERVICE_FIELD_LANGUAGE,
     SERVICE_UPDATE_MENARCHE_DATE,
     SERVICE_UPDATE_MENOPAUSE_DATE,
     SERVICE_UPDATE_PREGNANCY_DATE,
@@ -107,6 +112,7 @@ from .const import (
     TANNER_STAGE_5,
 )
 from .model import build_cycle_model, normalize_history
+from .statistics import compute_statistics, generate_doctor_report_html
 from .storage import MenstruationStorage
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
@@ -154,6 +160,8 @@ COMPACT_CARD_STATIC_URL = _build_card_static_url("menstrual-cycle-card-compact.j
 HISTORY_ROW_STATIC_URL = _build_card_static_url("menstrual-cycle-history-card-row.js")
 HISTORY_ANALOG_STATIC_URL = _build_card_static_url("menstrual-cycle-history-card-analog.js")
 COMPACT_STATUS_STATIC_URL = _build_card_static_url("menstrual-cycle-compact-status-card.js")
+STATISTICS_CARD_STATIC_URL = _build_card_static_url("menstrual-statistics-card.js")
+STATISTICS_CARD_EDITOR_STATIC_URL = _build_card_static_url("menstrual-statistics-card-editor.js")
 CARD_RESOURCE_URL = _build_card_resource_url("menstruation-gauge-card.js")
 HEATMAP_RESOURCE_URL = _build_card_resource_url("menstruation-cycle-heatmap-card.js")
 PRODUCT_ICONS_RESOURCE_URL = _build_card_resource_url("product-icons.js")
@@ -168,6 +176,8 @@ COMPACT_CARD_RESOURCE_URL = _build_card_resource_url("menstrual-cycle-card-compa
 HISTORY_ROW_RESOURCE_URL = _build_card_resource_url("menstrual-cycle-history-card-row.js")
 HISTORY_ANALOG_RESOURCE_URL = _build_card_resource_url("menstrual-cycle-history-card-analog.js")
 COMPACT_STATUS_RESOURCE_URL = _build_card_resource_url("menstrual-cycle-compact-status-card.js")
+STATISTICS_CARD_RESOURCE_URL = _build_card_resource_url("menstrual-statistics-card.js")
+STATISTICS_CARD_EDITOR_RESOURCE_URL = _build_card_resource_url("menstrual-statistics-card-editor.js")
 CARD_RESOURCE_TYPE = "module"
 EXPORT_DIR_NAME = "menstruation_gauge_exports"
 LOVELACE_RESOURCES = (
@@ -185,6 +195,8 @@ LOVELACE_RESOURCES = (
     (COMPACT_STATUS_RESOURCE_URL, COMPACT_STATUS_STATIC_URL, "menstrual-cycle-compact-status-card.js"),
     (HISTORY_ROW_RESOURCE_URL, HISTORY_ROW_STATIC_URL, "menstrual-cycle-history-card-row.js"),
     (HISTORY_ANALOG_RESOURCE_URL, HISTORY_ANALOG_STATIC_URL, "menstrual-cycle-history-card-analog.js"),
+    (STATISTICS_CARD_RESOURCE_URL, STATISTICS_CARD_STATIC_URL, "menstrual-statistics-card.js"),
+    (STATISTICS_CARD_EDITOR_RESOURCE_URL, STATISTICS_CARD_EDITOR_STATIC_URL, "menstrual-statistics-card-editor.js"),
 )
 VALID_PRODUCT_USAGE_PRODUCTS = {"tampon", "pad", "cup", "underwear", "liner"}
 VALID_PRODUCT_USAGE_ACTIONS = {"used", "emptied"}
@@ -808,6 +820,9 @@ def _register_domain_services(hass: HomeAssistant) -> None:
     async def async_save_timer_state(call: ServiceCall) -> None:
         await _async_handle_save_timer_state(hass, call)
 
+    async def async_export_doctor_report(call: ServiceCall) -> None:
+        await _async_handle_export_doctor_report(hass, call)
+
     hass.services.async_register(
         DOMAIN,
         SERVICE_ADD_CYCLE_START,
@@ -1026,6 +1041,19 @@ def _register_domain_services(hass: HomeAssistant) -> None:
         }),
     )
 
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_EXPORT_DOCTOR_REPORT,
+        async_export_doctor_report,
+        schema=vol.Schema({
+            **common_profile_field,
+            vol.Optional(SERVICE_FIELD_DAYS_BACK, default=180): vol.All(vol.Coerce(int), vol.Range(min=30, max=730)),
+            vol.Optional(SERVICE_FIELD_PATIENT_NAME): cv.string,
+            vol.Optional(SERVICE_FIELD_PATIENT_BIRTHDATE): cv.string,
+            vol.Optional(SERVICE_FIELD_LANGUAGE, default="de"): vol.In(["de", "en"]),
+        }),
+    )
+
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up integration from YAML (not used, config-entry only)."""
@@ -1195,6 +1223,46 @@ async def _async_handle_save_timer_state(hass: HomeAssistant, call: ServiceCall)
         f"menstruation_gauge_timer.{profile}",
         "active" if is_running else "idle",
         timer_state,
+    )
+
+
+async def _async_handle_export_doctor_report(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Generate an HTML doctor report from the cycle history and symptom data."""
+    runtime = _runtime_for_call(hass, call)
+    days_back = max(30, min(730, int(call.data.get(SERVICE_FIELD_DAYS_BACK, 180))))
+    patient_name = call.data.get(SERVICE_FIELD_PATIENT_NAME)
+    patient_birthdate = call.data.get(SERVICE_FIELD_PATIENT_BIRTHDATE)
+    language = str(call.data.get(SERVICE_FIELD_LANGUAGE, "de")).strip().lower() or "de"
+
+    if patient_name is not None:
+        patient_name = str(patient_name).strip() or None
+    if patient_birthdate is not None:
+        patient_birthdate = _normalize_date_or_raise(str(patient_birthdate).strip())
+
+    stats = compute_statistics(runtime.history, runtime.symptom_history, days_back=days_back)
+    html_content = generate_doctor_report_html(
+        stats=stats,
+        history=runtime.history,
+        symptom_history=runtime.symptom_history,
+        profile=runtime.profile,
+        patient_name=patient_name,
+        patient_birthdate=patient_birthdate,
+        language=language,
+    )
+
+    stem = _sanitize_export_filename(f"doctor_report_{runtime.profile}_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+    target_dir = Path(hass.config.path(EXPORT_DIR_NAME))
+    target_path = target_dir / f"{stem}.html"
+
+    def _write_file() -> None:
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target_path.write_text(html_content, encoding="utf-8")
+
+    await hass.async_add_executor_job(_write_file)
+    _LOGGER.info(
+        "Exported doctor report for profile '%s' to %s",
+        runtime.profile,
+        target_path,
     )
 
 
