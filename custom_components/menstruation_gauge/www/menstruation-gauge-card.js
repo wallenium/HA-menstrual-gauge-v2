@@ -540,11 +540,10 @@ class MenstruationGaugeCard extends HTMLElement {
     const all = [
       { key: 'bleeding_strength', icon: 'mdi:water-opacity', multi: false, options: ['none', 'light', 'medium', 'heavy', 'very_heavy'] },
       { key: 'clots', icon: 'mdi:water-alert', multi: false, options: ['yes', 'no'] },
-      { key: 'smell', icon: 'mdi:nose', multi: false, options: ['normal', 'inconspicuous', 'unpleasant', 'fishy'] },
       { key: 'clot_size', icon: 'mdi:ruler-square', multi: false, options: ['small', 'medium', 'large'], dependsOn: { key: 'clots', value: 'yes' } },
       { key: 'bleeding_type', icon: 'mdi:waves', multi: false, options: ['continuous', 'intermittent', 'drops'] },
       { key: 'spotting', icon: 'mdi:blood-bag', multi: false, options: ['red', 'brown'] },
-      { key: 'pain', icon: 'mdi:emoticon-sad-outline', multi: true, options: ['mittelschmerz', 'cramps', 'tender_breasts', 'headache', 'migraine', 'lower_back', 'vulva'] },
+      { key: 'smell', icon: 'mdi:nose', multi: false, options: ['normal', 'inconspicuous', 'unpleasant', 'fishy'] },
       { key: 'discharge', icon: 'mdi:water-outline', multi: false, options: ['reddish', 'brown', 'white', 'clear', 'other'] },
       { key: 'hygiene', icon: 'mdi:medical-bag', multi: true, options: ['pad', 'liner', 'tampon', 'cup', 'period_underwear'] },
       { key: 'cervical_mucus', icon: 'mdi:water', multi: false, options: ['keinen', 'klebrig', 'cremig', 'fadenziehend', 'untypisch'] },
@@ -552,16 +551,17 @@ class MenstruationGaugeCard extends HTMLElement {
       { key: 'cervix_texture', icon: 'mdi:grid', multi: false, options: ['firm', 'soft', 'open'], hiddenInModal: true },
       { key: 'intercourse', icon: 'mdi:heart', multi: false, options: ['protected', 'unprotected'] },
       { key: 'libido', icon: 'mdi:heart-pulse', multi: false, options: ['libido_low', 'normal', 'libido_high'] },
+      { key: 'pain', icon: 'mdi:emoticon-sad-outline', multi: true, options: ['mittelschmerz', 'cramps', 'tender_breasts', 'headache', 'migraine', 'lower_back', 'vulva'] },
       { key: 'test', icon: 'mdi:test-tube', multi: true, options: ['positive_ovulation', 'negative_ovulation', 'positive_pregnancy', 'negative_pregnancy'] },
       { key: 'training_intensity', icon: 'mdi:run-fast', multi: false, options: ['training_light', 'training_moderate', 'training_intense'] },
     ];
     if (String(state || '') === 'pre_menarche') {
-      const allowed = new Set(['spotting', 'discharge', 'cervical_mucus', 'pain', 'hygiene']);
+      const allowed = new Set(['spotting', 'smell', 'discharge', 'hygiene', 'cervical_mucus', 'pain', 'training_intensity']);
       return all.filter((cat) => allowed.has(cat.key));
     }
     if (pregnant) {
       const pregnancyConfig = all
-        .filter((cat) => cat.key !== 'bleeding_strength')
+        .filter((cat) => (cat.key !== 'bleeding_strength' && & cat.key !== 'clots' && cat.key !== 'clot_size' && cat.key !== 'bleeding_type'))
         .map((cat) => {
           if (cat.key === 'hygiene') {
             return { ...cat, options: cat.options.filter((opt) => opt !== 'tampon' && opt !== 'cup') };
