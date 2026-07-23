@@ -343,6 +343,13 @@ function testPregnancyModeSymptomModalFields() {
 
   // Verify pregnancy_symptoms category is present.
   assert.ok(keys.includes('pregnancy_symptoms'), 'pregnancy_symptoms category must be present in pregnancy mode');
+  assert.strictEqual(keys[0], 'pregnancy_symptoms', 'pregnancy_symptoms must be rendered first in pregnancy mode');
+  const pregnancySymptoms = pregConfig.find((c) => c.key === 'pregnancy_symptoms');
+  assert.deepStrictEqual(
+    pregnancySymptoms.options,
+    ['nausea', 'fatigue', 'headache', 'back_pain', 'heartburn', 'swelling'],
+    'pregnancy symptoms must use backend keys in priority order',
+  );
 
   // Verify hygiene does not include tampon or cup.
   const hygieneConfig = pregConfig.find((c) => c.key === 'hygiene');
@@ -437,7 +444,7 @@ function testPregnancyModeSymptomSave() {
     },
     querySelectorAll: (sel) => {
       if (sel === '.sym-multi[name="pregnancy_symptoms"]:checked') {
-        return [{ value: 'preg_nausea' }, { value: 'preg_fatigue' }];
+        return [{ value: 'nausea' }, { value: 'fatigue' }];
       }
       return [];
     },
@@ -460,7 +467,15 @@ function testPregnancyModeSymptomSave() {
   console.log('  ✓ pregnancy mode symptom save: no early return, _modalIso cleared');
 
   // Return promise so any async errors propagate (optional await in runner).
-  return savePromise;
+  return savePromise.then(() => {
+    const symptomCall = savedCalls.find((c) => c.domain === 'menstruation_gauge' && c.service === 'add_symptom');
+    assert.ok(symptomCall, 'add_symptom service must be called');
+    assert.deepStrictEqual(
+      symptomCall.payload.symptom_data.pregnancy_symptoms,
+      ['nausea', 'fatigue'],
+      'pregnancy symptom payload must use backend keys',
+    );
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -490,41 +505,59 @@ function testDischargeSymptomConfigAndOrdering() {
 
   const periodConfig = proto._symptomConfig.call(card, 'period', false);
   const periodKeys = periodConfig.map((c) => c.key);
-  const spottingIndex = periodKeys.indexOf('spotting');
   const dischargeIndex = periodKeys.indexOf('discharge');
+  const hygieneIndex = periodKeys.indexOf('hygiene');
   const mucusIndex = periodKeys.indexOf('cervical_mucus');
+  const cervixIndex = periodKeys.indexOf('cervix_position');
+  const intercourseIndex = periodKeys.indexOf('intercourse');
+  const libidoIndex = periodKeys.indexOf('libido');
+  const bleedingStrengthIndex = periodKeys.indexOf('bleeding_strength');
+  const clotsIndex = periodKeys.indexOf('clots');
+  const smellIndex = periodKeys.indexOf('smell');
   assert.ok(dischargeIndex !== -1, 'discharge must be present in period mode');
-  assert.ok(spottingIndex !== -1, 'spotting must be present in period mode');
+  assert.ok(hygieneIndex !== -1, 'hygiene must be present in period mode');
   assert.ok(mucusIndex !== -1, 'cervical_mucus must be present in period mode');
-  assert.strictEqual(dischargeIndex, spottingIndex + 1, 'discharge must be directly after spotting');
-  assert.ok(mucusIndex > dischargeIndex, 'cervical_mucus must come after discharge');
+  assert.ok(cervixIndex !== -1, 'cervix_position must be present in period mode');
+  assert.ok(intercourseIndex !== -1, 'intercourse must be present in period mode');
+  assert.ok(libidoIndex !== -1, 'libido must be present in period mode');
+  assert.strictEqual(bleedingStrengthIndex, 0, 'bleeding_strength must stay first in period mode');
+  assert.ok(clotsIndex > bleedingStrengthIndex, 'clots must be prioritized near the top');
+  assert.ok(smellIndex > clotsIndex, 'smell must follow clots near the top');
+  assert.ok(hygieneIndex > dischargeIndex, 'hygiene must come after discharge');
+  assert.ok(mucusIndex > hygieneIndex, 'cervical_mucus must be grouped under hygiene');
+  assert.ok(cervixIndex > mucusIndex, 'cervix_position must follow cervical_mucus under hygiene');
+  assert.ok(libidoIndex > intercourseIndex, 'libido must be grouped under intercourse');
 
   const preMenarcheConfig = proto._symptomConfig.call(card, 'pre_menarche', false);
   const preMenarcheKeys = preMenarcheConfig.map((c) => c.key);
   assert.ok(preMenarcheKeys.includes('discharge'), 'discharge must be present in pre_menarche mode');
   assert.ok(preMenarcheKeys.includes('cervical_mucus'), 'cervical_mucus must be present in pre_menarche mode');
-  assert.strictEqual(
-    preMenarcheKeys.indexOf('discharge'),
-    preMenarcheKeys.indexOf('spotting') + 1,
-    'pre_menarche: discharge must be directly after spotting',
+  assert.ok(
+    preMenarcheKeys.indexOf('cervical_mucus') > preMenarcheKeys.indexOf('hygiene'),
+    'pre_menarche: cervical_mucus must stay grouped after hygiene',
   );
 
   const pregnantConfig = proto._symptomConfig.call(card, 'pregnant', true);
   const pregnantKeys = pregnantConfig.map((c) => c.key);
   assert.ok(pregnantKeys.includes('discharge'), 'discharge must be present in pregnancy mode');
-  assert.strictEqual(
-    pregnantKeys.indexOf('discharge'),
-    pregnantKeys.indexOf('spotting') + 1,
-    'pregnancy: discharge must be directly after spotting',
+  assert.strictEqual(pregnantKeys[0], 'pregnancy_symptoms', 'pregnancy symptoms must appear first');
+  assert.deepStrictEqual(
+    pregnantConfig.find((c) => c.key === 'pregnancy_symptoms')?.options,
+    ['nausea', 'fatigue', 'headache', 'back_pain', 'heartburn', 'swelling'],
+    'pregnancy symptoms must use supported backend keys',
   );
 
   card._hass = { locale: { language: 'de' } };
   assert.strictEqual(proto._t.call(card, 'cat_discharge'), 'Ausfluss', 'German discharge category translation should exist');
   assert.strictEqual(proto._t.call(card, 'opt_reddish'), 'Rötlich', 'German reddish option translation should exist');
+  assert.strictEqual(proto._t.call(card, 'opt_nausea'), 'Übelkeit', 'German nausea translation should use backend key');
+  assert.strictEqual(proto._t.call(card, 'opt_fatigue'), 'Müdigkeit', 'German fatigue translation should use backend key');
 
   card._hass = { locale: { language: 'en' } };
   assert.strictEqual(proto._t.call(card, 'cat_discharge'), 'Discharge', 'English discharge category translation should exist');
   assert.strictEqual(proto._t.call(card, 'opt_reddish'), 'Reddish', 'English reddish option translation should exist');
+  assert.strictEqual(proto._t.call(card, 'opt_nausea'), 'Nausea', 'English nausea translation should use backend key');
+  assert.strictEqual(proto._t.call(card, 'opt_fatigue'), 'Fatigue', 'English fatigue translation should use backend key');
 
   console.log('  ✓ discharge symptom config/order/translations');
 }
