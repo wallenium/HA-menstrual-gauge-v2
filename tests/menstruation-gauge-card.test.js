@@ -643,6 +643,31 @@ function testTodaySaveButtonUsesPeriodLifecycleLabels() {
   console.log('  ✓ period lifecycle save labels');
 }
 
+function testPreMenarcheFirstPeriodEntryPointAndTranslations() {
+  const card = makeCard();
+  card.setConfig({ entity: 'sensor.menstruation' });
+  card._hass = makeHass({
+    state: 'pre_menarche',
+    attributes: {
+      menarche_data: { estimated_date: '2026-08-01' },
+    },
+  });
+  card._render();
+  const html = card.shadowRoot.innerHTML;
+
+  assert.ok(html.includes('btn-log-first-period'), 'pre_menarche card must render the first-period CTA');
+  assert.ok(html.includes('data-action="log-first-period"'), 'pre_menarche card CTA must trigger the modal flow');
+  assert.ok(html.includes('Erste Periode loggen'), 'pre_menarche card CTA must keep the first-period label');
+
+  const proto = GaugeCard.prototype;
+  card._hass = { locale: { language: 'de' } };
+  assert.strictEqual(proto._t.call(card, 'log_first_period_symptoms'), 'Symptome loggen', 'German modal header should say Symptome loggen');
+  card._hass = { locale: { language: 'en' } };
+  assert.strictEqual(proto._t.call(card, 'log_first_period_symptoms'), 'Log Symptoms', 'English modal header should say Log Symptoms');
+
+  console.log('  ✓ pre-menarche CTA renders and symptom modal translations are aligned');
+}
+
 // ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
@@ -663,6 +688,7 @@ const tests = [
   ['new-symptom-categories-across-modes', testNewSymptomCategoriesAcrossModes],
   ['clot-size-dependency-save', testClotSizeDependencyOnSave],
   ['period-lifecycle-save-labels', testTodaySaveButtonUsesPeriodLifecycleLabels],
+  ['pre-menarche-first-period-entrypoint', testPreMenarcheFirstPeriodEntryPointAndTranslations],
 ];
 
 (async () => {

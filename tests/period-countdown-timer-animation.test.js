@@ -200,6 +200,17 @@ function testDischargeTranslations() {
   console.log('  ✓ period timer discharge translations');
 }
 
+function testFirstPeriodSymptomHeaderTranslations() {
+  const timer = new PeriodCountdownTimer();
+  timer._hass = { locale: { language: 'de' } };
+  assert.strictEqual(timer._t('log_first_period_symptoms'), 'Symptome loggen', 'German pre-menarche modal header should say Symptome loggen');
+
+  timer._hass = { locale: { language: 'en' } };
+  assert.strictEqual(timer._t('log_first_period_symptoms'), 'Log Symptoms', 'English pre-menarche modal header should say Log Symptoms');
+
+  console.log('  ✓ timer first-period symptom header translations');
+}
+
 let failed = 0;
 
 [
@@ -209,6 +220,7 @@ let failed = 0;
   testTimerProductIconSizes,
   testTimerProductConfigIconSize,
   testDischargeTranslations,
+  testFirstPeriodSymptomHeaderTranslations,
 ].forEach((fn) => {
   try {
     fn();
