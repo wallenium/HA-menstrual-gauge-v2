@@ -36,8 +36,8 @@ class MenstruationGaugeCard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
-    // Don't re-render while the symptom modal is open to preserve user input.
-    if (this._modalIso) return;
+    // Don't re-render while the symptom modal or first period modal is open to preserve user input.
+    if (this._modalIso || this._pmModalOpen) return;
     this._render();
   }
 
@@ -177,6 +177,23 @@ class MenstruationGaugeCard extends HTMLElement {
         opt_preg_frequent_urination: 'Häufiges Wasserlassen',
         opt_preg_braxton_hicks: 'Braxton-Hicks',
         opt_preg_back_pain: 'Rückenschmerzen',
+        // First Period (Pre-Menarche) flow
+        log_first_period: 'Erste Periode loggen',
+        log_first_period_symptoms: 'Erste Periode - Symptome loggen',
+        first_period_description: 'Wähle deine heutigen Symptome aus und bestätige den Start deiner ersten Periode.',
+        leave_pre_menarche_title: 'Willst du den Pre-Menarche Modus verlassen?',
+        leave_pre_menarche_message: 'Deine erste Periode wird für heute geloggt und der Zyklus-Tracking-Modus wird aktiviert.',
+        welcome_period_title: 'Willkommen zur Periode! 🎉',
+        welcome_period_cycle_tracking: 'Zyklus-Tracking startet jetzt',
+        welcome_period_features: 'Neue Features: Zyklus-Vorhersage, Statistiken, ...',
+        welcome_period_contraception: 'Du bist jetzt fruchtbar - denke an Verhütung, wenn nötig!',
+        welcome_period_return: 'Du kannst jederzeit in den Einstellungen zum Pre-Menarche Modus zurückwechseln',
+        spotting: 'Schmierblutung',
+        discharge: 'Ausfluss',
+        pain: 'Schmerzen',
+        yes: 'Ja',
+        no: 'Nein',
+        continue: 'Weiter',
       },
       en: {
         days_unit: 'days',
@@ -280,6 +297,23 @@ class MenstruationGaugeCard extends HTMLElement {
         opt_preg_frequent_urination: 'Frequent Urination',
         opt_preg_braxton_hicks: 'Braxton Hicks',
         opt_preg_back_pain: 'Back Pain',
+        // First Period (Pre-Menarche) flow
+        log_first_period: 'Log First Period',
+        log_first_period_symptoms: 'First Period - Log Symptoms',
+        first_period_description: 'Select your symptoms for today and confirm the start of your first period.',
+        leave_pre_menarche_title: 'Do you want to leave Pre-Menarche mode?',
+        leave_pre_menarche_message: 'Your first period will be logged for today and cycle tracking mode will be activated.',
+        welcome_period_title: 'Welcome to your period! 🎉',
+        welcome_period_cycle_tracking: 'Cycle tracking starts now',
+        welcome_period_features: 'New features: cycle prediction, statistics, ...',
+        welcome_period_contraception: 'You are now fertile - think about contraception if needed!',
+        welcome_period_return: 'You can always return to Pre-Menarche mode in Settings',
+        spotting: 'Spotting',
+        discharge: 'Discharge',
+        pain: 'Pain',
+        yes: 'Yes',
+        no: 'No',
+        continue: 'Continue',
       },
     };
     return (i18n[this._lang()] && i18n[this._lang()][key]) || (i18n.en[key] || key);
@@ -1134,6 +1168,157 @@ class MenstruationGaugeCard extends HTMLElement {
     this._render();
   }
 
+  _removeFirstPeriodModal() {
+    this.shadowRoot?.querySelector('#pm-first-period-modal')?.remove();
+    this._pmModalOpen = false;
+  }
+
+  _handleLogFirstPeriod() {
+    this._removeFirstPeriodModal();
+    this._pendingFirstPeriodSymptoms = null;
+    this._pmModalOpen = true;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'pm-first-period-modal';
+    overlay.className = 'pm-overlay';
+    overlay.innerHTML = `
+      <div class="pm-modal" role="dialog" aria-modal="true">
+        <div class="pm-modal-header">
+          <span class="pm-modal-emoji">🩸</span>
+          <h3>${this._t('log_first_period_symptoms')}</h3>
+        </div>
+        <div class="pm-modal-body">
+          <p class="pm-modal-description">${this._t('first_period_description')}</p>
+          <div class="pm-symptom-grid">
+            <label class="pm-symptom-btn">
+              <input type="checkbox" name="pm-symptom" value="spotting" />
+              <span>🩸 ${this._t('spotting')}</span>
+            </label>
+            <label class="pm-symptom-btn">
+              <input type="checkbox" name="pm-symptom" value="discharge" />
+              <span>💧 ${this._t('discharge')}</span>
+            </label>
+            <label class="pm-symptom-btn">
+              <input type="checkbox" name="pm-symptom" value="pain" />
+              <span>😣 ${this._t('pain')}</span>
+            </label>
+          </div>
+        </div>
+        <div class="pm-modal-actions">
+          <button type="button" class="btn pm-btn-secondary" data-action="pm-cancel-symptoms">${this._t('cancel')}</button>
+          <button type="button" class="btn pm-btn-primary" data-action="pm-confirm-symptoms">${this._t('continue')}</button>
+        </div>
+      </div>
+    `;
+    this.shadowRoot?.appendChild(overlay);
+  }
+
+  _collectFirstPeriodSymptoms() {
+    const root = this.shadowRoot;
+    if (!root) return {};
+    const symptomData = {};
+    if (root.querySelector('input[name="pm-symptom"][value="spotting"]:checked')) {
+      symptomData.spotting = 'red';
+    }
+    if (root.querySelector('input[name="pm-symptom"][value="discharge"]:checked')) {
+      symptomData.discharge = 'other';
+    }
+    if (root.querySelector('input[name="pm-symptom"][value="pain"]:checked')) {
+      symptomData.pain = ['cramps'];
+    }
+    return symptomData;
+  }
+
+  _showLeavePreMenarcheDialog() {
+    this._pendingFirstPeriodSymptoms = this._collectFirstPeriodSymptoms();
+    this._removeFirstPeriodModal();
+    this._pmModalOpen = true;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'pm-first-period-modal';
+    overlay.className = 'pm-overlay';
+    overlay.innerHTML = `
+      <div class="pm-modal" role="dialog" aria-modal="true">
+        <div class="pm-modal-header">
+          <span class="pm-modal-emoji">🌸</span>
+          <h3>${this._t('leave_pre_menarche_title')}</h3>
+        </div>
+        <div class="pm-modal-body">
+          <p class="pm-modal-description">${this._t('leave_pre_menarche_message')}</p>
+        </div>
+        <div class="pm-modal-actions">
+          <button type="button" class="btn pm-btn-secondary" data-action="pm-cancel-leave">${this._t('no')}</button>
+          <button type="button" class="btn pm-btn-primary" data-action="pm-confirm-leave">${this._t('yes')}</button>
+        </div>
+      </div>
+    `;
+    this.shadowRoot?.appendChild(overlay);
+  }
+
+  async _doLogFirstPeriod() {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const model = this._buildModel();
+      const entityId = model.entityId || this._config?.entity || '';
+      const profile = model.stateObj?.attributes?.profile || '';
+      const entryId = model.stateObj?.attributes?.entry_id || this._config?.entry_id || '';
+      const serviceBase = {
+        ...(entityId ? { entity_id: entityId } : {}),
+        ...(profile ? { profile } : {}),
+        ...(entryId ? { entry_id: entryId } : {}),
+      };
+
+      // Log any selected symptoms (include bleeding_strength: light for first period)
+      const symptoms = this._pendingFirstPeriodSymptoms || {};
+      await this._hass.callService('menstruation_gauge', 'add_symptom', {
+        ...serviceBase,
+        date: today,
+        symptom_data: { bleeding_strength: 'light', ...symptoms },
+      });
+
+      // Atomically record menarche date and add cycle start (transitions from pre_menarche to normal)
+      await this._hass.callService('menstruation_gauge', 'log_first_period', {
+        ...serviceBase,
+        date: today,
+      });
+
+      this._pendingFirstPeriodSymptoms = null;
+      this._showWelcomePeriodPopup();
+    } catch (error) {
+      console.error('menstruation-gauge-card: error logging first period', error);
+      this._removeFirstPeriodModal();
+    }
+  }
+
+  _showWelcomePeriodPopup() {
+    this._removeFirstPeriodModal();
+    this._pmModalOpen = true;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'pm-first-period-modal';
+    overlay.className = 'pm-overlay';
+    overlay.innerHTML = `
+      <div class="pm-modal pm-modal-welcome" role="dialog" aria-modal="true">
+        <div class="pm-modal-header">
+          <span class="pm-modal-emoji">🎉</span>
+          <h3>${this._t('welcome_period_title')}</h3>
+        </div>
+        <div class="pm-modal-body">
+          <ul class="pm-info-list">
+            <li>📊 ${this._t('welcome_period_cycle_tracking')}</li>
+            <li>✨ ${this._t('welcome_period_features')}</li>
+            <li>🌸 ${this._t('welcome_period_contraception')}</li>
+            <li>↩️ ${this._t('welcome_period_return')}</li>
+          </ul>
+        </div>
+        <div class="pm-modal-actions pm-modal-actions-center">
+          <button type="button" class="btn pm-btn-primary pm-btn-ok" data-action="pm-welcome-ok">OK</button>
+        </div>
+      </div>
+    `;
+    this.shadowRoot?.appendChild(overlay);
+  }
+
   _attachHandlers() {
     if (this._handlersAttached) return;
     this._handlersAttached = true;
@@ -1200,6 +1385,33 @@ class MenstruationGaugeCard extends HTMLElement {
             modal?.querySelectorAll('.sym-opt-btn[data-cat="clot_size"]').forEach((b) => b.classList.remove('sym-selected'));
           }
         }
+      }
+      // First period (pre-menarche) flow buttons
+      const pmAction = ev.target?.closest('[data-action]')?.getAttribute('data-action');
+      if (pmAction === 'log-first-period') {
+        this._handleLogFirstPeriod();
+        return;
+      }
+      if (pmAction === 'pm-confirm-symptoms') {
+        this._showLeavePreMenarcheDialog();
+        return;
+      }
+      if (pmAction === 'pm-cancel-symptoms') {
+        this._removeFirstPeriodModal();
+        return;
+      }
+      if (pmAction === 'pm-confirm-leave') {
+        this._doLogFirstPeriod();
+        return;
+      }
+      if (pmAction === 'pm-cancel-leave') {
+        this._handleLogFirstPeriod();
+        return;
+      }
+      if (pmAction === 'pm-welcome-ok') {
+        this._removeFirstPeriodModal();
+        this._render();
+        return;
       }
     });
   }
@@ -1356,6 +1568,29 @@ class MenstruationGaugeCard extends HTMLElement {
         .sym-opt-label input[type="checkbox"] { accent-color: ${palette.confirmed}; }
         .sym-temp-input { padding: 5px 8px; border-radius: 6px; border: 1px solid rgba(128,128,128,.35); background: transparent; color: inherit; font-size: .88rem; width: 100px; }
         .sym-disabled { opacity: .62; }
+        /* Pre-Menarche first period flow */
+        .btn-log-first-period { display: block; width: 100%; padding: 10px 16px; font-size: .95rem; font-weight: 600; cursor: pointer; border-radius: 10px; border: 2px solid ${palette.confirmed}; background: ${palette.confirmed}; color: #fff; }
+        .btn-log-first-period:hover { opacity: .88; }
+        .pm-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; padding: 16px; }
+        .pm-modal { background: ${palette.cardBg}; color: ${palette.cardColor}; border-radius: 16px; padding: 24px; max-width: 400px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.3); display: flex; flex-direction: column; gap: 16px; }
+        .pm-modal-header { display: flex; align-items: center; gap: 12px; }
+        .pm-modal-emoji { font-size: 2rem; line-height: 1; flex-shrink: 0; }
+        .pm-modal-header h3 { margin: 0; font-size: 1.05rem; font-weight: 700; }
+        .pm-modal-body { color: ${palette.cardColor}; }
+        .pm-modal-description { margin: 0 0 12px 0; font-size: 0.95rem; opacity: .8; line-height: 1.5; }
+        .pm-symptom-grid { display: flex; flex-direction: column; gap: 8px; }
+        .pm-symptom-btn { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid ${palette.border}; border-radius: 8px; cursor: pointer; font-size: 0.95rem; color: ${palette.cardColor}; transition: border-color 0.15s ease, background 0.15s ease; }
+        .pm-symptom-btn:hover { border-color: ${palette.confirmed}; background: rgba(${palette.confirmed},0.1); }
+        .pm-symptom-btn input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; flex-shrink: 0; }
+        .pm-info-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+        .pm-info-list li { padding: 10px 14px; background: rgba(39,174,96,0.12); border: 1px solid rgba(39,174,96,0.3); border-radius: 8px; font-size: 0.9rem; line-height: 1.4; }
+        .pm-modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+        .pm-modal-actions-center { justify-content: center; }
+        .pm-btn-primary { background: ${palette.confirmed}; color: #fff; padding: 10px 24px; flex: none; border-color: ${palette.confirmed}; font-weight: 600; }
+        .pm-btn-primary:hover { opacity: .88; }
+        .pm-btn-secondary { background: #95a5a6; color: #fff; padding: 10px 20px; flex: none; border-color: #95a5a6; }
+        .pm-btn-secondary:hover { background: #7f8c8d; border-color: #7f8c8d; }
+        .pm-btn-ok { min-width: 100px; }
         @media (max-width: 420px) {
           .center { padding: 64px; }
           .center-panel { min-width: 124px; padding: 10px 12px; }
@@ -1379,6 +1614,12 @@ class MenstruationGaugeCard extends HTMLElement {
               ${this._renderGauge(model, palette)}
               <div class="center">${this._renderCenterContent(model, palette, canEdit, isOverdueSoon, countdown)}</div>
             </div>
+            ${model.state === 'pre_menarche' ? `
+            <div style="padding: 0 4px;">
+              <button type="button" class="btn btn-log-first-period" data-action="log-first-period">
+                🩸 ${this._t('log_first_period')}
+              </button>
+            </div>` : ''}
             ${this._config.show_editor && canEdit ? `
             <div class="editor">
               <div class="toolbar">

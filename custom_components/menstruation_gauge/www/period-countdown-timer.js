@@ -766,7 +766,7 @@ class PeriodCountdownTimer extends HTMLElement {
       <div class="pm-modal" role="dialog" aria-modal="true">
         <div class="pm-modal-header">
           <span class="pm-modal-emoji">🩸</span>
-          <h3>${this._t('log_first_period')}</h3>
+          <h3>${this._t('log_first_period_symptoms')}</h3>
         </div>
         <div class="pm-modal-body">
           <p class="pm-modal-description">${this._t('first_period_description')}</p>
@@ -1649,6 +1649,7 @@ class PeriodCountdownTimer extends HTMLElement {
         symptom_save_error: "Symptome konnten nicht gespeichert werden.",
         // First Period (Pre-Menarche) flow
         log_first_period: "Erste Periode loggen",
+        log_first_period_symptoms: "Erste Periode - Symptome loggen",
         first_period_description: "Wähle deine heutigen Symptome aus und bestätige den Start deiner ersten Periode.",
         leave_pre_menarche_title: "Willst du den Pre-Menarche Modus verlassen?",
         leave_pre_menarche_message: "Deine erste Periode wird für heute geloggt und der Zyklus-Tracking-Modus wird aktiviert.",
@@ -1727,6 +1728,7 @@ class PeriodCountdownTimer extends HTMLElement {
         symptom_save_error: "Could not save symptoms.",
         // First Period (Pre-Menarche) flow
         log_first_period: "Log First Period",
+        log_first_period_symptoms: "First Period - Log Symptoms",
         first_period_description: "Select your symptoms for today and confirm the start of your first period.",
         leave_pre_menarche_title: "Do you want to leave Pre-Menarche mode?",
         leave_pre_menarche_message: "Your first period will be logged for today and cycle tracking mode will be activated.",
