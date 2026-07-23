@@ -2565,12 +2565,12 @@ class PeriodCountdownTimer extends HTMLElement {
   }
 
   static getConfigElement() {
-    return document.createElement("period-countdown-timer-editor");
+    return document.createElement("menstruation-countdown-timer-editor");
   }
 
   static getStubConfig() {
     return {
-      type: "custom:period-countdown-timer",
+      type: "custom:menstruation-countdown-timer",
       entity: "sensor.anna",
       product_animations: true,
       animation_style: "realistic",
@@ -2583,11 +2583,11 @@ class PeriodCountdownTimer extends HTMLElement {
   }
 }
 
-customElements.define("period-countdown-timer", PeriodCountdownTimer);
+customElements.define("menstruation-countdown-timer", PeriodCountdownTimer);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
-  type: "period-countdown-timer",
-  name: "Period Countdown Timer",
+  type: "menstruation-countdown-timer",
+  name: "Menstruation Countdown Timer",
   description: "Countdown timer with direct product-usage logging for period products.",
 });

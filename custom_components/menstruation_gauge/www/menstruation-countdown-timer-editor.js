@@ -1,4 +1,4 @@
-class PeriodCountdownTimerEditor extends HTMLElement {
+class MenstruationCountdownTimerEditor extends HTMLElement {
   setConfig(config) {
     this._config = {
       product_animations: true,
@@ -359,6 +359,6 @@ class PeriodCountdownTimerEditor extends HTMLElement {
   }
 }
 
-if (!customElements.get("period-countdown-timer-editor")) {
-  customElements.define("period-countdown-timer-editor", PeriodCountdownTimerEditor);
+if (!customElements.get("menstruation-countdown-timer-editor")) {
+  customElements.define("menstruation-countdown-timer-editor", MenstruationCountdownTimerEditor);
 }
