@@ -1,9 +1,6 @@
 /**
  * Menstrual Statistics Card
- * Displays cycle statistics in three modes:
- *   1. Statistiken (User statistics view)
- *   2. Arzt-Bericht (Doctor report + PDF export)
- *   3. Einstellungen (Settings)
+ * Displays cycle statistics, hygiene statistics and a doctor report.
  */
 class MenstruationStatisticsCard extends HTMLElement {
   static getStubConfig() {
@@ -13,6 +10,7 @@ class MenstruationStatisticsCard extends HTMLElement {
       title: '',
       days_back: 180,
       language: 'auto',
+      ...((window.MenstruationProductStatsShared && window.MenstruationProductStatsShared.DEFAULT_CONFIG) || {}),
     };
   }
 
@@ -24,13 +22,16 @@ class MenstruationStatisticsCard extends HTMLElement {
     if (!config || (!config.entity && !config.entry_id)) {
       throw new Error('entity or entry_id is required');
     }
+    const productDefaults = (window.MenstruationProductStatsShared && window.MenstruationProductStatsShared.DEFAULT_CONFIG) || {};
     this._config = {
       title: '',
       days_back: 180,
       language: 'auto',
+      ...productDefaults,
       ...config,
     };
     this._tab = this._tab || 'stats';
+    this._settingsOpen = this._settingsOpen || false;
     this._exportStatus = null;
     this._patientName = '';
     this._patientBirthdate = '';
@@ -64,9 +65,11 @@ class MenstruationStatisticsCard extends HTMLElement {
     const i18n = {
       de: {
         title: 'Statistiken',
-        tab_stats: 'Statistiken',
+        tab_period: 'Periode',
+        tab_hygiene: 'Hygiene',
         tab_doctor: 'Arzt-Bericht',
-        tab_settings: 'Einstellungen',
+        filter: 'Filter',
+        filter_aria: 'Statistik-Filter öffnen',
         no_data: 'Keine Daten vorhanden',
         entity_not_found: 'Entity nicht gefunden',
         cycle_length: 'Zykluslänge',
@@ -116,9 +119,11 @@ class MenstruationStatisticsCard extends HTMLElement {
       },
       en: {
         title: 'Statistics',
-        tab_stats: 'Statistics',
+        tab_period: 'Period',
+        tab_hygiene: 'Hygiene',
         tab_doctor: 'Doctor Report',
-        tab_settings: 'Settings',
+        filter: 'Filter',
+        filter_aria: 'Open statistics filters',
         no_data: 'No data available',
         entity_not_found: 'Entity not found',
         cycle_length: 'Cycle Length',
@@ -182,26 +187,35 @@ class MenstruationStatisticsCard extends HTMLElement {
     return stateObj.attributes || {};
   }
 
+  _filterOptions() {
+    return [
+      { value: 90, label: this._t('months_3') },
+      { value: 180, label: this._t('months_6') },
+      { value: 365, label: this._t('months_12') },
+    ];
+  }
+
+  _currentFilterLabel() {
+    const selected = this._filterOptions().find((option) => option.value === this._daysBack);
+    return selected ? selected.label : this._t('custom');
+  }
+
   _computeStats(attrs) {
     if (!attrs) return null;
     const today = new Date();
     const cutoffMs = today.getTime() - this._daysBack * 86400000;
     const cutoffIso = new Date(cutoffMs).toISOString().slice(0, 10);
 
-    // Raw history from sensor attributes
     const rawHistory = Array.isArray(attrs.history) ? attrs.history : [];
     const history = rawHistory.filter(d => d >= cutoffIso).sort();
 
-    // Grouped cycle starts
     const rawStarts = Array.isArray(attrs.grouped_starts) ? attrs.grouped_starts : [];
     const starts = rawStarts.filter(d => d >= cutoffIso);
 
-    // Cycle statistics from sensor
     const cycleStats = attrs.cycle_statistics || {};
     const symptomStats = attrs.symptom_statistics || {};
     const bleedingBlocks = Array.isArray(attrs.bleeding_blocks) ? attrs.bleeding_blocks : [];
 
-    // Compute cycle lengths from starts within window
     const allStarts = rawStarts.filter(d => typeof d === 'string');
     const cycleLengths = [];
     for (let i = 1; i < allStarts.length; i++) {
@@ -230,7 +244,6 @@ class MenstruationStatisticsCard extends HTMLElement {
       regularity = stdDev <= 2 ? 'very_regular' : stdDev <= 5 ? 'regular' : 'irregular';
     }
 
-    // Bleeding duration from bleeding_blocks
     const durations = bleedingBlocks
       .filter(b => b && b.start >= cutoffIso)
       .map(b => {
@@ -248,11 +261,9 @@ class MenstruationStatisticsCard extends HTMLElement {
     const minBleed = durations.length ? Math.min(...durations) : null;
     const maxBleed = durations.length ? Math.max(...durations) : null;
 
-    // Symptom data
     const symptomHistory = Array.isArray(attrs.symptom_history) ? attrs.symptom_history : [];
     const recentSymptoms = symptomHistory.filter(s => s.date >= cutoffIso);
 
-    // Bleeding strength distribution
     const bsCount = {};
     for (const s of recentSymptoms) {
       const bs = s.bleeding_strength;
@@ -263,7 +274,6 @@ class MenstruationStatisticsCard extends HTMLElement {
       ? Object.entries(bsCount).map(([k, v]) => ({ key: k, pct: Math.round(v / bsTotal * 100) })).sort((a, b) => b.pct - a.pct)
       : [];
 
-    // Top symptoms
     const symCount = {};
     const numCycles = Math.max(1, cycleLengths.length);
     for (const s of recentSymptoms) {
@@ -278,7 +288,6 @@ class MenstruationStatisticsCard extends HTMLElement {
       .slice(0, 5)
       .map(([k, v]) => ({ key: k, count: v, pct: Math.round(v / numCycles * 100) }));
 
-    // Pain trend per cycle
     const cycleStarts = rawStarts.filter(d => d >= cutoffIso);
     const painTrend = cycleStarts.map((startIso, idx) => {
       const endIso = cycleStarts[idx + 1]
@@ -289,6 +298,10 @@ class MenstruationStatisticsCard extends HTMLElement {
     });
 
     return {
+      history,
+      starts,
+      cycleStats,
+      symptomStats,
       cycleLengths,
       avg,
       minLen,
@@ -388,7 +401,6 @@ class MenstruationStatisticsCard extends HTMLElement {
     const t = (k) => this._t(k);
     const esc = (s) => this._escHtml(String(s));
 
-    // Cycle length
     const hasCycle = stats.cycleLengths.length > 0;
     const cycleHtml = hasCycle ? `
       <div class="stat-grid">
@@ -400,7 +412,6 @@ class MenstruationStatisticsCard extends HTMLElement {
 
     const regularity = stats.regularity ? `<div class="regularity-badge reg-${esc(stats.regularity)}">${esc(t(stats.regularity))}</div>` : '';
 
-    // Bleeding duration
     const bleedHtml = stats.avgBleed !== null ? `
       <div class="stat-grid">
         <div class="stat-box"><div class="stat-val">${stats.avgBleed}</div><div class="stat-key">${t('avg')} (${t('days')})</div></div>
@@ -408,13 +419,8 @@ class MenstruationStatisticsCard extends HTMLElement {
         <div class="stat-box"><div class="stat-val">${stats.maxBleed}</div><div class="stat-key">${t('max')}</div></div>
       </div>` : `<div class="no-data">${t('no_data')}</div>`;
 
-    // Bleeding strength distribution
     const bsHtml = this._renderStatsBars(stats.bsDist, (k) => this._bsLabel(k));
-
-    // Top symptoms
     const symHtml = this._renderStatsBars(stats.topSymptoms, (k) => this._symLabel(k));
-
-    // Pain trend sparkline
     const painHtml = this._renderPainSparkline(stats.painTrend);
 
     return `
@@ -443,6 +449,12 @@ class MenstruationStatisticsCard extends HTMLElement {
         <div class="section-header"><span class="section-icon">😣</span><span>${esc(t('pain_trend'))}</span></div>
         ${painHtml}
       </div>`;
+  }
+
+  _renderHygieneTab(attrs) {
+    const shared = window.MenstruationProductStatsShared;
+    if (!shared) return `<div class="no-data">${this._t('no_data')}</div>`;
+    return `<div class="hygiene-tab">${shared.renderEmbedded(this._hass, this._config, attrs || {})}</div>`;
   }
 
   _renderDoctorTab() {
@@ -478,21 +490,12 @@ class MenstruationStatisticsCard extends HTMLElement {
       </div>`;
   }
 
-  _renderSettingsTab() {
-    const t = (k) => this._t(k);
-    const options = [
-      { value: 90, label: t('months_3') },
-      { value: 180, label: t('months_6') },
-      { value: 365, label: t('months_12') },
-    ];
+  _renderFilterMenu() {
     return `
-      <div class="section">
-        <div class="section-header"><span class="section-icon">⚙️</span><span>${this._escHtml(t('settings_title'))}</span></div>
-        <div class="form-field">
-          <label>${this._escHtml(t('days_back_label'))}</label>
-          <div class="days-buttons">
-            ${options.map(o => `<button class="days-btn ${this._daysBack === o.value ? 'active' : ''}" data-days="${o.value}">${this._escHtml(o.label)}</button>`).join('')}
-          </div>
+      <div class="filter-popover ${this._settingsOpen ? 'open' : ''}">
+        <div class="section-header compact"><span class="section-icon">⚙️</span><span>${this._escHtml(this._t('days_back_label'))}</span></div>
+        <div class="days-buttons compact">
+          ${this._filterOptions().map(o => `<button class="days-btn ${this._daysBack === o.value ? 'active' : ''}" data-days="${o.value}">${this._escHtml(o.label)}</button>`).join('')}
         </div>
       </div>`;
   }
@@ -521,33 +524,41 @@ class MenstruationStatisticsCard extends HTMLElement {
     const title = this._config.title || this._t('title');
     const tab = this._tab;
     const t = (k) => this._t(k);
+    const productStyles = window.MenstruationProductStatsShared?.getStyles({ embedded: true }) || '';
 
     let tabContent = '';
     if (tab === 'stats') tabContent = this._renderStatsTab(stats);
+    else if (tab === 'hygiene') tabContent = this._renderHygieneTab(attrs);
     else if (tab === 'doctor') tabContent = this._renderDoctorTab();
-    else if (tab === 'settings') tabContent = this._renderSettingsTab();
 
     this.shadowRoot.innerHTML = `
       <style>
         :host { display: block; }
         ha-card { padding: 12px 16px 16px; }
         .card-title { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: var(--primary-text-color); }
-        .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 2px solid var(--divider-color, #ddd); padding-bottom: 0; }
+        .toolbar-wrap { position: relative; margin-bottom: 12px; }
+        .tab-toolbar { display: flex; align-items: flex-end; gap: 8px; }
+        .tabs { flex: 1; display: flex; gap: 4px; border-bottom: 2px solid var(--divider-color, #ddd); padding-bottom: 0; }
         .tab-btn { flex: 1; padding: 8px 4px; border: none; background: none; cursor: pointer; font-size: 12px; font-weight: 500; color: var(--secondary-text-color, #888); border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s; }
         .tab-btn.active { color: var(--primary-color, #c0392b); border-bottom-color: var(--primary-color, #c0392b); }
         .tab-btn:hover:not(.active) { color: var(--primary-text-color); }
+        .filter-toggle { flex: 0 0 auto; width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--divider-color, #ddd); background: var(--card-background-color, #fff); color: var(--primary-text-color); cursor: pointer; }
+        .filter-toggle .filter-glyph { font-size: 16px; line-height: 1; display: inline-block; }
+        .filter-popover { display: none; margin-top: 8px; border: 1px solid var(--divider-color, #ddd); border-radius: 12px; padding: 10px; background: var(--ha-card-background, var(--card-background-color, #fff)); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); }
+        .filter-popover.open { display: block; }
         .section { margin-bottom: 20px; }
         .section-header { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; margin-bottom: 8px; color: var(--primary-text-color); }
+        .section-header.compact { margin-bottom: 10px; }
         .section-icon { font-size: 16px; }
         .section-meta { font-size: 11px; color: var(--secondary-text-color, #888); margin-bottom: 8px; }
-        .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-        .stat-box { background: var(--secondary-background-color, #f5f5f5); border-radius: 8px; padding: 8px; text-align: center; }
+        .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(82px, 1fr)); gap: 8px; }
+        .stat-box { background: var(--secondary-background-color, #f5f5f5); border-radius: 8px; padding: 8px; text-align: center; border: 1px solid var(--divider-color, rgba(128, 128, 128, 0.18)); }
         .stat-val { font-size: 18px; font-weight: 700; color: var(--primary-color, #c0392b); }
         .stat-key { font-size: 10px; color: var(--secondary-text-color, #888); margin-top: 2px; }
         .regularity-badge { padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; margin-left: auto; }
-        .reg-very_regular { background: #d5f5e3; color: #27ae60; }
-        .reg-regular { background: #fef9e7; color: #f39c12; }
-        .reg-irregular { background: #fdedec; color: #e74c3c; }
+        .reg-very_regular { background: color-mix(in srgb, var(--success-color, #27ae60) 16%, transparent); color: var(--success-color, #27ae60); }
+        .reg-regular { background: color-mix(in srgb, var(--warning-color, #f39c12) 16%, transparent); color: var(--warning-color, #f39c12); }
+        .reg-irregular { background: color-mix(in srgb, var(--error-color, #e74c3c) 14%, transparent); color: var(--error-color, #e74c3c); }
         .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
         .bar-label { flex: 0 0 120px; font-size: 12px; color: var(--primary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .bar-outer { flex: 1; height: 10px; background: var(--secondary-background-color, #f0f0f0); border-radius: 5px; overflow: hidden; }
@@ -564,16 +575,33 @@ class MenstruationStatisticsCard extends HTMLElement {
         .export-btn:disabled { opacity: 0.5; cursor: default; }
         .export-hint { font-size: 11px; color: var(--secondary-text-color, #888); margin-top: 8px; line-height: 1.5; }
         .days-buttons { display: flex; gap: 8px; }
-        .days-btn { flex: 1; padding: 8px; border: 1px solid var(--divider-color, #ddd); border-radius: 6px; background: var(--secondary-background-color, #f5f5f5); cursor: pointer; font-size: 12px; color: var(--primary-text-color); }
+        .days-buttons.compact { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+        .days-btn { min-height: 34px; padding: 8px; border: 1px solid var(--divider-color, #ddd); border-radius: 8px; background: var(--secondary-background-color, #f5f5f5); cursor: pointer; font-size: 12px; color: var(--primary-text-color); }
         .days-btn.active { background: var(--primary-color, #c0392b); color: #fff; border-color: var(--primary-color, #c0392b); }
         .empty { padding: 20px; text-align: center; color: var(--secondary-text-color, #888); }
+        .hygiene-tab { min-height: 0; }
+        ${productStyles}
+        @media (max-width: 480px) {
+          ha-card { padding: 12px; }
+          .tab-toolbar { align-items: stretch; }
+          .tabs { gap: 2px; }
+          .tab-btn { font-size: 11px; }
+          .bar-label { flex-basis: 96px; }
+          .days-buttons.compact { grid-template-columns: 1fr; }
+        }
       </style>
       <ha-card>
         ${title ? `<div class="card-title">${this._escHtml(title)}</div>` : ''}
-        <div class="tabs">
-          <button class="tab-btn ${tab === 'stats' ? 'active' : ''}" data-tab="stats">${this._escHtml(t('tab_stats'))}</button>
-          <button class="tab-btn ${tab === 'doctor' ? 'active' : ''}" data-tab="doctor">${this._escHtml(t('tab_doctor'))}</button>
-          <button class="tab-btn ${tab === 'settings' ? 'active' : ''}" data-tab="settings">${this._escHtml(t('tab_settings'))}</button>
+        <div class="toolbar-wrap">
+          <div class="tab-toolbar">
+            <div class="tabs">
+              <button class="tab-btn ${tab === 'stats' ? 'active' : ''}" data-tab="stats">${this._escHtml(t('tab_period'))}</button>
+              <button class="tab-btn ${tab === 'hygiene' ? 'active' : ''}" data-tab="hygiene">${this._escHtml(t('tab_hygiene'))}</button>
+              <button class="tab-btn ${tab === 'doctor' ? 'active' : ''}" data-tab="doctor">${this._escHtml(t('tab_doctor'))}</button>
+            </div>
+            <button class="filter-toggle" id="statistics-filter-toggle" title="${this._escHtml(`${t('filter')}: ${this._currentFilterLabel()}`)}" aria-label="${this._escHtml(t('filter_aria'))}"><span class="filter-glyph">⚙</span></button>
+          </div>
+          ${this._renderFilterMenu()}
         </div>
         <div class="tab-content">${tabContent}</div>
       </ha-card>`;
@@ -585,24 +613,52 @@ class MenstruationStatisticsCard extends HTMLElement {
     const root = this.shadowRoot;
     if (!root) return;
 
-    // Tab switching
     root.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        this._tab = btn.dataset.tab;
+        const nextTab = btn.dataset.tab;
+        if (!nextTab || nextTab === this._tab) return;
+        this._tab = nextTab;
+        this._settingsOpen = false;
         this._exportStatus = null;
         this._render();
       });
     });
 
-    // Days buttons (settings tab)
+    const toggle = root.getElementById('statistics-filter-toggle');
+    if (toggle) {
+      toggle.addEventListener('click', () => {
+        this._settingsOpen = !this._settingsOpen;
+        this._render();
+      });
+    }
+
     root.querySelectorAll('.days-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        this._daysBack = parseInt(btn.dataset.days, 10);
-        this._render();
+        const nextDays = parseInt(btn.dataset.days, 10);
+        if (Number.isNaN(nextDays)) return;
+        const changed = nextDays !== this._daysBack;
+        this._daysBack = nextDays;
+        this._settingsOpen = false;
+        if (changed || this._settingsOpen) {
+          this._render();
+        } else {
+          this._render();
+        }
       });
     });
 
-    // Doctor export form input persistence
+    root.querySelectorAll('button[data-action="add-underwear-shopping"]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!this._hass) return;
+        const quantity = Math.max(1, Number(btn.dataset.quantity || 1));
+        await this._hass.callService('menstruation_gauge', 'manage_household_inventory', {
+          inventory_action: 'add_to_shopping_list',
+          product: 'underwear',
+          quantity,
+        });
+      });
+    });
+
     const nameInput = root.getElementById('patient-name');
     if (nameInput) {
       nameInput.addEventListener('input', e => { this._patientName = e.target.value; });
@@ -616,7 +672,6 @@ class MenstruationStatisticsCard extends HTMLElement {
       langSelect.addEventListener('change', e => { this._exportLanguage = e.target.value; });
     }
 
-    // Export button
     const exportBtn = root.getElementById('export-btn');
     if (exportBtn) {
       exportBtn.addEventListener('click', async () => {
