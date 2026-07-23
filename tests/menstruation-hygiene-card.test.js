@@ -1,5 +1,5 @@
 /**
- * Tests for menstrual-product-stats-card.js
+ * Tests for menstruation-hygiene-card.js
  *
  * Covers:
  *  - calculateStats: liner + underwear per-cycle averages extracted correctly
@@ -7,7 +7,7 @@
  *  - multiple entries on the same day (correct summation in timeline grouping)
  *  - empty data / unknown product types handled robustly
  *
- * Run with:  node tests/menstrual-product-stats-card.test.js
+ * Run with:  node tests/menstruation-hygiene-card.test.js
  */
 
 'use strict';
@@ -31,14 +31,14 @@ global.HTMLElement = class HTMLElement {
 global.window.ProductIcons = { getSvgIcon: () => '' };
 
 const sharedSrc = fs.readFileSync(
-  path.join(__dirname, '../custom_components/menstruation_gauge/www/menstruation-product-stats-shared.js'),
+  path.join(__dirname, '../custom_components/menstruation_gauge/www/menstruation-hygiene-shared.js'),
   'utf8',
 );
 // eslint-disable-next-line no-eval
 eval(sharedSrc);
 
 const src = fs.readFileSync(
-  path.join(__dirname, '../custom_components/menstruation_gauge/www/menstruation-product-stats-card.js'),
+  path.join(__dirname, '../custom_components/menstruation_gauge/www/menstruation-hygiene-card.js'),
   'utf8',
 );
 // eslint-disable-next-line no-eval
@@ -47,7 +47,7 @@ eval(src);
 // Retrieve the registered class from the customElements stub.
 let CardClass;
 const origDefine = global.customElements.define;
-global.customElements.define = (name, cls) => { if (name === 'menstruation-product-stats-card') CardClass = cls; };
+global.customElements.define = (name, cls) => { if (name === 'menstruation-hygiene-card') CardClass = cls; };
 eval(src); // re-eval to trigger define()
 global.customElements.define = origDefine;
 

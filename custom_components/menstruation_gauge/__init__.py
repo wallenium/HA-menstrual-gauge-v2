@@ -152,7 +152,8 @@ HEATMAP_STATIC_URL = _build_card_static_url("menstruation-cycle-heatmap-card.js"
 PRODUCT_ICONS_STATIC_URL = _build_card_static_url("product-icons.js")
 TIMER_STATIC_URL = _build_card_static_url("menstruation-countdown-timer.js")
 TIMER_EDITOR_STATIC_URL = _build_card_static_url("menstruation-countdown-timer-editor.js")
-PRODUCT_STATS_STATIC_URL = _build_card_static_url("menstruation-product-stats-card.js")
+HYGIENE_SHARED_STATIC_URL = _build_card_static_url("menstruation-hygiene-shared.js")
+HYGIENE_CARD_STATIC_URL = _build_card_static_url("menstruation-hygiene-card.js")
 PRODUCT_INVENTORY_STATIC_URL = _build_card_static_url("menstruation-product-inventory-card.js")
 PRODUCT_INVENTORY_EDITOR_STATIC_URL = _build_card_static_url("menstruation-product-inventory-card-editor.js")
 HEATMAP_EDITOR_STATIC_URL = _build_card_static_url("menstruation-cycle-heatmap-card-editor.js")
@@ -168,7 +169,8 @@ HEATMAP_RESOURCE_URL = _build_card_resource_url("menstruation-cycle-heatmap-card
 PRODUCT_ICONS_RESOURCE_URL = _build_card_resource_url("menstruation-icons.js")
 TIMER_RESOURCE_URL = _build_card_resource_url("menstruation-countdown-timer.js")
 TIMER_EDITOR_RESOURCE_URL = _build_card_resource_url("menstruation-countdown-timer-editor.js")
-PRODUCT_STATS_RESOURCE_URL = _build_card_resource_url("menstruation-product-stats-card.js")
+HYGIENE_SHARED_RESOURCE_URL = _build_card_resource_url("menstruation-hygiene-shared.js")
+HYGIENE_CARD_RESOURCE_URL = _build_card_resource_url("menstruation-hygiene-card.js")
 PRODUCT_INVENTORY_RESOURCE_URL = _build_card_resource_url("menstruation-product-inventory-card.js")
 PRODUCT_INVENTORY_EDITOR_RESOURCE_URL = _build_card_resource_url("menstruation-product-inventory-card-editor.js")
 HEATMAP_EDITOR_RESOURCE_URL = _build_card_resource_url("menstruation-cycle-heatmap-card-editor.js")
@@ -187,7 +189,8 @@ LOVELACE_RESOURCES = (
     (HEATMAP_RESOURCE_URL, HEATMAP_STATIC_URL, "menstruation-cycle-heatmap-card.js"),
     (TIMER_RESOURCE_URL, TIMER_STATIC_URL, "menstruation-countdown-timer.js"),
     (TIMER_EDITOR_RESOURCE_URL, TIMER_EDITOR_STATIC_URL, "menstruation-countdown-timer-editor.js"),
-    (PRODUCT_STATS_RESOURCE_URL, PRODUCT_STATS_STATIC_URL, "menstruation-product-stats-card.js"),
+    (HYGIENE_SHARED_RESOURCE_URL, HYGIENE_SHARED_STATIC_URL, "menstruation-hygiene-shared.js"),
+    (HYGIENE_CARD_RESOURCE_URL, HYGIENE_CARD_STATIC_URL, "menstruation-hygiene-card.js"),
     (PRODUCT_INVENTORY_RESOURCE_URL, PRODUCT_INVENTORY_STATIC_URL, "menstruation-product-inventory-card.js"),
     (PRODUCT_INVENTORY_EDITOR_RESOURCE_URL, PRODUCT_INVENTORY_EDITOR_STATIC_URL, "menstruation-product-inventory-card-editor.js"),
     (HEATMAP_EDITOR_RESOURCE_URL, HEATMAP_EDITOR_STATIC_URL, "menstruation-cycle-heatmap-card-editor.js"),

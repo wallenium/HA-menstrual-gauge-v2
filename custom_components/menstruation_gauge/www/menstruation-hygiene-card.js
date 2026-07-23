@@ -1,9 +1,9 @@
-class MenstruationProductStatsCard extends HTMLElement {
+class MenstruationHygieneCard extends HTMLElement {
   setConfig(config) {
     if (!config?.entity) {
       throw new Error('Entity is required');
     }
-    this.config = window.MenstruationProductStatsShared.mergeConfig(config);
+    this.config = window.MenstruationHygieneShared.mergeConfig(config);
   }
 
   set hass(hass) {
@@ -16,12 +16,12 @@ class MenstruationProductStatsCard extends HTMLElement {
   }
 
   static getConfigElement() {
-    return document.createElement('menstruation-product-stats-card-editor');
+    return document.createElement('menstruation-hygiene-card-editor');
   }
 
   static getStubConfig() {
     return {
-      type: 'custom:menstruation-product-stats-card',
+      type: 'custom:menstruation-hygiene-card',
       entity: 'sensor.menstruation_gauge',
       title: 'Product usage',
     };
@@ -54,7 +54,7 @@ class MenstruationProductStatsCard extends HTMLElement {
       return;
     }
 
-    this.innerHTML = window.MenstruationProductStatsShared.renderStandalone(
+    this.innerHTML = window.MenstruationHygieneShared.renderStandalone(
       this._hass,
       this.config,
       stateObj.attributes || {},
@@ -62,83 +62,83 @@ class MenstruationProductStatsCard extends HTMLElement {
   }
 
   calculateStats(productUsageThisCycle, productUsageStats, daysUntilNextStart) {
-    return window.MenstruationProductStatsShared.calculateStats(productUsageThisCycle, productUsageStats, daysUntilNextStart);
+    return window.MenstruationHygieneShared.calculateStats(productUsageThisCycle, productUsageStats, daysUntilNextStart);
   }
 
   calculateAverageDailyUsage(productUsage, product) {
-    return window.MenstruationProductStatsShared.calculateAverageDailyUsage(productUsage, product);
+    return window.MenstruationHygieneShared.calculateAverageDailyUsage(productUsage, product);
   }
 
   calculateUnderwearWashPlan(averageDailyUsage) {
-    return window.MenstruationProductStatsShared.calculateUnderwearWashPlan(this.config, averageDailyUsage);
+    return window.MenstruationHygieneShared.calculateUnderwearWashPlan(this.config, averageDailyUsage);
   }
 
   calculateCupSavings(productUsage) {
-    return window.MenstruationProductStatsShared.calculateCupSavings(this.config, productUsage);
+    return window.MenstruationHygieneShared.calculateCupSavings(this.config, productUsage);
   }
 
   renderTimeline(productUsage) {
-    return window.MenstruationProductStatsShared.renderTimeline(this._hass, productUsage);
+    return window.MenstruationHygieneShared.renderTimeline(this._hass, productUsage);
   }
 
   productLabel(entry) {
-    return window.MenstruationProductStatsShared.productLabel(this._hass, entry);
+    return window.MenstruationHygieneShared.productLabel(this._hass, entry);
   }
 
   normalizeQuantity(value) {
-    return window.MenstruationProductStatsShared.normalizeQuantity(value);
+    return window.MenstruationHygieneShared.normalizeQuantity(value);
   }
 
   normalizeProductKey(value) {
-    return window.MenstruationProductStatsShared.normalizeProductKey(value);
+    return window.MenstruationHygieneShared.normalizeProductKey(value);
   }
 
   normalizeDateKey(value) {
-    return window.MenstruationProductStatsShared.normalizeDateKey(value);
+    return window.MenstruationHygieneShared.normalizeDateKey(value);
   }
 
   dateKeyToOrdinal(value) {
-    return window.MenstruationProductStatsShared.dateKeyToOrdinal(value);
+    return window.MenstruationHygieneShared.dateKeyToOrdinal(value);
   }
 
   todayOrdinal() {
-    return window.MenstruationProductStatsShared.todayOrdinal();
+    return window.MenstruationHygieneShared.todayOrdinal();
   }
 
   formatNumber(value) {
-    return window.MenstruationProductStatsShared.formatNumber(value);
+    return window.MenstruationHygieneShared.formatNumber(value);
   }
 
   _lang() {
-    return window.MenstruationProductStatsShared.getLang(this._hass);
+    return window.MenstruationHygieneShared.getLang(this._hass);
   }
 
   escapeHtml(value) {
-    return window.MenstruationProductStatsShared.escapeHtml(value);
+    return window.MenstruationHygieneShared.escapeHtml(value);
   }
 
   escapeClassName(value) {
-    return window.MenstruationProductStatsShared.escapeClassName(value);
+    return window.MenstruationHygieneShared.escapeClassName(value);
   }
 
   dateLocale() {
-    return window.MenstruationProductStatsShared.dateLocale(this._hass);
+    return window.MenstruationHygieneShared.dateLocale(this._hass);
   }
 
   formatDate(value) {
-    return window.MenstruationProductStatsShared.formatDate(this._hass, value);
+    return window.MenstruationHygieneShared.formatDate(this._hass, value);
   }
 
   _getSvgIcon(product) {
-    return window.MenstruationProductStatsShared.getSvgIcon(product);
+    return window.MenstruationHygieneShared.getSvgIcon(product);
   }
 
   _t(key, placeholders = {}) {
-    return window.MenstruationProductStatsShared.translate(this._hass, key, placeholders);
+    return window.MenstruationHygieneShared.translate(this._hass, key, placeholders);
   }
 }
 
-class MenstruationProductStatsCardEditor extends HTMLElement {
+class MenstruationHygieneCardEditor extends HTMLElement {
   setConfig(config) {
     this._config = { ...config };
     this._render();
@@ -207,18 +207,18 @@ class MenstruationProductStatsCardEditor extends HTMLElement {
   }
 }
 
-if (!customElements.get('menstruation-product-stats-card')) {
-  customElements.define('menstruation-product-stats-card', MenstruationProductStatsCard);
+if (!customElements.get('menstruation-hygiene-card')) {
+  customElements.define('menstruation-hygiene-card', MenstruationHygieneCard);
 }
-if (!customElements.get('menstruation-product-stats-card-editor')) {
-  customElements.define('menstruation-product-stats-card-editor', MenstruationProductStatsCardEditor);
+if (!customElements.get('menstruation-hygiene-card-editor')) {
+  customElements.define('menstruation-hygiene-card-editor', MenstruationHygieneCardEditor);
 }
 
 window.customCards = window.customCards || [];
 window.customCards.push({
-  type: 'menstruation-product-stats-card',
-  name: 'Menstruation Product Stats Card',
-  description: 'Shows per-cycle product usage KPIs and a 30-day usage timeline.',
+  type: 'menstruation-hygiene-card',
+  name: 'Menstruation Hygiene Card',
+  description: 'Displays per-cycle hygiene product usage KPIs and a 30-day usage timeline.',
   preview: true,
   documentationURL: 'https://github.com/wallenium/HA-menstrual-gauge-v2',
 });

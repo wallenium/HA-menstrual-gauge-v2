@@ -55,7 +55,7 @@ global.customElements = {
 };
 
 const sharedSrc = fs.readFileSync(
-  path.join(__dirname, '../custom_components/menstruation_gauge/www/menstruation-product-stats-shared.js'),
+  path.join(__dirname, '../custom_components/menstruation_gauge/www/menstruation-hygiene-shared.js'),
   'utf8',
 );
 // eslint-disable-next-line no-eval

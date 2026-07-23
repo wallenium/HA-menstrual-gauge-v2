@@ -10,7 +10,7 @@ class MenstruationStatisticsCard extends HTMLElement {
       title: '',
       days_back: 180,
       language: 'auto',
-      ...((window.MenstruationProductStatsShared && window.MenstruationProductStatsShared.DEFAULT_CONFIG) || {}),
+      ...((window.MenstruationHygieneShared && window.MenstruationHygieneShared.DEFAULT_CONFIG) || {}),
     };
   }
 
@@ -22,7 +22,7 @@ class MenstruationStatisticsCard extends HTMLElement {
     if (!config || (!config.entity && !config.entry_id)) {
       throw new Error('entity or entry_id is required');
     }
-    const productDefaults = (window.MenstruationProductStatsShared && window.MenstruationProductStatsShared.DEFAULT_CONFIG) || {};
+    const productDefaults = (window.MenstruationHygieneShared && window.MenstruationHygieneShared.DEFAULT_CONFIG) || {};
     this._config = {
       title: '',
       days_back: 180,
@@ -452,7 +452,7 @@ class MenstruationStatisticsCard extends HTMLElement {
   }
 
   _renderHygieneTab(attrs) {
-    const shared = window.MenstruationProductStatsShared;
+    const shared = window.MenstruationHygieneShared;
     if (!shared) return `<div class="no-data">${this._t('no_data')}</div>`;
     return `<div class="hygiene-tab">${shared.renderEmbedded(this._hass, this._config, attrs || {})}</div>`;
   }
@@ -524,7 +524,7 @@ class MenstruationStatisticsCard extends HTMLElement {
     const title = this._config.title || this._t('title');
     const tab = this._tab;
     const t = (k) => this._t(k);
-    const productStyles = window.MenstruationProductStatsShared?.getStyles({ embedded: true }) || '';
+    const productStyles = window.MenstruationHygieneShared?.getStyles({ embedded: true }) || '';
 
     let tabContent = '';
     if (tab === 'stats') tabContent = this._renderStatsTab(stats);

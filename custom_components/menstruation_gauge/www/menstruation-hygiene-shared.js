@@ -1,5 +1,5 @@
 (function () {
-  if (window.MenstruationProductStatsShared) return;
+  if (window.MenstruationHygieneShared) return;
 
   const DEFAULT_CONFIG = {
     tampon_price: 0.12,
@@ -673,7 +673,7 @@
     return renderContent(hass, mergeConfig(config), attrs || {});
   }
 
-  window.MenstruationProductStatsShared = {
+  window.MenstruationHygieneShared = {
     DEFAULT_CONFIG,
     TRANSLATIONS,
     mergeConfig,
