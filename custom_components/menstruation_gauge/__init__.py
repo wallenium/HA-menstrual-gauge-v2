@@ -106,7 +106,7 @@ from .const import (
     TANNER_STAGE_4,
     TANNER_STAGE_5,
 )
-from .model import normalize_history
+from .model import build_cycle_model, normalize_history
 from .storage import MenstruationStorage
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
@@ -1187,11 +1187,59 @@ async def _async_handle_save_timer_state(hass: HomeAssistant, call: ServiceCall)
     )
 
 
+def _smart_period_history_dates(
+    runtime: MenstruationRuntime,
+    date_iso: str,
+    *,
+    allow_new_period: bool = True,
+) -> list[str]:
+    """Resolve which history dates should be recorded for a smart period continuation."""
+    target_date = date.fromisoformat(date_iso)
+    model = build_cycle_model(
+        history=runtime.history,
+        period_duration_days=runtime.period_duration_days,
+        symptom_history=runtime.symptom_history,
+        pregnancy_data=runtime.pregnancy_data,
+        menarche_data=runtime.menarche_data,
+        pre_menarche_data=runtime.pre_menarche_data,
+        menopause_data=runtime.menopause_data,
+        today=target_date,
+    )
+    current_period = model.current_period
+    if not isinstance(current_period, dict) or not current_period.get("is_active"):
+        return [date_iso] if allow_new_period else []
+
+    start_iso = current_period.get("start")
+    if not isinstance(start_iso, str) or date_iso < start_iso:
+        return [date_iso] if allow_new_period else []
+
+    confirmed_days = [
+        item
+        for item in current_period.get("confirmed_days", [])
+        if isinstance(item, str) and item <= date_iso
+    ]
+    last_confirmed_iso = confirmed_days[-1] if confirmed_days else None
+
+    if last_confirmed_iso is None:
+        return [date_iso] if allow_new_period else []
+    if last_confirmed_iso >= date_iso:
+        return [] if date_iso in runtime.history else [date_iso]
+
+    fill_start = date.fromisoformat(last_confirmed_iso)
+    fill_days: list[str] = []
+    day_cursor = fill_start
+    while day_cursor.isoformat() < date_iso:
+        day_cursor = day_cursor.fromordinal(day_cursor.toordinal() + 1)
+        fill_days.append(day_cursor.isoformat())
+    return fill_days
+
+
 async def _async_handle_add(hass: HomeAssistant, call: ServiceCall) -> None:
     runtime = _runtime_for_call(hass, call)
     date_iso = _normalize_date_or_raise(call.data[SERVICE_FIELD_DATE])
-    if date_iso not in runtime.history:
-        runtime.history.append(date_iso)
+    for history_date in _smart_period_history_dates(runtime, date_iso):
+        if history_date not in runtime.history:
+            runtime.history.append(history_date)
     await _async_save_and_notify(hass, runtime)
 
 
@@ -1460,6 +1508,15 @@ async def _async_handle_add_symptom(hass: HomeAssistant, call: ServiceCall) -> N
         runtime.symptom_history.append(new_entry)
 
     runtime.symptom_history.sort(key=lambda x: x.get("date", ""))
+
+    bleeding_strength = str(next_symptom_data.get("bleeding_strength", "")).strip().lower()
+    if bleeding_strength in {"none", "keine"}:
+        runtime.history = [item for item in runtime.history if item != date_iso]
+    elif "bleeding_strength" in next_symptom_data:
+        for history_date in _smart_period_history_dates(runtime, date_iso, allow_new_period=False):
+            if history_date not in runtime.history:
+                runtime.history.append(history_date)
+
     await _async_save_and_notify(hass, runtime)
 
 

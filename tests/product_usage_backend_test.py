@@ -86,6 +86,46 @@ storage = _load_module("mgtest.storage", "storage.py")
 
 
 class ProductUsageBackendTests(unittest.TestCase):
+    def test_build_cycle_model_keeps_period_active_until_duration_limit(self) -> None:
+        cycle = model.build_cycle_model(
+            history=["2026-07-01"],
+            period_duration_days=5,
+            symptom_history=[],
+            today=date(2026, 7, 2),
+        )
+
+        self.assertEqual(cycle.state, const.STATE_PERIOD)
+        self.assertIsNotNone(cycle.current_period)
+        self.assertTrue(cycle.current_period["is_active"])
+        self.assertEqual(cycle.current_period["days_elapsed"], 2)
+        self.assertEqual(cycle.current_period["effective_duration"], 5)
+
+    def test_build_cycle_model_ends_period_when_none_is_logged(self) -> None:
+        cycle = model.build_cycle_model(
+            history=["2026-07-01", "2026-07-02"],
+            period_duration_days=5,
+            symptom_history=[{"date": "2026-07-03", "bleeding_strength": "none"}],
+            today=date(2026, 7, 3),
+        )
+
+        self.assertNotEqual(cycle.state, const.STATE_PERIOD)
+        self.assertIsNotNone(cycle.current_period)
+        self.assertFalse(cycle.current_period["is_active"])
+        self.assertEqual(cycle.current_period["ended_by"], "bleeding_none")
+
+    def test_build_cycle_model_ends_period_after_average_duration(self) -> None:
+        cycle = model.build_cycle_model(
+            history=["2026-07-01", "2026-07-02"],
+            period_duration_days=5,
+            symptom_history=[],
+            today=date(2026, 7, 6),
+        )
+
+        self.assertNotEqual(cycle.state, const.STATE_PERIOD)
+        self.assertIsNotNone(cycle.current_period)
+        self.assertFalse(cycle.current_period["is_active"])
+        self.assertEqual(cycle.current_period["ended_by"], "duration")
+
     def test_storage_normalizes_aliases_and_dates(self) -> None:
         entries = [
             {"created_at": "2026-07-18T09:15:00Z", "product": "pantyliners", "quantity": "2"},

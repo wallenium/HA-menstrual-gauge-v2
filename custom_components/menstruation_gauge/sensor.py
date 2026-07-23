@@ -69,7 +69,7 @@ PRODUCT_USAGE_TIMELINE_DAYS = 30
 SYMPTOM_SENSOR_HISTORY_LIMIT = 60
 SYMPTOM_STATS_MAX_CYCLES = 6
 SYMPTOM_MULTI_VALUE_KEYS = ("pain", "hygiene", "test")
-BLEEDING_STRENGTH_PRIORITY = {"light": 1, "medium": 2, "heavy": 3, "very_heavy": 4}
+BLEEDING_STRENGTH_PRIORITY = {"none": 0, "keine": 0, "light": 1, "medium": 2, "heavy": 3, "very_heavy": 4}
 CYCLE_STATS_MAX_CYCLES = 12
 CYCLE_RECENT_LIMIT = 12
 CYCLE_HISTORY_LIMIT_MONTHS = 18
@@ -625,31 +625,11 @@ def _build_cycle_statistics(
     }
 
 
-def _get_current_bleeding_block(
-    bleeding_blocks_payload: list[dict[str, str | int]],
-    history: list[str],
-    today: date,
-) -> dict[str, Any] | None:
-    """Return the most recent bleeding block enriched with confirmed days."""
-    if not bleeding_blocks_payload:
+def _get_current_bleeding_block(current_period: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Return the lifecycle-aware period block for the latest cycle."""
+    if not isinstance(current_period, dict):
         return None
-
-    last_block = bleeding_blocks_payload[-1]
-    start_iso = last_block.get("start")
-    end_iso = last_block.get("end")
-
-    if not isinstance(start_iso, str):
-        return None
-
-    end_filter = end_iso if isinstance(end_iso, str) else today.isoformat()
-    confirmed_days = [d for d in history if isinstance(d, str) and start_iso <= d <= end_filter]
-
-    return {
-        "start": start_iso,
-        "end": end_iso,
-        "length": last_block.get("length"),
-        "confirmed_days": confirmed_days,
-    }
+    return dict(current_period)
 
 
 class MenstruationGaugeSensor(SensorEntity):
@@ -735,7 +715,7 @@ class MenstruationGaugeSensor(SensorEntity):
                 cycle_day = (today - start_d).days + 1
 
         cycle_statistics = _build_cycle_statistics(model.grouped_starts, model.bleeding_blocks, today)
-        current_bleeding_block = _get_current_bleeding_block(model.bleeding_blocks, model.history, today)
+        current_bleeding_block = _get_current_bleeding_block(model.current_period)
 
         # Compact history/grouped_starts for sensor broadcasting (full data stays in storage)
         sensor_history = _compact_history_for_sensor(model.history, today)
