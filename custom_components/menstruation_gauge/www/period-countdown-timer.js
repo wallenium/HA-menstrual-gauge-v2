@@ -270,6 +270,10 @@ class PeriodCountdownTimer extends HTMLElement {
     const preMenarcheIcon = this._getStatusAnimatedIcon("pre_menarche");
     cardContent.innerHTML = `
       <div class="premenarche-container">
+        <button type="button" class="btn btn-log-first-period" data-action="log-first-period">
+          🩸 ${this._t('log_first_period')}
+        </button>
+
         <div class="premenarche-badge">
           <div class="badge-emoji">${preMenarcheIcon}</div>
           <div class="badge-text">
@@ -745,6 +749,155 @@ class PeriodCountdownTimer extends HTMLElement {
     return Math.floor(diffTime / (1000 * 60 * 60 * 24));
   }
 
+  // ── First Period (Pre-Menarche) Modal Flow ──────────────────────────────
+
+  _removeFirstPeriodModal() {
+    this.shadowRoot?.querySelector('#pm-first-period-modal')?.remove();
+  }
+
+  _handleLogFirstPeriod() {
+    this._removeFirstPeriodModal();
+    this._pendingFirstPeriodSymptoms = null;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'pm-first-period-modal';
+    overlay.className = 'pm-overlay';
+    overlay.innerHTML = `
+      <div class="pm-modal" role="dialog" aria-modal="true">
+        <div class="pm-modal-header">
+          <span class="pm-modal-emoji">🩸</span>
+          <h3>${this._t('log_first_period')}</h3>
+        </div>
+        <div class="pm-modal-body">
+          <p class="pm-modal-description">${this._t('first_period_description')}</p>
+          <div class="pm-symptom-grid">
+            <label class="pm-symptom-btn">
+              <input type="checkbox" name="pm-symptom" value="spotting" />
+              <span>🩸 ${this._t('spotting')}</span>
+            </label>
+            <label class="pm-symptom-btn">
+              <input type="checkbox" name="pm-symptom" value="discharge" />
+              <span>💧 ${this._t('discharge')}</span>
+            </label>
+            <label class="pm-symptom-btn">
+              <input type="checkbox" name="pm-symptom" value="pain" />
+              <span>😣 ${this._t('pain')}</span>
+            </label>
+          </div>
+        </div>
+        <div class="pm-modal-actions">
+          <button type="button" class="btn pm-btn-secondary" data-action="pm-cancel-symptoms">${this._t('cancel')}</button>
+          <button type="button" class="btn pm-btn-primary" data-action="pm-confirm-symptoms">${this._t('continue')}</button>
+        </div>
+      </div>
+    `;
+    this.shadowRoot?.appendChild(overlay);
+  }
+
+  _collectFirstPeriodSymptoms() {
+    const root = this.shadowRoot;
+    if (!root) return {};
+    const symptomData = {};
+    if (root.querySelector('input[name="pm-symptom"][value="spotting"]:checked')) {
+      symptomData.spotting = 'red';
+    }
+    if (root.querySelector('input[name="pm-symptom"][value="discharge"]:checked')) {
+      symptomData.discharge = 'other';
+    }
+    if (root.querySelector('input[name="pm-symptom"][value="pain"]:checked')) {
+      symptomData.pain = ['cramps'];
+    }
+    return symptomData;
+  }
+
+  _showLeavePreMenarcheDialog() {
+    this._pendingFirstPeriodSymptoms = this._collectFirstPeriodSymptoms();
+    this._removeFirstPeriodModal();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'pm-first-period-modal';
+    overlay.className = 'pm-overlay';
+    overlay.innerHTML = `
+      <div class="pm-modal" role="dialog" aria-modal="true">
+        <div class="pm-modal-header">
+          <span class="pm-modal-emoji">🌸</span>
+          <h3>${this._t('leave_pre_menarche_title')}</h3>
+        </div>
+        <div class="pm-modal-body">
+          <p class="pm-modal-description">${this._t('leave_pre_menarche_message')}</p>
+        </div>
+        <div class="pm-modal-actions">
+          <button type="button" class="btn pm-btn-secondary" data-action="pm-cancel-leave">${this._t('no')}</button>
+          <button type="button" class="btn pm-btn-primary" data-action="pm-confirm-leave">${this._t('yes')}</button>
+        </div>
+      </div>
+    `;
+    this.shadowRoot?.appendChild(overlay);
+  }
+
+  async _doLogFirstPeriod() {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const entityId = this.config?.entity;
+      const profile = this.config?.profile;
+      const entryId = this.config?.entry_id;
+      const serviceBase = {
+        ...(entityId ? { entity_id: entityId } : {}),
+        ...(profile ? { profile } : {}),
+        ...(entryId ? { entry_id: entryId } : {}),
+      };
+
+      // Log any selected symptoms (include bleeding_strength: light for first period)
+      const symptoms = this._pendingFirstPeriodSymptoms || {};
+      await this.callService("menstruation_gauge", "add_symptom", {
+        ...serviceBase,
+        date: today,
+        symptom_data: { bleeding_strength: 'light', ...symptoms },
+      });
+
+      // Atomically record menarche date and add cycle start (transitions from pre_menarche to normal)
+      await this.callService("menstruation_gauge", "log_first_period", {
+        ...serviceBase,
+        date: today,
+      });
+
+      this._pendingFirstPeriodSymptoms = null;
+      this._showWelcomePeriodPopup();
+    } catch (error) {
+      console.error("Error logging first period:", error);
+      this._removeFirstPeriodModal();
+    }
+  }
+
+  _showWelcomePeriodPopup() {
+    this._removeFirstPeriodModal();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'pm-first-period-modal';
+    overlay.className = 'pm-overlay';
+    overlay.innerHTML = `
+      <div class="pm-modal pm-modal-welcome" role="dialog" aria-modal="true">
+        <div class="pm-modal-header">
+          <span class="pm-modal-emoji">🎉</span>
+          <h3>${this._t('welcome_period_title')}</h3>
+        </div>
+        <div class="pm-modal-body">
+          <ul class="pm-info-list">
+            <li>📊 ${this._t('welcome_period_cycle_tracking')}</li>
+            <li>✨ ${this._t('welcome_period_features')}</li>
+            <li>↩️ ${this._t('welcome_period_return')}</li>
+          </ul>
+        </div>
+        <div class="pm-modal-actions pm-modal-actions-center">
+          <button type="button" class="btn pm-btn-primary pm-btn-ok" data-action="pm-welcome-ok">OK</button>
+        </div>
+      </div>
+    `;
+    this.shadowRoot?.appendChild(overlay);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+
   attachTimerEventListeners() {
     const root = this._ensureRoot();
     if (this._timerHandlersAttached) {
@@ -776,6 +929,24 @@ class PeriodCountdownTimer extends HTMLElement {
           break;
         case "log-cup-usage":
           this.logProductUsage("emptied");
+          break;
+        case "log-first-period":
+          this._handleLogFirstPeriod();
+          break;
+        case "pm-confirm-symptoms":
+          this._showLeavePreMenarcheDialog();
+          break;
+        case "pm-cancel-symptoms":
+          this._removeFirstPeriodModal();
+          break;
+        case "pm-confirm-leave":
+          this._doLogFirstPeriod();
+          break;
+        case "pm-cancel-leave":
+          this._handleLogFirstPeriod();
+          break;
+        case "pm-welcome-ok":
+          this._removeFirstPeriodModal();
           break;
         default:
           break;
@@ -1474,7 +1645,20 @@ class PeriodCountdownTimer extends HTMLElement {
         card_title: "Menstruations-Countdown",
         pregnancy_card_title: "Schwangerschaft",
         symptom_saved: "Symptome gespeichert.",
-        symptom_save_error: "Symptome konnten nicht gespeichert werden."
+        symptom_save_error: "Symptome konnten nicht gespeichert werden.",
+        // First Period (Pre-Menarche) flow
+        log_first_period: "Erste Periode loggen",
+        first_period_description: "Wähle deine heutigen Symptome aus und bestätige den Start deiner ersten Periode.",
+        leave_pre_menarche_title: "Willst du den Pre-Menarche Modus verlassen?",
+        leave_pre_menarche_message: "Deine erste Periode wird für heute geloggt und der Zyklus-Tracking-Modus wird aktiviert.",
+        welcome_period_title: "Willkommen zur Periode! 🎉",
+        welcome_period_cycle_tracking: "Zyklus-Tracking startet jetzt",
+        welcome_period_features: "Neue Features: Zyklus-Vorhersage, Statistiken, ...",
+        welcome_period_return: "Du kannst jederzeit in den Einstellungen zum Pre-Menarche Modus zurückwechseln",
+        yes: "Ja",
+        no: "Nein",
+        cancel: "Abbrechen",
+        continue: "Weiter"
       },
       en: {
         // Status labels
@@ -1538,7 +1722,20 @@ class PeriodCountdownTimer extends HTMLElement {
         card_title: "Menstrual Countdown",
         pregnancy_card_title: "Pregnancy",
         symptom_saved: "Symptoms saved.",
-        symptom_save_error: "Could not save symptoms."
+        symptom_save_error: "Could not save symptoms.",
+        // First Period (Pre-Menarche) flow
+        log_first_period: "Log First Period",
+        first_period_description: "Select your symptoms for today and confirm the start of your first period.",
+        leave_pre_menarche_title: "Do you want to leave Pre-Menarche mode?",
+        leave_pre_menarche_message: "Your first period will be logged for today and cycle tracking mode will be activated.",
+        welcome_period_title: "Welcome to your period! 🎉",
+        welcome_period_cycle_tracking: "Cycle tracking starts now",
+        welcome_period_features: "New features: cycle prediction, statistics, ...",
+        welcome_period_return: "You can always return to Pre-Menarche mode in Settings",
+        yes: "Yes",
+        no: "No",
+        cancel: "Cancel",
+        continue: "Continue"
       },
     };
 
@@ -2203,6 +2400,161 @@ class PeriodCountdownTimer extends HTMLElement {
         .badge-text h3 {
           font-size: 1rem;
         }
+      }
+
+      /* ── Log First Period button ────────────────────────────── */
+      .btn-log-first-period {
+        background: var(--mg-status-error);
+        padding: 14px 20px;
+        font-size: 1rem;
+        border-radius: 12px;
+        width: 100%;
+        text-align: center;
+      }
+
+      .btn-log-first-period:hover {
+        background: color-mix(in srgb, var(--mg-status-error) 85%, #000);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px color-mix(in srgb, var(--mg-status-error) 30%, transparent);
+      }
+
+      /* ── Pre-Menarche Modal Overlay ─────────────────────────── */
+      .pm-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+      }
+
+      .pm-modal {
+        background: var(--mg-card-bg);
+        border-radius: 16px;
+        padding: 24px;
+        max-width: 400px;
+        width: 100%;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .pm-modal-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .pm-modal-emoji {
+        font-size: 2rem;
+        line-height: 1;
+        flex-shrink: 0;
+      }
+
+      .pm-modal-header h3 {
+        margin: 0;
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--primary-text-color);
+      }
+
+      .pm-modal-body {
+        color: var(--primary-text-color);
+      }
+
+      .pm-modal-description {
+        margin: 0 0 12px 0;
+        font-size: 0.95rem;
+        color: var(--secondary-text-color);
+        line-height: 1.5;
+      }
+
+      .pm-symptom-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .pm-symptom-btn {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border: 1px solid var(--mg-border);
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.95rem;
+        color: var(--primary-text-color);
+        transition: border-color 0.15s ease, background 0.15s ease;
+      }
+
+      .pm-symptom-btn:hover {
+        border-color: var(--mg-status-accent);
+        background: color-mix(in srgb, var(--mg-status-accent) 10%, transparent);
+      }
+
+      .pm-symptom-btn input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        accent-color: var(--mg-status-accent);
+        flex-shrink: 0;
+      }
+
+      .pm-info-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .pm-info-list li {
+        padding: 10px 14px;
+        background: color-mix(in srgb, var(--mg-status-success) 12%, transparent);
+        border: 1px solid color-mix(in srgb, var(--mg-status-success) 30%, transparent);
+        border-radius: 8px;
+        font-size: 0.9rem;
+        color: var(--primary-text-color);
+        line-height: 1.4;
+      }
+
+      .pm-modal-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+      }
+
+      .pm-modal-actions-center {
+        justify-content: center;
+      }
+
+      .pm-btn-primary {
+        background: var(--mg-status-accent);
+        padding: 10px 24px;
+        flex: none;
+      }
+
+      .pm-btn-primary:hover {
+        background: color-mix(in srgb, var(--mg-status-accent) 85%, #000);
+      }
+
+      .pm-btn-secondary {
+        background: #95a5a6;
+        padding: 10px 20px;
+        flex: none;
+      }
+
+      .pm-btn-secondary:hover {
+        background: #7f8c8d;
+      }
+
+      .pm-btn-ok {
+        min-width: 100px;
       }
     `;
   }
