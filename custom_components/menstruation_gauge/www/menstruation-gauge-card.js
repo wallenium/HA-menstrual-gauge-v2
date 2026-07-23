@@ -1972,6 +1972,6 @@ customElements.define('menstruation-gauge-card-editor', MenstruationGaugeCardEdi
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'menstruation-gauge-card',
-  name: localize('card.name', this.hass.language),
-  description: localize('card_description', this.hass.language)
+  name: this.hass.language.card_name,
+  description: this.hass.language.card_description
 });
