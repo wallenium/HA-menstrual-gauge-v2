@@ -855,14 +855,8 @@ class PeriodCountdownTimer extends HTMLElement {
         symptom_data: { bleeding_strength: 'light', ...symptoms },
       });
 
-      // Add first period as cycle start
-      await this.callService("menstruation_gauge", "add_cycle_start", {
-        ...serviceBase,
-        date: today,
-      });
-
-      // Record menarche date – this transitions the sensor from pre_menarche to normal
-      await this.callService("menstruation_gauge", "update_menarche_date", {
+      // Atomically record menarche date and add cycle start (transitions from pre_menarche to normal)
+      await this.callService("menstruation_gauge", "log_first_period", {
         ...serviceBase,
         date: today,
       });

@@ -787,6 +787,9 @@ def _register_domain_services(hass: HomeAssistant) -> None:
     async def async_update_menarche_date(call: ServiceCall) -> None:
         await _async_handle_update_menarche_date(hass, call)
 
+    async def async_log_first_period(call: ServiceCall) -> None:
+        await _async_handle_log_first_period(hass, call)
+
     async def async_get_menarche_info(call: ServiceCall) -> dict[str, Any]:
         return await _async_handle_get_menarche_info(hass, call)
 
@@ -960,6 +963,13 @@ def _register_domain_services(hass: HomeAssistant) -> None:
         schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_DATE): cv.string}),
     )
 
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_LOG_FIRST_PERIOD,
+        async_log_first_period,
+        schema=vol.Schema({**common_profile_field, vol.Required(SERVICE_FIELD_DATE): cv.string}),
+    )
+
     _menarche_info_kwargs: dict[str, Any] = {
         "schema": vol.Schema(common_profile_field),
     }
@@ -1126,6 +1136,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_UPDATE_PREGNANCY_DATE,
             SERVICE_SET_MENARCHE_MODE,
             SERVICE_UPDATE_MENARCHE_DATE,
+            SERVICE_LOG_FIRST_PERIOD,
             SERVICE_GET_MENARCHE_INFO,
             SERVICE_ADD_PRE_MENARCHE_SIGN,
             SERVICE_REMOVE_PRE_MENARCHE_SIGN,
@@ -1593,6 +1604,24 @@ async def _async_handle_update_menarche_date(hass: HomeAssistant, call: ServiceC
     runtime.menarche_data["tracking_active"] = True
     runtime.menarche_data["is_menarche"] = True
     runtime.menarche_data["menarche_date"] = date_iso
+    await _async_save_and_notify(hass, runtime)
+
+
+async def _async_handle_log_first_period(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Log the first period: atomically records menarche date and adds cycle start."""
+    runtime = _runtime_for_call(hass, call)
+    date_iso = _normalize_date_or_raise(call.data[SERVICE_FIELD_DATE])
+
+    # Record menarche transition
+    runtime.menarche_data["tracking_active"] = True
+    runtime.menarche_data["is_menarche"] = True
+    runtime.menarche_data["menarche_date"] = date_iso
+
+    # Add cycle start
+    for history_date in _smart_period_history_dates(runtime, date_iso):
+        if history_date not in runtime.history:
+            runtime.history.append(history_date)
+
     await _async_save_and_notify(hass, runtime)
 
 
