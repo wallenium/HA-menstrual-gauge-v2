@@ -2,7 +2,7 @@
  * Menstrual Statistics Card Editor
  * Config UI for the Menstrual Statistics Card.
  */
-class MenstrualStatisticsCardEditor extends HTMLElement {
+class MenstruationStatisticsCardEditor extends HTMLElement {
   setConfig(config) {
     this._config = { ...config };
     this._render();
@@ -94,4 +94,4 @@ class MenstrualStatisticsCardEditor extends HTMLElement {
   }
 }
 
-customElements.define('menstrual-statistics-card-editor', MenstrualStatisticsCardEditor);
+customElements.define('menstruation-statistics-card-editor', MenstruationStatisticsCardEditor);

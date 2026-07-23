@@ -1,4 +1,4 @@
-class MenstrualCycleHistoryCardRowEditor extends HTMLElement {
+class MenstruationCycleHistoryCardRowEditor extends HTMLElement {
   setConfig(config) {
     this._config = {
       max_rows: 12,
@@ -324,6 +324,6 @@ class MenstrualCycleHistoryCardRowEditor extends HTMLElement {
   }
 }
 
-if (!customElements.get('menstrual-cycle-history-card-row-editor')) {
-  customElements.define('menstrual-cycle-history-card-row-editor', MenstrualCycleHistoryCardRowEditor);
+if (!customElements.get('menstruation-cycle-history-card-row-editor')) {
+  customElements.define('menstruation-cycle-history-card-row-editor', MenstruationCycleHistoryCardRowEditor);
 }

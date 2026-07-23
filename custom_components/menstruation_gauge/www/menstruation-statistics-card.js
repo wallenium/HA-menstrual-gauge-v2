@@ -5,10 +5,10 @@
  *   2. Arzt-Bericht (Doctor report + PDF export)
  *   3. Einstellungen (Settings)
  */
-class MenstrualStatisticsCard extends HTMLElement {
+class MenstruationStatisticsCard extends HTMLElement {
   static getStubConfig() {
     return {
-      type: 'custom:menstrual-statistics-card',
+      type: 'custom:menstruation-statistics-card',
       entity: '',
       title: '',
       days_back: 180,
@@ -17,7 +17,7 @@ class MenstrualStatisticsCard extends HTMLElement {
   }
 
   static getConfigElement() {
-    return document.createElement('menstrual-statistics-card-editor');
+    return document.createElement('menstruation-statistics-card-editor');
   }
 
   setConfig(config) {
@@ -650,12 +650,12 @@ class MenstrualStatisticsCard extends HTMLElement {
   }
 }
 
-customElements.define('menstrual-statistics-card', MenstrualStatisticsCard);
+customElements.define('menstruation-statistics-card', MenstruationStatisticsCard);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
-  type: 'menstrual-statistics-card',
-  name: 'Menstrual Statistics Card',
+  type: 'menstruation-statistics-card',
+  name: 'Menstruation Statistics Card',
   description: 'Displays menstrual cycle statistics and generates a doctor report.',
   preview: false,
   documentationURL: 'https://github.com/wallenium/HA-menstrual-gauge-v2',

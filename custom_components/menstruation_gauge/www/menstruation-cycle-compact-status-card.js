@@ -1,7 +1,7 @@
-class MenstrualCycleCompactStatusCard extends HTMLElement {
+class MenstruationCycleCompactStatusCard extends HTMLElement {
   static getStubConfig() {
     return {
-      type: 'custom:menstrual-cycle-compact-status',
+      type: 'custom:menstruation-cycle-compact-status',
       entity: 'sensor.menstruation',
       entry_id: '',
       title: '',
@@ -10,7 +10,7 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
   }
 
   static getConfigElement() {
-    return document.createElement('menstrual-cycle-compact-status-editor');
+    return document.createElement('menstruation-cycle-compact-status-editor');
   }
 
   setConfig(config) {
@@ -764,7 +764,7 @@ class MenstrualCycleCompactStatusCard extends HTMLElement {
   }
 }
 
-class MenstrualCycleCompactStatusEditor extends HTMLElement {
+class MenstruationCycleCompactStatusEditor extends HTMLElement {
   setConfig(config) {
     this._config = {
       show_title: false,
@@ -869,17 +869,17 @@ class MenstrualCycleCompactStatusEditor extends HTMLElement {
   }
 }
 
-if (!customElements.get('menstrual-cycle-compact-status')) {
-  customElements.define('menstrual-cycle-compact-status', MenstrualCycleCompactStatusCard);
+if (!customElements.get('menstruation-cycle-compact-status')) {
+  customElements.define('menstruation-cycle-compact-status', MenstruationCycleCompactStatusCard);
 }
 
-if (!customElements.get('menstrual-cycle-compact-status-editor')) {
-  customElements.define('menstrual-cycle-compact-status-editor', MenstrualCycleCompactStatusEditor);
+if (!customElements.get('menstruation-cycle-compact-status-editor')) {
+  customElements.define('menstruation-cycle-compact-status-editor', MenstruationCycleCompactStatusEditor);
 }
 
 window.customCards = window.customCards || [];
 window.customCards.push({
-  type: 'menstrual-cycle-compact-status',
-  name: 'Menstrual Cycle Compact Status',
+  type: 'menstruation-cycle-compact-status',
+  name: 'Menstruation Cycle Compact Status',
   description: 'Compact cycle status with circular day indicator and status icon',
 });

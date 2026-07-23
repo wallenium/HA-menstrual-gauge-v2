@@ -1,4 +1,4 @@
-class MenstrualProductStatsCard extends HTMLElement {
+class MenstruationProductStatsCard extends HTMLElement {
   setConfig(config) {
     if (!config?.entity) {
       throw new Error("Entity is required");
@@ -27,12 +27,12 @@ class MenstrualProductStatsCard extends HTMLElement {
   }
 
   static getConfigElement() {
-    return document.createElement('menstrual-product-stats-card-editor');
+    return document.createElement('menstruation-product-stats-card-editor');
   }
 
   static getStubConfig() {
     return {
-      type: 'custom:menstrual-product-stats-card',
+      type: 'custom:menstruation-product-stats-card',
       entity: 'sensor.menstruation_gauge',
       title: 'Product usage'
     };
@@ -745,7 +745,7 @@ class MenstrualProductStatsCard extends HTMLElement {
   }
 }
 
-class MenstrualProductStatsCardEditor extends HTMLElement {
+class MenstruationProductStatsCardEditor extends HTMLElement {
   setConfig(config) {
     this._config = { ...config };
     this._render();
@@ -811,16 +811,16 @@ class MenstrualProductStatsCardEditor extends HTMLElement {
   }
 }
 
-if (!customElements.get("menstrual-product-stats-card")) {
-  customElements.define("menstrual-product-stats-card", MenstrualProductStatsCard);
+if (!customElements.get("menstruation-product-stats-card")) {
+  customElements.define("menstruation-product-stats-card", MenstruationProductStatsCard);
 }
-if (!customElements.get("menstrual-product-stats-card-editor")) {
-  customElements.define("menstrual-product-stats-card-editor", MenstrualProductStatsCardEditor);
+if (!customElements.get("menstruation-product-stats-card-editor")) {
+  customElements.define("menstruation-product-stats-card-editor", MenstruationProductStatsCardEditor);
 }
 
 window.customCards = window.customCards || [];
 window.customCards.push({
-  type: "menstrual-product-stats-card",
-  name: "Menstrual Product Stats Card",
+  type: "menstruation-product-stats-card",
+  name: "Menstruation Product Stats Card",
   description: "Shows per-cycle product usage KPIs and a 30-day usage timeline.",
 });

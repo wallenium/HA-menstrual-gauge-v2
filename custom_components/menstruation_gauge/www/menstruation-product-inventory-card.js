@@ -1,7 +1,7 @@
-class MenstrualProductInventoryCard extends HTMLElement {
+class MenstruationProductInventoryCard extends HTMLElement {
   static getStubConfig() {
     return {
-      type: "custom:menstrual-product-inventory-card",
+      type: "custom:menstruation-product-inventory-card",
       inventory_entity: "sensor.household_product_stock",
       title: "Household inventory",
       member: "",
@@ -584,13 +584,13 @@ class MenstrualProductInventoryCard extends HTMLElement {
   }
 }
 
-if (!customElements.get("menstrual-product-inventory-card")) {
-  customElements.define("menstrual-product-inventory-card", MenstrualProductInventoryCard);
+if (!customElements.get("menstruation-product-inventory-card")) {
+  customElements.define("menstruation-product-inventory-card", MenstruationProductInventoryCard);
 }
 
 window.customCards = window.customCards || [];
 window.customCards.push({
-  type: "menstrual-product-inventory-card",
-  name: "Menstrual Product Inventory Card",
+  type: "menstruation-product-inventory-card",
+  name: "Menstruation Product Inventory Card",
   description: "Shared household inventory management for period products.",
 });

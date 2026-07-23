@@ -1,4 +1,4 @@
-class MenstrualProductInventoryCardEditor extends HTMLElement {
+class MenstruationProductInventoryCardEditor extends HTMLElement {
   static get ALL_PRODUCTS() {
     return ["tampon", "pad", "cup", "liner", "underwear"];
   }
@@ -411,6 +411,6 @@ class MenstrualProductInventoryCardEditor extends HTMLElement {
   }
 }
 
-if (!customElements.get("menstrual-product-inventory-card-editor")) {
-  customElements.define("menstrual-product-inventory-card-editor", MenstrualProductInventoryCardEditor);
+if (!customElements.get("menstruation-product-inventory-card-editor")) {
+  customElements.define("menstruation-product-inventory-card-editor", MenstruationProductInventoryCardEditor);
 }

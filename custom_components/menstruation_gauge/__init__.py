@@ -152,52 +152,52 @@ HEATMAP_STATIC_URL = _build_card_static_url("menstruation-cycle-heatmap-card.js"
 PRODUCT_ICONS_STATIC_URL = _build_card_static_url("product-icons.js")
 TIMER_STATIC_URL = _build_card_static_url("menstruation-countdown-timer.js")
 TIMER_EDITOR_STATIC_URL = _build_card_static_url("menstruation-countdown-timer-editor.js")
-PRODUCT_STATS_STATIC_URL = _build_card_static_url("menstrual-product-stats-card.js")
-PRODUCT_INVENTORY_STATIC_URL = _build_card_static_url("menstrual-product-inventory-card.js")
-PRODUCT_INVENTORY_EDITOR_STATIC_URL = _build_card_static_url("menstrual-product-inventory-card-editor.js")
+PRODUCT_STATS_STATIC_URL = _build_card_static_url("menstruation-product-stats-card.js")
+PRODUCT_INVENTORY_STATIC_URL = _build_card_static_url("menstruation-product-inventory-card.js")
+PRODUCT_INVENTORY_EDITOR_STATIC_URL = _build_card_static_url("menstruation-product-inventory-card-editor.js")
 HEATMAP_EDITOR_STATIC_URL = _build_card_static_url("menstruation-cycle-heatmap-card-editor.js")
-HISTORY_ROW_EDITOR_STATIC_URL = _build_card_static_url("menstrual-cycle-history-card-row-editor.js")
-COMPACT_CARD_STATIC_URL = _build_card_static_url("menstrual-cycle-card-compact.js")
-HISTORY_ROW_STATIC_URL = _build_card_static_url("menstrual-cycle-history-card-row.js")
-HISTORY_ANALOG_STATIC_URL = _build_card_static_url("menstrual-cycle-history-card-analog.js")
-COMPACT_STATUS_STATIC_URL = _build_card_static_url("menstrual-cycle-compact-status-card.js")
-STATISTICS_CARD_STATIC_URL = _build_card_static_url("menstrual-statistics-card.js")
-STATISTICS_CARD_EDITOR_STATIC_URL = _build_card_static_url("menstrual-statistics-card-editor.js")
+HISTORY_ROW_EDITOR_STATIC_URL = _build_card_static_url("menstruation-cycle-history-card-row-editor.js")
+COMPACT_CARD_STATIC_URL = _build_card_static_url("menstruation-cycle-card-compact.js")
+HISTORY_ROW_STATIC_URL = _build_card_static_url("menstruation-cycle-history-card-row.js")
+HISTORY_ANALOG_STATIC_URL = _build_card_static_url("menstruation-cycle-history-card-analog.js")
+COMPACT_STATUS_STATIC_URL = _build_card_static_url("menstruation-cycle-compact-status-card.js")
+STATISTICS_CARD_STATIC_URL = _build_card_static_url("menstruation-statistics-card.js")
+STATISTICS_CARD_EDITOR_STATIC_URL = _build_card_static_url("menstruation-statistics-card-editor.js")
 CARD_RESOURCE_URL = _build_card_resource_url("menstruation-gauge-card.js")
 HEATMAP_RESOURCE_URL = _build_card_resource_url("menstruation-cycle-heatmap-card.js")
-PRODUCT_ICONS_RESOURCE_URL = _build_card_resource_url("product-icons.js")
+PRODUCT_ICONS_RESOURCE_URL = _build_card_resource_url("menstruation-icons.js")
 TIMER_RESOURCE_URL = _build_card_resource_url("menstruation-countdown-timer.js")
 TIMER_EDITOR_RESOURCE_URL = _build_card_resource_url("menstruation-countdown-timer-editor.js")
-PRODUCT_STATS_RESOURCE_URL = _build_card_resource_url("menstrual-product-stats-card.js")
-PRODUCT_INVENTORY_RESOURCE_URL = _build_card_resource_url("menstrual-product-inventory-card.js")
-PRODUCT_INVENTORY_EDITOR_RESOURCE_URL = _build_card_resource_url("menstrual-product-inventory-card-editor.js")
+PRODUCT_STATS_RESOURCE_URL = _build_card_resource_url("menstruation-product-stats-card.js")
+PRODUCT_INVENTORY_RESOURCE_URL = _build_card_resource_url("menstruation-product-inventory-card.js")
+PRODUCT_INVENTORY_EDITOR_RESOURCE_URL = _build_card_resource_url("menstruation-product-inventory-card-editor.js")
 HEATMAP_EDITOR_RESOURCE_URL = _build_card_resource_url("menstruation-cycle-heatmap-card-editor.js")
-HISTORY_ROW_EDITOR_RESOURCE_URL = _build_card_resource_url("menstrual-cycle-history-card-row-editor.js")
-COMPACT_CARD_RESOURCE_URL = _build_card_resource_url("menstrual-cycle-card-compact.js")
-HISTORY_ROW_RESOURCE_URL = _build_card_resource_url("menstrual-cycle-history-card-row.js")
-HISTORY_ANALOG_RESOURCE_URL = _build_card_resource_url("menstrual-cycle-history-card-analog.js")
-COMPACT_STATUS_RESOURCE_URL = _build_card_resource_url("menstrual-cycle-compact-status-card.js")
-STATISTICS_CARD_RESOURCE_URL = _build_card_resource_url("menstrual-statistics-card.js")
-STATISTICS_CARD_EDITOR_RESOURCE_URL = _build_card_resource_url("menstrual-statistics-card-editor.js")
+HISTORY_ROW_EDITOR_RESOURCE_URL = _build_card_resource_url("menstruation-cycle-history-card-row-editor.js")
+COMPACT_CARD_RESOURCE_URL = _build_card_resource_url("menstruation-cycle-card-compact.js")
+HISTORY_ROW_RESOURCE_URL = _build_card_resource_url("menstruation-cycle-history-card-row.js")
+HISTORY_ANALOG_RESOURCE_URL = _build_card_resource_url("menstruation-cycle-history-card-analog.js")
+COMPACT_STATUS_RESOURCE_URL = _build_card_resource_url("menstruation-cycle-compact-status-card.js")
+STATISTICS_CARD_RESOURCE_URL = _build_card_resource_url("menstruation-statistics-card.js")
+STATISTICS_CARD_EDITOR_RESOURCE_URL = _build_card_resource_url("menstruation-statistics-card-editor.js")
 CARD_RESOURCE_TYPE = "module"
 EXPORT_DIR_NAME = "menstruation_gauge_exports"
 LOVELACE_RESOURCES = (
     (CARD_RESOURCE_URL, CARD_STATIC_URL, "menstruation-gauge-card.js"),
-    (PRODUCT_ICONS_RESOURCE_URL, PRODUCT_ICONS_STATIC_URL, "product-icons.js"),
+    (PRODUCT_ICONS_RESOURCE_URL, PRODUCT_ICONS_STATIC_URL, "menstruation-icons.js"),
     (HEATMAP_RESOURCE_URL, HEATMAP_STATIC_URL, "menstruation-cycle-heatmap-card.js"),
     (TIMER_RESOURCE_URL, TIMER_STATIC_URL, "menstruation-countdown-timer.js"),
     (TIMER_EDITOR_RESOURCE_URL, TIMER_EDITOR_STATIC_URL, "menstruation-countdown-timer-editor.js"),
-    (PRODUCT_STATS_RESOURCE_URL, PRODUCT_STATS_STATIC_URL, "menstrual-product-stats-card.js"),
-    (PRODUCT_INVENTORY_RESOURCE_URL, PRODUCT_INVENTORY_STATIC_URL, "menstrual-product-inventory-card.js"),
-    (PRODUCT_INVENTORY_EDITOR_RESOURCE_URL, PRODUCT_INVENTORY_EDITOR_STATIC_URL, "menstrual-product-inventory-card-editor.js"),
+    (PRODUCT_STATS_RESOURCE_URL, PRODUCT_STATS_STATIC_URL, "menstruation-product-stats-card.js"),
+    (PRODUCT_INVENTORY_RESOURCE_URL, PRODUCT_INVENTORY_STATIC_URL, "menstruation-product-inventory-card.js"),
+    (PRODUCT_INVENTORY_EDITOR_RESOURCE_URL, PRODUCT_INVENTORY_EDITOR_STATIC_URL, "menstruation-product-inventory-card-editor.js"),
     (HEATMAP_EDITOR_RESOURCE_URL, HEATMAP_EDITOR_STATIC_URL, "menstruation-cycle-heatmap-card-editor.js"),
-    (HISTORY_ROW_EDITOR_RESOURCE_URL, HISTORY_ROW_EDITOR_STATIC_URL, "menstrual-cycle-history-card-row-editor.js"),
-    (COMPACT_CARD_RESOURCE_URL, COMPACT_CARD_STATIC_URL, "menstrual-cycle-card-compact.js"),
-    (COMPACT_STATUS_RESOURCE_URL, COMPACT_STATUS_STATIC_URL, "menstrual-cycle-compact-status-card.js"),
-    (HISTORY_ROW_RESOURCE_URL, HISTORY_ROW_STATIC_URL, "menstrual-cycle-history-card-row.js"),
-    (HISTORY_ANALOG_RESOURCE_URL, HISTORY_ANALOG_STATIC_URL, "menstrual-cycle-history-card-analog.js"),
-    (STATISTICS_CARD_RESOURCE_URL, STATISTICS_CARD_STATIC_URL, "menstrual-statistics-card.js"),
-    (STATISTICS_CARD_EDITOR_RESOURCE_URL, STATISTICS_CARD_EDITOR_STATIC_URL, "menstrual-statistics-card-editor.js"),
+    (HISTORY_ROW_EDITOR_RESOURCE_URL, HISTORY_ROW_EDITOR_STATIC_URL, "menstruation-cycle-history-card-row-editor.js"),
+    (COMPACT_CARD_RESOURCE_URL, COMPACT_CARD_STATIC_URL, "menstruation-cycle-card-compact.js"),
+    (COMPACT_STATUS_RESOURCE_URL, COMPACT_STATUS_STATIC_URL, "menstruation-cycle-compact-status-card.js"),
+    (HISTORY_ROW_RESOURCE_URL, HISTORY_ROW_STATIC_URL, "menstruation-cycle-history-card-row.js"),
+    (HISTORY_ANALOG_RESOURCE_URL, HISTORY_ANALOG_STATIC_URL, "menstruation-cycle-history-card-analog.js"),
+    (STATISTICS_CARD_RESOURCE_URL, STATISTICS_CARD_STATIC_URL, "menstruation-statistics-card.js"),
+    (STATISTICS_CARD_EDITOR_RESOURCE_URL, STATISTICS_CARD_EDITOR_STATIC_URL, "menstruation-statistics-card-editor.js"),
 )
 VALID_PRODUCT_USAGE_PRODUCTS = {"tampon", "pad", "cup", "underwear", "liner"}
 VALID_PRODUCT_USAGE_ACTIONS = {"used", "emptied"}

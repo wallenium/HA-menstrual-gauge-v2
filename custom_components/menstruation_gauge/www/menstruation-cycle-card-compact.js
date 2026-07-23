@@ -1,4 +1,4 @@
-class MenstrualCycleCard extends HTMLElement {
+class MenstruationCycleCard extends HTMLElement {
   connectedCallback() {
     this.innerHTML = `
       <ha-card>
@@ -268,15 +268,15 @@ class MenstrualCycleCard extends HTMLElement {
   }
 
   static getConfigElement() {
-    return document.createElement("menstrual-cycle-card-editor");
+    return document.createElement("menstruation-cycle-card-editor");
   }
 
   static getStubConfig() {
     return {
-      type: "custom:menstrual-cycle-card",
+      type: "custom:menstruation-cycle-card",
       entity: "sensor.cycle_status",
     };
   }
 }
 
-customElements.define("menstrual-cycle-card", MenstrualCycleCard);
+customElements.define("menstruation-cycle-card", MenstruationCycleCard);

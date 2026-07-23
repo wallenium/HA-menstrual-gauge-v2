@@ -1,11 +1,11 @@
-class MenstrualCycleHistoryCardRow extends HTMLElement {
+class MenstruationCycleHistoryCardRow extends HTMLElement {
   static getConfigElement() {
-    return document.createElement('menstrual-cycle-history-card-row-editor');
+    return document.createElement('menstruation-cycle-history-card-row-editor');
   }
 
   static getStubConfig() {
     return {
-      type: 'custom:menstrual-cycle-history-card-row',
+      type: 'custom:menstruation-cycle-history-card-row',
       entity: 'sensor.menstruation',
       entry_id: '',
       title: 'Zyklus History',
@@ -255,10 +255,10 @@ class MenstrualCycleHistoryCardRow extends HTMLElement {
   }
 }
 
-customElements.define('menstrual-cycle-history-card-row', MenstrualCycleHistoryCardRow);
+customElements.define('menstruation-cycle-history-card-row', MenstruationCycleHistoryCardRow);
 window.customCards = window.customCards || [];
 window.customCards.push({
-  type: 'menstrual-cycle-history-card-row',
-  name: 'Menstrual Cycle History (Table)',
+  type: 'menstruation-cycle-history-card-row',
+  name: 'Menstruation Cycle History (Table)',
   description: 'Menstrual cycle history in table format',
 });
