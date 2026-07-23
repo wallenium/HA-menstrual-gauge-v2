@@ -38,7 +38,7 @@ const sharedSrc = fs.readFileSync(
 eval(sharedSrc);
 
 const src = fs.readFileSync(
-  path.join(__dirname, '../custom_components/menstruation_gauge/www/menstrual-product-stats-card.js'),
+  path.join(__dirname, '../custom_components/menstruation_gauge/www/menstruation-product-stats-card.js'),
   'utf8',
 );
 // eslint-disable-next-line no-eval
@@ -47,7 +47,7 @@ eval(src);
 // Retrieve the registered class from the customElements stub.
 let CardClass;
 const origDefine = global.customElements.define;
-global.customElements.define = (name, cls) => { if (name === 'menstrual-product-stats-card') CardClass = cls; };
+global.customElements.define = (name, cls) => { if (name === 'menstruation-product-stats-card') CardClass = cls; };
 eval(src); // re-eval to trigger define()
 global.customElements.define = origDefine;
 
