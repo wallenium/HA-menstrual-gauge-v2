@@ -885,6 +885,7 @@ class PeriodCountdownTimer extends HTMLElement {
           <ul class="pm-info-list">
             <li>📊 ${this._t('welcome_period_cycle_tracking')}</li>
             <li>✨ ${this._t('welcome_period_features')}</li>
+            <li>🌸 ${this._t('welcome_period_contraception')}</li>
             <li>↩️ ${this._t('welcome_period_return')}</li>
           </ul>
         </div>
@@ -1654,6 +1655,7 @@ class PeriodCountdownTimer extends HTMLElement {
         welcome_period_title: "Willkommen zur Periode! 🎉",
         welcome_period_cycle_tracking: "Zyklus-Tracking startet jetzt",
         welcome_period_features: "Neue Features: Zyklus-Vorhersage, Statistiken, ...",
+        welcome_period_contraception: "Du bist jetzt fruchtbar - denke an Verhütung, wenn nötig!",
         welcome_period_return: "Du kannst jederzeit in den Einstellungen zum Pre-Menarche Modus zurückwechseln",
         yes: "Ja",
         no: "Nein",
@@ -1731,6 +1733,7 @@ class PeriodCountdownTimer extends HTMLElement {
         welcome_period_title: "Welcome to your period! 🎉",
         welcome_period_cycle_tracking: "Cycle tracking starts now",
         welcome_period_features: "New features: cycle prediction, statistics, ...",
+        welcome_period_contraception: "You are now fertile - think about contraception if needed!",
         welcome_period_return: "You can always return to Pre-Menarche mode in Settings",
         yes: "Yes",
         no: "No",
