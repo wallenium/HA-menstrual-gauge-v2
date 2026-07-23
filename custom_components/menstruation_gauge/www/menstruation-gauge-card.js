@@ -76,6 +76,8 @@ class MenstruationGaugeCard extends HTMLElement {
   _t(key) {
     const i18n = {
       de: {
+        card_name: 'Menstruation Gauge Karte',
+        card_description: 'Eine Karte zur Visualisierung des weiblichen Menstruationszyklus, des fruchtbaren Tage, des Eisprungs und damit verbundener Symptome.',
         days_unit: 'Tage',
         days_unknown: '-- Tage',
         days_until_menarche: 'Tage bis Menarche',
@@ -201,6 +203,8 @@ class MenstruationGaugeCard extends HTMLElement {
         continue: 'Weiter',
       },
       en: {
+        card_name: 'Menstruation Gauge Card',
+        card_description: 'A card to visualize menstruation cycle, fertile window, ovulation, and related symptoms.',
         days_unit: 'days',
         days_unknown: '-- days',
         days_until_menarche: 'Days until menarche',
@@ -1968,6 +1972,6 @@ customElements.define('menstruation-gauge-card-editor', MenstruationGaugeCardEdi
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'menstruation-gauge-card',
-  name: 'Menstruation Gauge Card',
-  description: 'Cycle gauge with profile support and visual editor (entity/entry_id/theme/flags).'
+  name: localize('card.name', this.hass.language),
+  description: localize('card_description', this.hass.language)
 });
