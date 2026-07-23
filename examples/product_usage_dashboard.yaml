@@ -15,6 +15,6 @@ cards:
     underwear_duration: 6
     liner_duration: 8
 
-  - type: custom:menstrual-product-stats-card
+  - type: custom:menstruation-statistics-card
     entity: sensor.anna
-    title: Product Usage
+    title: Statistics

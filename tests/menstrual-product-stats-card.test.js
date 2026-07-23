@@ -1,5 +1,10 @@
 /**
- * Tests for menstrual-product-stats-card.js
+ * Tests for product-stats shared logic (menstruation-product-stats-shared.js)
+ *
+ * The standalone menstruation-product-stats-card has been removed.
+ * Its functionality is now integrated directly into menstruation-statistics-card.js
+ * as the "Hygiene" tab. All calculation and rendering logic lives in the shared
+ * module and is tested here.
  *
  * Covers:
  *  - calculateStats: liner + underwear per-cycle averages extracted correctly
@@ -27,7 +32,7 @@ global.HTMLElement = class HTMLElement {
   set innerHTML(v) { this._html = v; }
 };
 
-// Stub ProductIcons so the card doesn't crash when _getSvgIcon is called.
+// Stub ProductIcons so the shared module doesn't crash when getSvgIcon is called.
 global.window.ProductIcons = { getSvgIcon: () => '' };
 
 const sharedSrc = fs.readFileSync(
@@ -37,28 +42,37 @@ const sharedSrc = fs.readFileSync(
 // eslint-disable-next-line no-eval
 eval(sharedSrc);
 
-const src = fs.readFileSync(
-  path.join(__dirname, '../custom_components/menstruation_gauge/www/menstruation-product-stats-card.js'),
-  'utf8',
-);
-// eslint-disable-next-line no-eval
-eval(src);
-
-// Retrieve the registered class from the customElements stub.
-let CardClass;
-const origDefine = global.customElements.define;
-global.customElements.define = (name, cls) => { if (name === 'menstruation-product-stats-card') CardClass = cls; };
-eval(src); // re-eval to trigger define()
-global.customElements.define = origDefine;
+const shared = window.MenstruationProductStatsShared;
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Helpers — thin wrapper so all test functions keep the same card.X() call style
 // ---------------------------------------------------------------------------
 
 function makeCard() {
-  const card = new CardClass();
-  card._hass = { locale: { language: 'en' }, states: {} };
-  card.config = { entity: 'sensor.test' };
+  const hass = { locale: { language: 'en' }, states: {} };
+  const config = { entity: 'sensor.test', underwear_total_owned: 12, target_wash_days: 7 };
+  const card = {
+    _hass: hass,
+    config,
+    calculateStats(thisCycle, usageStats, daysUntilNextStart) {
+      return shared.calculateStats(thisCycle, usageStats, daysUntilNextStart);
+    },
+    renderTimeline(timeline) {
+      return shared.renderTimeline(this._hass, timeline);
+    },
+    normalizeQuantity(v) {
+      return shared.normalizeQuantity(v);
+    },
+    productLabel(entry) {
+      return shared.productLabel(this._hass, entry);
+    },
+    calculateUnderwearWashPlan(avg) {
+      return shared.calculateUnderwearWashPlan(this.config, avg);
+    },
+    calculateCupSavings(usage) {
+      return shared.calculateCupSavings(this.config, usage);
+    },
+  };
   return card;
 }
 

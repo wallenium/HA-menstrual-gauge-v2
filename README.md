@@ -63,7 +63,7 @@ HA-menstruation-gauge-v2/
             ├── menstruation-gauge-card.js
             ├── menstruation-cycle-heatmap-card.js
             ├── period-countdown-timer.js
-            └── menstrual-product-stats-card.js
+            └── menstruation-statistics-card.js
 ```
 
 ## Why This Structure Is Required - Notes to myself to understand HACS requirements better.
@@ -148,7 +148,6 @@ Guardrails:
     - `/menstruation_gauge/menstruation-gauge-card.js`
     - `/menstruation_gauge/menstruation-cycle-heatmap-card.js`
     - `/menstruation_gauge/period-countdown-timer.js`
-    - `/menstruation_gauge/menstrual-product-stats-card.js`
 - Type: `JavaScript module`
   
 - restart HA
@@ -234,9 +233,10 @@ underwear_duration: 6
 liner_duration: 8
 ```
 
-### Product Usage Statistics Card
+### Product Usage Statistics (Hygiene Tab)
 
-The statistics card uses the main menstruation sensor attributes to visualize:
+Product usage statistics are now integrated directly into the **menstruation-statistics-card**
+as the "Hygiene" tab. The tab shows:
 - tampons per recent cycle
 - pads per recent cycle
 - menstrual cup empties per day for the last period
@@ -244,9 +244,9 @@ The statistics card uses the main menstruation sensor attributes to visualize:
 - a 30-day timeline with color-coded product usage
 
 ```yaml
-type: custom:menstrual-product-stats-card
+type: custom:menstruation-statistics-card
 entity: sensor.anna
-title: Product Usage
+title: Statistics
 ```
 
 The repository also includes a combined dashboard example:
