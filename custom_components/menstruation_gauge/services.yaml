@@ -752,3 +752,57 @@ save_timer_state:
         number:
           min: 0
           mode: box
+
+export_doctor_report:
+  name: Export doctor report (HTML)
+  description: |
+    Generates a professional HTML medical report from the cycle history and symptom data.
+    The file is saved to `<config>/menstruation_gauge_exports/`.
+    Open the file in a browser and use "Print to PDF" to create a PDF.
+  fields:
+    entity_id:
+      required: false
+      example: "sensor.anna_zyklus"
+      selector:
+        entity:
+          domain: sensor
+    profile:
+      required: false
+      example: "anna"
+      selector:
+        text:
+    entry_id:
+      required: false
+      example: "a1b2c3d4e5f6..."
+      selector:
+        text:
+    days_back:
+      required: false
+      example: 180
+      description: Number of days to include in the report (30–730). Default is 180 (6 months).
+      selector:
+        number:
+          min: 30
+          max: 730
+          mode: box
+    patient_name:
+      required: false
+      example: "Anna Müller"
+      description: Patient name to include in the report header (optional).
+      selector:
+        text:
+    patient_birthdate:
+      required: false
+      example: "1995-06-15"
+      description: Patient date of birth in YYYY-MM-DD format (optional).
+      selector:
+        text:
+    language:
+      required: false
+      example: "de"
+      description: Report language. "de" for German, "en" for English. Default is "de".
+      selector:
+        select:
+          options:
+            - "de"
+            - "en"
