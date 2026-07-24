@@ -54,13 +54,6 @@ global.customElements = {
   get: (name) => defined[name] || null,
 };
 
-const sharedSrc = fs.readFileSync(
-  path.join(__dirname, '../custom_components/menstruation_gauge/www/menstruation-product-stats-shared.js'),
-  'utf8',
-);
-// eslint-disable-next-line no-eval
-eval(sharedSrc);
-
 const cardSrc = fs.readFileSync(
   path.join(__dirname, '../custom_components/menstruation_gauge/www/menstruation-statistics-card.js'),
   'utf8',

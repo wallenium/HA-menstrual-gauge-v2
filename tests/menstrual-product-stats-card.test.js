@@ -1,10 +1,11 @@
 /**
- * Tests for product-stats shared logic (menstruation-product-stats-shared.js)
+ * Tests for hygiene tab logic inlined in menstruation-statistics-card.js
  *
- * The standalone menstruation-product-stats-card has been removed.
- * Its functionality is now integrated directly into menstruation-statistics-card.js
- * as the "Hygiene" tab. All calculation and rendering logic lives in the shared
- * module and is tested here.
+ * The standalone menstruation-product-stats-card has been removed and the
+ * separate menstruation-product-stats-shared.js has been fully inlined into
+ * menstruation-statistics-card.js as the "Hygiene" tab. All calculation and
+ * rendering logic lives directly in the statistics card and is tested here
+ * via MenstruationStatisticsCard._hygieneHelpers.
  *
  * Covers:
  *  - calculateStats: liner + underwear per-cycle averages extracted correctly
@@ -24,25 +25,26 @@ const fs = require('fs');
 // ---------------------------------------------------------------------------
 // Minimal browser-global stubs
 // ---------------------------------------------------------------------------
-global.window = {};
+global.window = { customCards: [] };
 global.document = { createElement: () => ({}) };
-global.customElements = { get: () => null, define: () => {} };
+const defined = {};
+global.customElements = { get: (n) => defined[n] || null, define: (n, c) => { defined[n] = c; } };
 global.HTMLElement = class HTMLElement {
   get innerHTML() { return this._html || ''; }
   set innerHTML(v) { this._html = v; }
 };
 
-// Stub ProductIcons so the shared module doesn't crash when getSvgIcon is called.
+// Stub ProductIcons so getSvgIcon calls don't crash.
 global.window.ProductIcons = { getSvgIcon: () => '' };
 
-const sharedSrc = fs.readFileSync(
-  path.join(__dirname, '../custom_components/menstruation_gauge/www/menstruation-product-stats-shared.js'),
+const cardSrc = fs.readFileSync(
+  path.join(__dirname, '../custom_components/menstruation_gauge/www/menstruation-statistics-card.js'),
   'utf8',
 );
 // eslint-disable-next-line no-eval
-eval(sharedSrc);
+eval(cardSrc);
 
-const shared = window.MenstruationProductStatsShared;
+const shared = defined['menstruation-statistics-card']._hygieneHelpers;
 
 // ---------------------------------------------------------------------------
 // Helpers — thin wrapper so all test functions keep the same card.X() call style
