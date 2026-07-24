@@ -86,6 +86,31 @@ function makeHass() {
   };
 }
 
+function makeHassWithPredictions() {
+  return {
+    locale: { language: 'en' },
+    callService: async () => {},
+    states: {
+      'sensor.menstruation': {
+        state: 'ok',
+        attributes: {
+          entry_id: 'entry-1',
+          profile: 'default',
+          history: ['2026-07-02', '2026-07-03'],
+          grouped_starts: ['2026-07-02'],
+          fertile_window_start: '2026-07-10',
+          fertile_window_end: '2026-07-16',
+          ovulation_day: '2026-07-14',
+          avg_cycle_length: 28,
+          period_duration_days: 5,
+          predicted_cycle_starts: ['2026-07-30', '2026-08-27', '2026-09-24'],
+          symptom_history: [],
+        },
+      },
+    },
+  };
+}
+
 function testRegistration() {
   assert.ok(CardClass, 'calendar card is registered');
   assert.ok(EditorClass, 'calendar card editor is registered');
@@ -145,12 +170,110 @@ function testOvulationMarkerToggle() {
   console.log('  ✓ supports ovulation marker toggle');
 }
 
+function testPredictedCycleRendering() {
+  const card = new CardClass();
+  card.setConfig({
+    entity: 'sensor.menstruation',
+    show_fertile_period: true,
+    show_ovulation_marker: true,
+    show_predicted_cycles: true,
+    num_predicted_cycles: 3,
+  });
+  card.hass = makeHassWithPredictions();
+
+  // View August 2026 — first predicted cycle starts 2026-07-30, period covers Jul 30 – Aug 3
+  card._viewDate = new Date(2026, 7, 1, 12, 0, 0, 0);
+  const model = card._buildModel();
+  const html = card._calendarGrid(model, 'en');
+
+  assert.ok(html.includes('is-predicted-period'), 'predicted period days are marked with is-predicted-period class');
+  assert.ok(html.includes('is-predicted-fertile'), 'predicted fertile days are marked with is-predicted-fertile class');
+  assert.ok(html.includes('is-predicted-ovulation'), 'predicted ovulation day is marked with is-predicted-ovulation class');
+  assert.ok(html.includes('ovulation-dot predicted'), 'predicted ovulation dot has predicted class');
+  assert.ok(html.includes('(Predicted)'), 'predicted days have Predicted label in tooltip');
+  console.log('  ✓ renders predicted cycle period, fertile, and ovulation markers');
+}
+
+function testPredictedCyclesToggle() {
+  const card = new CardClass();
+  card.setConfig({
+    entity: 'sensor.menstruation',
+    show_predicted_cycles: false,
+  });
+  card.hass = makeHassWithPredictions();
+  card._viewDate = new Date(2026, 7, 1, 12, 0, 0, 0);
+  const model = card._buildModel();
+  const html = card._calendarGrid(model, 'en');
+
+  assert.ok(!html.includes('is-predicted-period'), 'no predicted period when show_predicted_cycles is false');
+  assert.ok(!html.includes('is-predicted-fertile'), 'no predicted fertile when show_predicted_cycles is false');
+  console.log('  ✓ hides predicted cycles when show_predicted_cycles is false');
+}
+
+function testNumPredictedCyclesLimit() {
+  const card = new CardClass();
+  card.setConfig({
+    entity: 'sensor.menstruation',
+    show_predicted_cycles: true,
+    num_predicted_cycles: 1,
+  });
+  card.hass = makeHassWithPredictions();
+  // Model has 3 predicted starts; only first 1 should be used
+  const model = card._buildModel();
+  assert.strictEqual(model.predictedStartSet.size, 1, 'only 1 predicted start when num_predicted_cycles is 1');
+  assert.ok(model.predictedStartSet.has('2026-07-30'), 'first predicted start is included');
+  assert.ok(!model.predictedStartSet.has('2026-08-27'), 'second predicted start is excluded');
+  console.log('  ✓ respects num_predicted_cycles limit');
+}
+
+function testPredictedLegendEntry() {
+  const card = new CardClass();
+  card.setConfig({
+    entity: 'sensor.menstruation',
+    show_predicted_cycles: true,
+  });
+  card.hass = makeHass();
+  card._viewDate = new Date(2026, 6, 1, 12, 0, 0, 0);
+  card._render();
+  const html = card.shadowRoot.innerHTML;
+  assert.ok(html.includes('predicted-period'), 'legend includes predicted-period swatch when show_predicted_cycles is true');
+  console.log('  ✓ shows predicted period legend entry when enabled');
+}
+
+function testPredictedLegendHidden() {
+  const card = new CardClass();
+  card.setConfig({
+    entity: 'sensor.menstruation',
+    show_predicted_cycles: false,
+  });
+  card.hass = makeHass();
+  card._viewDate = new Date(2026, 6, 1, 12, 0, 0, 0);
+  card._render();
+  const html = card.shadowRoot.innerHTML;
+  assert.ok(!html.includes('swatch predicted-period'), 'legend hides predicted-period swatch when show_predicted_cycles is false');
+  console.log('  ✓ hides predicted period legend entry when disabled');
+}
+
+function testEditorHasPredictedOptions() {
+  const editor = new EditorClass();
+  editor.setConfig({ entity: 'sensor.menstruation' });
+  assert.strictEqual(editor._config.show_predicted_cycles, true, 'editor defaults show_predicted_cycles to true');
+  assert.strictEqual(editor._config.num_predicted_cycles, 6, 'editor defaults num_predicted_cycles to 6');
+  console.log('  ✓ editor defaults show_predicted_cycles and num_predicted_cycles');
+}
+
 let failed = 0;
 [
   testRegistration,
   testWeekStartOption,
   testCalendarRenderingStates,
   testOvulationMarkerToggle,
+  testPredictedCycleRendering,
+  testPredictedCyclesToggle,
+  testNumPredictedCyclesLimit,
+  testPredictedLegendEntry,
+  testPredictedLegendHidden,
+  testEditorHasPredictedOptions,
 ].forEach((fn) => {
   try {
     fn();
