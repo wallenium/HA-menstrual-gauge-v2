@@ -68,6 +68,7 @@ class MenstruationStorage:
                 "menarche_data": {"tracking_active": False, "is_menarche": False, "menarche_date": None, "estimated_date": None, "family_menarche_age": None},
                 "pre_menarche_data": {"signs": {}, "tanner_stage": None},
                 "menopause_data": {"is_menopause": False, "start_date": None},
+                "noncycle_data": {"has_noncycle": False},
             }
 
         history = data.get("history", [])
@@ -117,6 +118,11 @@ class MenstruationStorage:
         menopause_data.setdefault("is_menopause", False)
         menopause_data.setdefault("start_date", None)
 
+        noncycle_data = data.get("noncycle_data", {})
+        if not isinstance(noncycle_data, dict):
+            noncycle_data = {}
+        noncycle_data.setdefault("has_noncycle", False)
+
         return {
             "history": normalized,
             "period_duration_days": days,
@@ -126,6 +132,7 @@ class MenstruationStorage:
             "menarche_data": menarche_data,
             "pre_menarche_data": pre_menarche_data,
             "menopause_data": menopause_data,
+            "noncycle_data": noncycle_data,
         }
 
     async def async_save(
@@ -138,6 +145,7 @@ class MenstruationStorage:
         menarche_data: dict[str, Any] | None = None,
         pre_menarche_data: dict[str, Any] | None = None,
         menopause_data: dict[str, Any] | None = None,
+        noncycle_data: dict[str, Any] | None = None,
     ) -> None:
         """Save data to storage."""
         normalized = sorted({self._normalize_iso(raw) for raw in history if self._normalize_iso(raw)})
@@ -148,6 +156,7 @@ class MenstruationStorage:
         men_data = menarche_data or {"tracking_active": False, "is_menarche": False, "menarche_date": None, "estimated_date": None, "family_menarche_age": None}
         pre_men_data = pre_menarche_data or {"signs": {}, "tanner_stage": None}
         meno_data = menopause_data or {"is_menopause": False, "start_date": None}
+        nc_data = noncycle_data if isinstance(noncycle_data, dict) else {"has_noncycle": False}
 
         await self._store.async_save(
             {
@@ -159,6 +168,7 @@ class MenstruationStorage:
                 "menarche_data": men_data,
                 "pre_menarche_data": pre_men_data,
                 "menopause_data": meno_data,
+                "noncycle_data": nc_data,
             }
         )
 
@@ -179,6 +189,7 @@ class MenstruationStorage:
             data.get("menarche_data"),
             data.get("pre_menarche_data"),
             data.get("menopause_data"),
+            data.get("noncycle_data"),
         )
 
     async def async_load_pregnancy_data(self) -> dict[str, Any]:
@@ -198,6 +209,7 @@ class MenstruationStorage:
             data.get("menarche_data"),
             data.get("pre_menarche_data"),
             data.get("menopause_data"),
+            data.get("noncycle_data"),
         )
 
     async def async_load_menarche_data(self) -> dict[str, Any]:
@@ -217,6 +229,7 @@ class MenstruationStorage:
             menarche_data,
             data.get("pre_menarche_data"),
             data.get("menopause_data"),
+            data.get("noncycle_data"),
         )
 
     @staticmethod

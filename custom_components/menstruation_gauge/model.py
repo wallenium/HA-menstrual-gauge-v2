@@ -45,6 +45,7 @@ class CycleModel:
     menarche_data: dict[str, Any]
     pre_menarche_data: dict[str, Any]
     menopause_data: dict[str, Any]
+    noncycle_data: dict[str, Any]
 
 
 def normalize_history(history: list[str]) -> list[str]:
@@ -267,6 +268,7 @@ def build_cycle_model(
     menarche_data: dict[str, Any] | None = None,
     pre_menarche_data: dict[str, Any] | None = None,
     menopause_data: dict[str, Any] | None = None,
+    noncycle_data: dict[str, Any] | None = None,
     today: date | None = None,
 ) -> CycleModel:
     """Build complete cycle model for sensor state + attributes."""
@@ -289,6 +291,10 @@ def build_cycle_model(
     meno_data: dict[str, Any] = {"is_menopause": False, "start_date": None}
     if isinstance(menopause_data, dict):
         meno_data.update(menopause_data)
+
+    nc_data: dict[str, Any] = {"has_noncycle": False}
+    if isinstance(noncycle_data, dict):
+        nc_data.update(noncycle_data)
 
     # If pregnant, return pregnancy state
     if is_pregnant:
@@ -315,6 +321,7 @@ def build_cycle_model(
             menarche_data=men_data,
             pre_menarche_data=pre_men_data,
             menopause_data=meno_data,
+            noncycle_data=nc_data,
         )
 
     # If in pre-menarche mode (tracking explicitly enabled, awaiting first period)
@@ -341,6 +348,7 @@ def build_cycle_model(
             menarche_data=men_data,
             pre_menarche_data=pre_men_data,
             menopause_data=meno_data,
+            noncycle_data=nc_data,
         )
 
     # If menarche has been recorded, check if we're in the menarche transition state
@@ -373,6 +381,7 @@ def build_cycle_model(
                     menarche_data=men_data,
                     pre_menarche_data=pre_men_data,
                     menopause_data=meno_data,
+                    noncycle_data=nc_data,
                 )
         except ValueError:
             pass
@@ -393,6 +402,10 @@ def build_cycle_model(
     starts = grouped_cycle_starts(base_history)
     effective_duration, learned_avg_duration = learned_period_duration(period_duration_days, blocks)
     next_start, avg_cycle = predict_next_start(starts)
+    # When cycle length is auto (no detected starts) and noncycle data exists,
+    # use the default period duration of 5 days for cycle phase calculations.
+    if avg_cycle is None and nc_data.get("has_noncycle"):
+        avg_cycle = DEFAULT_PERIOD_DURATION_DAYS
     duration_shift_days = max(0, effective_duration - DEFAULT_PERIOD_DURATION_DAYS)
     if next_start and duration_shift_days:
         shifted_next_date = date.fromisoformat(next_start) + timedelta(days=duration_shift_days)
@@ -446,4 +459,5 @@ def build_cycle_model(
         menarche_data=men_data,
         pre_menarche_data=pre_men_data,
         menopause_data=meno_data,
+        noncycle_data=nc_data,
     )
