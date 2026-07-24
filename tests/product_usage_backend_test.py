@@ -241,6 +241,30 @@ class ProductUsageBackendTests(unittest.TestCase):
         self.assertFalse(cycle.current_period["is_active"])
         self.assertEqual(cycle.current_period["ended_by"], "duration")
 
+    def test_build_cycle_model_sets_fertile_window_to_ovulation_plus_minus_five_days_for_28_day_cycle(self) -> None:
+        cycle = model.build_cycle_model(
+            history=["2026-06-01", "2026-06-29"],
+            period_duration_days=5,
+            symptom_history=[],
+            today=date(2026, 7, 1),
+        )
+
+        self.assertEqual(cycle.ovulation_day, "2026-07-12")
+        self.assertEqual(cycle.fertile_window_start, "2026-07-07")
+        self.assertEqual(cycle.fertile_window_end, "2026-07-17")
+
+    def test_build_cycle_model_sets_fertile_window_to_ovulation_plus_minus_five_days_for_30_day_cycle(self) -> None:
+        cycle = model.build_cycle_model(
+            history=["2026-05-01", "2026-05-31"],
+            period_duration_days=5,
+            symptom_history=[],
+            today=date(2026, 6, 1),
+        )
+
+        self.assertEqual(cycle.ovulation_day, "2026-06-14")
+        self.assertEqual(cycle.fertile_window_start, "2026-06-09")
+        self.assertEqual(cycle.fertile_window_end, "2026-06-19")
+
     def test_storage_normalizes_aliases_and_dates(self) -> None:
         entries = [
             {"created_at": "2026-07-18T09:15:00Z", "product": "pantyliners", "quantity": "2"},
