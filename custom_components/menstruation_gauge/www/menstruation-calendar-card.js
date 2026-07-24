@@ -20,6 +20,8 @@ class MenstruationCalendarCard extends HTMLElement {
       show_ovulation_marker: true,
       show_cycle_day_numbers: false,
       week_start: 'monday',
+      show_predicted_cycles: true,
+      num_predicted_cycles: 6,
     };
   }
 
@@ -33,6 +35,8 @@ class MenstruationCalendarCard extends HTMLElement {
       show_ovulation_marker: true,
       show_cycle_day_numbers: false,
       week_start: 'monday',
+      show_predicted_cycles: true,
+      num_predicted_cycles: 6,
       ...config,
     };
     this._render();
@@ -71,6 +75,8 @@ class MenstruationCalendarCard extends HTMLElement {
         spotting: 'Schmierblutung',
         pain: 'Schmerzen',
         none: 'Kein',
+        predicted: 'Vorhergesagt',
+        predicted_period: 'Vorhergesagte Periode',
       },
       en: {
         title: 'Cycle Calendar',
@@ -88,6 +94,8 @@ class MenstruationCalendarCard extends HTMLElement {
         spotting: 'Spotting',
         pain: 'Pain',
         none: 'None',
+        predicted: 'Predicted',
+        predicted_period: 'Predicted period',
       },
     };
     return (i18n[this._lang()]?.[key]) ?? (i18n.en[key] ?? key);
@@ -177,6 +185,37 @@ class MenstruationCalendarCard extends HTMLElement {
     return new Set(history.map((iso) => this._normalizeISO(iso)).filter(Boolean));
   }
 
+  _actualCycleStarts(attrs) {
+    const grouped = Array.isArray(attrs?.grouped_starts) ? attrs.grouped_starts : [];
+    return grouped.map((iso) => this._normalizeISO(iso)).filter(Boolean).sort();
+  }
+
+  _predictedCycleStartsList(attrs) {
+    const predicted = Array.isArray(attrs?.predicted_cycle_starts) ? attrs.predicted_cycle_starts : [];
+    const nextPredicted = attrs?.next_predicted_start ? [attrs.next_predicted_start] : [];
+    const combined = [...predicted, ...nextPredicted]
+      .map((iso) => this._normalizeISO(iso))
+      .filter(Boolean);
+    return Array.from(new Set(combined)).sort();
+  }
+
+  _periodDurationDays(attrs) {
+    const val = Number(attrs?.period_duration_days);
+    if (Number.isFinite(val) && val >= 1 && val <= 14) return Math.round(val);
+    return 5;
+  }
+
+  _predictedPeriodSet(predictedStarts, periodDuration) {
+    const set = new Set();
+    predictedStarts.forEach((startIso) => {
+      for (let d = 0; d < periodDuration; d += 1) {
+        const dayIso = this._addDaysToISO(startIso, d);
+        if (dayIso) set.add(dayIso);
+      }
+    });
+    return set;
+  }
+
   _effectiveCycleLength(attrs) {
     const val = Number(attrs?.avg_cycle_length);
     if (Number.isFinite(val) && val >= 20 && val <= 60) return Math.round(val);
@@ -210,8 +249,11 @@ class MenstruationCalendarCard extends HTMLElement {
 
   _statusForDay(iso, ctx) {
     const isPeriod = ctx.periodSet.has(iso);
+    const isPredictedPeriod = !isPeriod && (ctx.predictedPeriodSet?.has(iso) ?? false);
     let isFertile = false;
     let isOvulation = false;
+    let isPredictedFertile = false;
+    let isPredictedOvulation = false;
 
     const cycleStart = this._cycleStartForDate(iso, ctx.starts);
     if (cycleStart) {
@@ -219,8 +261,15 @@ class MenstruationCalendarCard extends HTMLElement {
       const next = idx >= 0 ? ctx.starts[idx + 1] : null;
       const window = this._windowForCycleStart(cycleStart, next, ctx.avgCycleLength);
       if (window) {
-        isOvulation = iso === window.ovulationDay;
-        isFertile = this._dayDiff(iso, window.fertileStart) >= 0 && this._dayDiff(window.fertileEnd, iso) >= 0;
+        const inFertile = this._dayDiff(iso, window.fertileStart) >= 0 && this._dayDiff(window.fertileEnd, iso) >= 0;
+        const inOvulation = iso === window.ovulationDay;
+        if (ctx.predictedStartSet?.has(cycleStart)) {
+          isPredictedFertile = inFertile;
+          isPredictedOvulation = inOvulation;
+        } else {
+          isFertile = inFertile;
+          isOvulation = inOvulation;
+        }
       }
     }
 
@@ -232,7 +281,7 @@ class MenstruationCalendarCard extends HTMLElement {
     }
 
     const cycleDay = cycleStart ? this._dayDiff(iso, cycleStart) + 1 : null;
-    return { isPeriod, isFertile, isOvulation, cycleDay };
+    return { isPeriod, isFertile, isOvulation, cycleDay, isPredictedPeriod, isPredictedFertile, isPredictedOvulation };
   }
 
   _buildModel() {
@@ -241,8 +290,18 @@ class MenstruationCalendarCard extends HTMLElement {
     if (!stateObj) return { missing: true, entityId };
 
     const attrs = stateObj.attributes || {};
-    const starts = this._allCycleStarts(attrs);
+    const actualStarts = this._actualCycleStarts(attrs);
+    const allPredictedStarts = this._predictedCycleStartsList(attrs);
+
+    const showPredicted = this._config?.show_predicted_cycles !== false;
+    const numPredicted = Math.max(1, Math.min(12, Number(this._config?.num_predicted_cycles || 6)));
+    const limitedPredictedStarts = showPredicted ? allPredictedStarts.slice(0, numPredicted) : [];
+
+    const starts = Array.from(new Set([...actualStarts, ...limitedPredictedStarts])).sort();
     const avgCycleLength = this._effectiveCycleLength(attrs);
+    const periodDuration = this._periodDurationDays(attrs);
+    const predictedStartSet = new Set(limitedPredictedStarts);
+    const predictedPeriodSet = this._predictedPeriodSet(limitedPredictedStarts, periodDuration);
 
     return {
       missing: false,
@@ -257,6 +316,8 @@ class MenstruationCalendarCard extends HTMLElement {
       sensorOvulation: this._normalizeISO(attrs.ovulation_day),
       todayIso: this._isoFromDate(new Date()),
       symptomByDate: this._symptomMap(attrs),
+      predictedStartSet,
+      predictedPeriodSet,
     };
   }
 
@@ -294,16 +355,20 @@ class MenstruationCalendarCard extends HTMLElement {
       const st = this._statusForDay(iso, model);
       const isToday = iso === model.todayIso;
       const isFocused = this._focusedIso ? this._focusedIso === iso : isToday;
+      const isPredictedDay = st.isPredictedPeriod || st.isPredictedFertile || st.isPredictedOvulation;
       const classes = [
         'day',
         st.isPeriod ? 'is-period-day' : '',
+        st.isPredictedPeriod ? 'is-predicted-period' : '',
         (this._config?.show_fertile_period !== false && st.isFertile) ? 'is-fertile' : '',
+        (this._config?.show_fertile_period !== false && st.isPredictedFertile) ? 'is-predicted-fertile' : '',
         (this._config?.show_ovulation_marker !== false && st.isOvulation) ? 'is-ovulation' : '',
+        (this._config?.show_ovulation_marker !== false && st.isPredictedOvulation) ? 'is-predicted-ovulation' : '',
         isToday ? 'today' : '',
       ].filter(Boolean).join(' ');
 
       const cycleHint = Number.isFinite(st.cycleDay)
-        ? `${this._t('cycle_day')}: ${st.cycleDay}`
+        ? `${this._t('cycle_day')}: ${st.cycleDay}${isPredictedDay ? ` (${this._t('predicted')})` : ''}`
         : this._t('no_data');
       const selected = this._selectedIso === iso;
       items.push(`
@@ -319,8 +384,8 @@ class MenstruationCalendarCard extends HTMLElement {
           ${this._config?.show_cycle_day_numbers && Number.isFinite(st.cycleDay)
             ? `<span class="cycle-day">${st.cycleDay}</span>`
             : ''}
-          ${(this._config?.show_ovulation_marker !== false && st.isOvulation)
-            ? '<span class="ovulation-dot" aria-hidden="true"></span>'
+          ${(this._config?.show_ovulation_marker !== false && (st.isOvulation || st.isPredictedOvulation))
+            ? `<span class="ovulation-dot${st.isPredictedOvulation ? ' predicted' : ''}" aria-hidden="true"></span>`
             : ''}
         </button>
       `);
@@ -532,6 +597,9 @@ class MenstruationCalendarCard extends HTMLElement {
         .day.is-period-day { background: color-mix(in srgb, var(--error-color, #e11d48) 26%, var(--card-background-color)); }
         .day.is-fertile { background: color-mix(in srgb, var(--warning-color, #facc15) 26%, var(--card-background-color)); }
         .day.is-ovulation { background: color-mix(in srgb, var(--success-color, #22c55e) 20%, var(--card-background-color)); }
+        .day.is-predicted-period { background: color-mix(in srgb, var(--error-color, #e11d48) 11%, var(--card-background-color)); border-style: dashed; }
+        .day.is-predicted-fertile { background: color-mix(in srgb, var(--warning-color, #facc15) 11%, var(--card-background-color)); border-style: dashed; }
+        .day.is-predicted-ovulation { background: color-mix(in srgb, var(--success-color, #22c55e) 8%, var(--card-background-color)); border-style: dashed; }
         .day-number { font-size: .88rem; font-weight: 650; }
         .cycle-day { font-size: .66rem; color: var(--secondary-text-color); line-height: 1; }
         .ovulation-dot {
@@ -549,6 +617,10 @@ class MenstruationCalendarCard extends HTMLElement {
         .swatch.period { background: color-mix(in srgb, var(--error-color, #e11d48) 68%, transparent); }
         .swatch.fertile { background: color-mix(in srgb, var(--warning-color, #facc15) 68%, transparent); }
         .swatch.ovulation { background: var(--success-color, #16a34a); }
+        .swatch.predicted-period { background: color-mix(in srgb, var(--error-color, #e11d48) 36%, transparent); border-style: dashed; }
+        .swatch.predicted-fertile { background: color-mix(in srgb, var(--warning-color, #facc15) 36%, transparent); border-style: dashed; }
+        .swatch.predicted-ovulation { background: color-mix(in srgb, var(--success-color, #16a34a) 45%, transparent); border-style: dashed; }
+        .ovulation-dot.predicted { background: color-mix(in srgb, var(--success-color, #16a34a) 55%, transparent); }
         .editor-wrap { border-top: 1px solid var(--divider-color); padding-top: 10px; display: grid; gap: 8px; }
         .editor-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
         .editor-date { font-size: .92rem; font-weight: 650; }
@@ -581,6 +653,7 @@ class MenstruationCalendarCard extends HTMLElement {
             <span class="legend-item"><span class="swatch period"></span>🔴 Period</span>
             ${this._config?.show_fertile_period !== false ? '<span class="legend-item"><span class="swatch fertile"></span>🟡 Fertile</span>' : ''}
             ${this._config?.show_ovulation_marker !== false ? '<span class="legend-item"><span class="swatch ovulation"></span>💚 Ovulation</span>' : ''}
+            ${this._config?.show_predicted_cycles !== false ? `<span class="legend-item"><span class="swatch predicted-period"></span>🔮 ${this._t('predicted_period')}</span>` : ''}
           </div>
           ${this._selectedDayContent(model)}
         </div>
