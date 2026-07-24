@@ -23,6 +23,9 @@ from .const import (
     CONF_PREGNANCY_ENABLED,
     CONF_PREGNANCY_START_DATE,
     CONF_PROFILE,
+    CONF_CYCLE_LENGTH_OVERRIDE,
+    CYCLE_LENGTH_OVERRIDE_MAX,
+    CYCLE_LENGTH_OVERRIDE_MIN,
     DEFAULT_MENARCHE_AGE_MAX,
     DEFAULT_MENARCHE_AGE_MIN,
     DEFAULT_NAME,
@@ -115,6 +118,7 @@ class MenstruationGaugeOptionsFlow(config_entries.OptionsFlow):
             pregnancy_data: dict = runtime.pregnancy_data
             menarche_data: dict = runtime.menarche_data
             menopause_data: dict = runtime.menopause_data
+            current_cycle_length_override: int = runtime.cycle_length_override or 0
         else:
             # Fallback: load from storage when runtime is not yet available
             profile = slugify(str(self._entry.data.get(CONF_PROFILE, ""))).strip("_") or "default"
@@ -139,6 +143,7 @@ class MenstruationGaugeOptionsFlow(config_entries.OptionsFlow):
                 },
             )
             menopause_data = stored.get("menopause_data", {"is_menopause": False, "start_date": None})
+            current_cycle_length_override = stored.get("cycle_length_override") or 0
 
         if user_input is not None:
             # Validate optional date fields
@@ -177,6 +182,14 @@ class MenstruationGaugeOptionsFlow(config_entries.OptionsFlow):
                 pre_menarche_enabled = bool(user_input.get(CONF_PRE_MENARCHE_ENABLED, False))
                 menopause_enabled = bool(user_input.get(CONF_MENOPAUSE_ENABLED, False))
 
+                # Parse cycle length override (0 = auto/disabled, 20-38 = override)
+                raw_cycle_override = user_input.get(CONF_CYCLE_LENGTH_OVERRIDE, 0)
+                try:
+                    cycle_override_int = int(raw_cycle_override)
+                    new_cycle_length_override: int | None = cycle_override_int if CYCLE_LENGTH_OVERRIDE_MIN <= cycle_override_int <= CYCLE_LENGTH_OVERRIDE_MAX else None
+                except (TypeError, ValueError):
+                    new_cycle_length_override = None
+
                 # Auto-populate pregnancy start date from last cycle if not provided
                 new_preg_start: str | None = preg_date_parsed if preg_date_parsed is not _INVALID_DATE_SENTINEL else None
                 if new_preg_start:
@@ -208,6 +221,7 @@ class MenstruationGaugeOptionsFlow(config_entries.OptionsFlow):
                     runtime.pregnancy_data = new_pregnancy_data
                     runtime.menarche_data = new_menarche_data
                     runtime.menopause_data = new_menopause_data
+                    runtime.cycle_length_override = new_cycle_length_override
 
                     # Persist to storage
                     await runtime.storage.async_save(
@@ -219,6 +233,7 @@ class MenstruationGaugeOptionsFlow(config_entries.OptionsFlow):
                         runtime.menarche_data,
                         runtime.pre_menarche_data,
                         runtime.menopause_data,
+                        cycle_length_override=new_cycle_length_override,
                     )
                     async_dispatcher_send(self.hass, SIGNAL_HISTORY_UPDATED)
                 else:
@@ -239,6 +254,7 @@ class MenstruationGaugeOptionsFlow(config_entries.OptionsFlow):
                         new_menarche_data,
                         stored_full.get("pre_menarche_data"),
                         new_menopause_data,
+                        cycle_length_override=new_cycle_length_override,
                     )
 
                 # Keep entry.data in sync for basic info fields
@@ -291,6 +307,10 @@ class MenstruationGaugeOptionsFlow(config_entries.OptionsFlow):
                     CONF_MENOPAUSE_START_DATE,
                     default=menopause_data.get("start_date") or "",
                 ): str,
+                vol.Optional(
+                    CONF_CYCLE_LENGTH_OVERRIDE,
+                    default=current_cycle_length_override,
+                ): vol.All(vol.Coerce(int), vol.Range(min=0, max=CYCLE_LENGTH_OVERRIDE_MAX)),
             }
         )
 

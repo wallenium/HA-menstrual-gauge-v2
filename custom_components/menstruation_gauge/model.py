@@ -7,6 +7,9 @@ from datetime import date, timedelta
 from typing import Any
 
 from .const import (
+    CYCLE_LENGTH_OVERRIDE_MAX,
+    CYCLE_LENGTH_OVERRIDE_MIN,
+    DEFAULT_CYCLE_LENGTH,
     DEFAULT_PERIOD_DURATION_DAYS,
     STATE_FERTILE,
     STATE_MENARCHE,
@@ -270,6 +273,7 @@ def build_cycle_model(
     menopause_data: dict[str, Any] | None = None,
     noncycle_data: dict[str, Any] | None = None,
     today: date | None = None,
+    cycle_length_override: int | None = None,
 ) -> CycleModel:
     """Build complete cycle model for sensor state + attributes."""
     now = today or date.today()
@@ -421,10 +425,21 @@ def build_cycle_model(
 
     if next_start:
         next_date = date.fromisoformat(next_start)
-        ovulation_day = next_date - timedelta(days=14)
+        # Determine effective cycle length: use override if valid, else avg_cycle, else default 28
+        if cycle_length_override and CYCLE_LENGTH_OVERRIDE_MIN <= cycle_length_override <= CYCLE_LENGTH_OVERRIDE_MAX:
+            effective_cycle = cycle_length_override
+        elif avg_cycle and CYCLE_LENGTH_OVERRIDE_MIN <= avg_cycle <= CYCLE_LENGTH_OVERRIDE_MAX:
+            effective_cycle = int(avg_cycle)
+        else:
+            effective_cycle = DEFAULT_CYCLE_LENGTH
+        # Ovulation: day floor(effective_cycle/2) from cycle start, consistent with frontend formula
+        # = next_date - (effective_cycle - effective_cycle//2 + 1)
+        # For 28-day: next_date - 15 = cycle_start + 13 = day 14 ✓
+        ovulation_day = next_date - timedelta(days=effective_cycle - effective_cycle // 2 + 1)
         ovulation_day_iso = ovulation_day.isoformat()
-        fertile_start = (ovulation_day - timedelta(days=4)).isoformat()
-        fertile_end = (ovulation_day + timedelta(days=1)).isoformat()
+        # Fertile window proportional to cycle length: day (L//7 + 1) to day (L - L//7 - 1)
+        fertile_start = (next_date - timedelta(days=effective_cycle - effective_cycle // 7)).isoformat()
+        fertile_end = (next_date - timedelta(days=effective_cycle // 7 + 2)).isoformat()
         days_until = (next_date - now).days
 
     state = STATE_NEUTRAL

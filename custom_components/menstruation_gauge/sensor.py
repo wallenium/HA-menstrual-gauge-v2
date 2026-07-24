@@ -680,6 +680,7 @@ class MenstruationGaugeSensor(SensorEntity):
             menopause_data=runtime.menopause_data,
             noncycle_data=runtime.noncycle_data,
             today=today,
+            cycle_length_override=runtime.cycle_length_override,
         )
         usage_stats = _build_product_usage_stats(
             runtime.history,
@@ -769,6 +770,7 @@ class MenstruationGaugeSensor(SensorEntity):
             "cycle_day": cycle_day,
             "current_bleeding_block": current_bleeding_block,
             "cycle_statistics": cycle_statistics,
+            "cycle_length_override": runtime.cycle_length_override,
         }
 
     def _calculate_days_until_menarche(self, menarche_data: dict[str, Any]) -> int | None:

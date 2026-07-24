@@ -30,7 +30,8 @@
           "estimated_menarche_date": "Voraussichtliches Menarche-Datum (JJJJ-MM-TT)",
           "family_menarche_age": "Menarche-Alter in der Familie (8–20, optional)",
           "menopause_enabled": "Menopause-Modus aktivieren",
-          "menopause_start_date": "Menopause-Startdatum (JJJJ-MM-TT)"
+          "menopause_start_date": "Menopause-Startdatum (JJJJ-MM-TT)",
+          "cycle_length_override": "Zyklus-Länge überschreiben (Tage, 0 = automatisch)"
         },
         "data_description": {
           "period_duration_days": "Typische Anzahl der Periodentage (1–14).",
@@ -40,7 +41,8 @@
           "estimated_menarche_date": "Voraussichtliches Datum der ersten Periode. Wird für das Countdown-Tracking verwendet.",
           "family_menarche_age": "Menarche-Alter in der Familie (Mutter/Schwester) zur Schätzung des erwarteten Alters.",
           "menopause_enabled": "Aktiviert den Menopause-Tracking-Modus.",
-          "menopause_start_date": "Datum des Menopause-Beginns (JJJJ-MM-TT). Leer lassen, falls unbekannt."
+          "menopause_start_date": "Datum des Menopause-Beginns (JJJJ-MM-TT). Leer lassen, falls unbekannt.",
+          "cycle_length_override": "Überschreibt die automatisch berechnete durchschnittliche Zykluslänge. 0 = automatisch aus dem Verlauf berechnen (empfohlen). 20–38 = feste Zykluslänge für Fruchtbarkeitsfenster und Eisprung-Berechnungen."
         }
       }
     },
