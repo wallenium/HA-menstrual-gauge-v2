@@ -179,6 +179,8 @@ class MenstruationGaugeOptionsFlow(config_entries.OptionsFlow):
 
                 # Auto-populate pregnancy start date from last cycle if not provided
                 new_preg_start: str | None = preg_date_parsed if preg_date_parsed is not _INVALID_DATE_SENTINEL else None
+                if new_preg_start:
+                    pregnancy_enabled = True
                 if pregnancy_enabled and not new_preg_start and runtime and runtime.history:
                     new_preg_start = sorted(runtime.history)[-1]
 
