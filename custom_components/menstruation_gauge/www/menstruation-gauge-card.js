@@ -383,7 +383,7 @@ class MenstruationGaugeCard extends HTMLElement {
     const ovulationOffset = Math.floor(cl / 2) - 1;
     // fertile window = 5 days before through 1 day after ovulation (~6-7 days total)
     const fertileStartOffset = ovulationOffset - 5;
-    const fertileEndOffset = ovulationOffset + 3;
+    const fertileEndOffset = ovulationOffset + 1;
     return {
       fertileStart: this._addDaysToISO(cycleStart, fertileStartOffset),
       fertileEnd: this._addDaysToISO(cycleStart, fertileEndOffset),
