@@ -723,6 +723,58 @@ async function testClotSizeDependencyOnSave() {
   console.log('  ✓ clot size dependency enforced on modal save');
 }
 
+// ---------------------------------------------------------------------------
+// D3) Ovulation fallback: sensor ovulation_day used when current cycle not in grouped_starts
+// ---------------------------------------------------------------------------
+
+function testOvulationFallbackCurrentCycleNotInGroupedStarts() {
+  const card = makeCard();
+  card.setConfig({ entity: 'sensor.menstruation', show_fertile_period: true });
+
+  // Viewing July 2026. Current cycle started July 10 but is not yet in grouped_starts
+  // (period is still ongoing). The sensor provides ovulation_day and fertile window from
+  // the current cycle. grouped_starts only contains the previous (June) cycle start.
+  card._viewDate = new Date(2026, 6, 1, 12, 0, 0, 0); // July 2026
+
+  card._hass = makeHass({
+    state: 'fertile',
+    attributes: {
+      ovulation_day: '2026-07-23',
+      fertile_window_start: '2026-07-14',
+      fertile_window_end: '2026-07-28',
+      grouped_starts: ['2026-06-10'],
+      avg_cycle_length: 28,
+    },
+  });
+
+  const model = card._buildModel();
+
+  // Sensor's ovulation_day should be used as model.ovulationDay since the grouped_starts
+  // calculation would put ovulation in June (June 10 + 13 = June 23), not July.
+  assert.strictEqual(model.ovulationDay, '2026-07-23', 'sensor ovulation_day must be used when grouped_starts cycle does not cover viewed month');
+
+  // The series must have the ovulation day marked (via sensor fallback).
+  assert.ok(model.series.some((s) => s.ovulation), 'ovulation day must be marked in series via sensor fallback');
+  const ovStep = model.series.find((s) => s.ovulation);
+  assert.strictEqual(ovStep && ovStep.iso, '2026-07-23', 'series ovulation entry must match sensor ovulation_day');
+
+  // Fertile window from sensor must also be applied.
+  assert.ok(model.series.some((s) => s.fertile), 'fertile days must be present via sensor fallback');
+  const jul14 = model.series.find((s) => s.iso === '2026-07-14');
+  const jul23 = model.series.find((s) => s.iso === '2026-07-23');
+  const jul28 = model.series.find((s) => s.iso === '2026-07-28');
+  assert.ok(jul14 && jul14.fertile, 'Jul 14 (fertile window start) must be fertile');
+  assert.ok(jul23 && jul23.fertile, 'Jul 23 (ovulation) must also be fertile');
+  assert.ok(jul28 && jul28.fertile, 'Jul 28 (fertile window end) must be fertile');
+
+  // Rendered HTML must include the ovulation marker.
+  card._render();
+  const html = card.shadowRoot.innerHTML;
+  assert.ok(html.includes('opacity="0.90"></circle>'), 'ovulation marker must render when sensor provides ovulation_day but current cycle is not in grouped_starts');
+
+  console.log('  ✓ ovulation fallback: sensor ovulation_day used when current cycle not in grouped_starts');
+}
+
 function testTodaySaveButtonUsesPeriodLifecycleLabels() {
   const todayIso = new Date().toISOString().slice(0, 10);
 
@@ -774,6 +826,7 @@ const tests = [
   ['rerender-on-countdown-change', testRerenderOnCountdownChange],
   ['fertile-ovulation-datetime-attributes', testFertileAndOvulationFromDateTimeAttributes],
   ['historical-cycle-fertile-ovulation', testHistoricalCycleFertileOvulation],
+  ['ovulation-fallback-current-cycle-not-in-grouped-starts', testOvulationFallbackCurrentCycleNotInGroupedStarts],
   ['pregnancy-mode-symptom-config', testPregnancyModeSymptomModalFields],
   ['pregnancy-mode-modal-field-visibility', testPregnancyModeModalHidesPeriodToggle],
   ['pregnancy-mode-symptom-save', testPregnancyModeSymptomSave],
