@@ -334,7 +334,7 @@ class MenstruationGaugeCard extends HTMLElement {
   }
 
   _normalizeISO(value) {
-    const m = String(value || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const m = String(value || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})(?:$|[T\s].*)/);
     if (!m) return null;
     return `${m[1]}-${m[2]}-${m[3]}`;
   }

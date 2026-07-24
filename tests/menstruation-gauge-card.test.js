@@ -322,6 +322,38 @@ function testRerenderOnCountdownChange() {
 }
 
 // ---------------------------------------------------------------------------
+// D) Regression: fertile/ovulation datetime attributes render in gauge
+// ---------------------------------------------------------------------------
+
+function testFertileAndOvulationFromDateTimeAttributes() {
+  const card = makeCard();
+  card.setConfig({ entity: 'sensor.menstruation', show_fertile_period: true });
+  card._viewDate = new Date(2026, 6, 1, 12, 0, 0, 0);
+  card._hass = makeHass({
+    state: 'fertile',
+    attributes: {
+      fertile_window_start: '2026-07-10T00:00:00+00:00',
+      fertile_window_end: '2026-07-15T00:00:00+00:00',
+      ovulation_day: '2026-07-13T00:00:00+00:00',
+    },
+  });
+
+  const model = card._buildModel();
+  assert.strictEqual(model.fertileStart, '2026-07-10', 'fertile start must normalize from datetime');
+  assert.strictEqual(model.fertileEnd, '2026-07-15', 'fertile end must normalize from datetime');
+  assert.strictEqual(model.ovulationDay, '2026-07-13', 'ovulation day must normalize from datetime');
+  assert.ok(model.series.some((step) => step.fertile), 'fertile days must be computed from normalized dates');
+  assert.ok(model.series.some((step) => step.ovulation), 'ovulation day must be computed from normalized date');
+
+  card._render();
+  const html = card.shadowRoot.innerHTML;
+  assert.ok(html.includes('stroke-opacity=".62"'), 'fertile arc segments must be rendered');
+  assert.ok(html.includes('opacity="0.90"></circle>'), 'ovulation marker must be rendered');
+
+  console.log('  ✓ fertile/ovulation render from datetime-formatted attributes');
+}
+
+// ---------------------------------------------------------------------------
 // E) Pregnancy mode UI: field visibility in symptom modal
 // ---------------------------------------------------------------------------
 
@@ -688,6 +720,7 @@ const tests = [
   ['pregnancy-gauge-regression', testPregnancyGaugeRegression],
   ['rerender-on-state-change', testRerenderOnStateChange],
   ['rerender-on-countdown-change', testRerenderOnCountdownChange],
+  ['fertile-ovulation-datetime-attributes', testFertileAndOvulationFromDateTimeAttributes],
   ['pregnancy-mode-symptom-config', testPregnancyModeSymptomModalFields],
   ['pregnancy-mode-modal-field-visibility', testPregnancyModeModalHidesPeriodToggle],
   ['pregnancy-mode-symptom-save', testPregnancyModeSymptomSave],
