@@ -865,6 +865,12 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
         }
         @media (prefers-color-scheme: dark) {
           .is-period-window { background: color-mix(in srgb, var(--error-color, #ff6b89) 26%, transparent); }
+          .is-period-day {
+            background:
+              radial-gradient(circle at 36% 28%, rgba(255,255,255,0.4) 0 16%, transparent 17%),
+              linear-gradient(165deg, color-mix(in srgb, var(--error-color, #ff6b89) 74%, #2f0816), color-mix(in srgb, var(--error-color, #ff6b89) 90%, #ff7f9a));
+            box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--error-color, #ff6b89) 38%, transparent);
+          }
           .is-fertile { background: color-mix(in srgb, var(--warning-color, #ffd45a) 62%, transparent); }
           .is-ovulation { background: color-mix(in srgb, var(--success-color, #4ade80) 68%, transparent); }
           .is-today { box-shadow: 0 0 0 1px color-mix(in srgb, var(--mg-card-bg) 20%, white); }

@@ -71,6 +71,12 @@ function makeCard(config) {
   return card;
 }
 
+function makeRenderedCard(config) {
+  const card = new CardClass();
+  card.setConfig({ title: 'History', entity: 'sensor.menstruation', ...config });
+  return card;
+}
+
 function testSkipsRenderOnUnchangedRelevantData() {
   const card = makeCard();
   const hass1 = baseHass();
@@ -145,12 +151,29 @@ function testRerendersOnConfiguredSymptomEntityChange() {
   console.log('  ✓ rerenders when configured symptom source changes');
 }
 
+function testDarkModeActualPeriodStyleExists() {
+  const card = makeRenderedCard();
+  card.hass = baseHass();
+
+  const html = card.shadowRoot.innerHTML;
+  assert.ok(
+    html.includes('.is-period-day {') && html.includes('@media (prefers-color-scheme: dark)'),
+    'rendered stylesheet should include an explicit dark-mode style for actual period days',
+  );
+  assert.ok(
+    html.includes('class="cell is-period-window is-period-day'),
+    'logged period days should still render with the actual-period class',
+  );
+  console.log('  ✓ keeps explicit dark-mode styling for actual period days');
+}
+
 let failed = 0;
 
 [
   testSkipsRenderOnUnchangedRelevantData,
   testRerendersOnMainEntityChange,
   testRerendersOnConfiguredSymptomEntityChange,
+  testDarkModeActualPeriodStyleExists,
 ].forEach((fn) => {
   try {
     fn();
