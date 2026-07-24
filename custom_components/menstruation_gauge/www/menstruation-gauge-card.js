@@ -517,35 +517,6 @@ class MenstruationGaugeCard extends HTMLElement {
 
     const viewDate = this._viewDate || new Date();
 
-    // For historical months (or when sensor lacks fertile data), compute the
-    // theoretical fertile window (cycle days 8–19) and ovulation day (cycle
-    // day 14) from grouped_starts so indicators appear on every cycle.
-    const groupedStarts = Array.isArray(attrs.grouped_starts)
-      ? attrs.grouped_starts.map((x) => this._normalizeISO(x)).filter(Boolean)
-      : [];
-    const nowDate = new Date();
-    const isCurrentViewMonth = viewDate.getMonth() === nowDate.getMonth()
-      && viewDate.getFullYear() === nowDate.getFullYear();
-    let effectiveFertileStart = fertileStart;
-    let effectiveFertileEnd = fertileEnd;
-    let effectiveOvulationDay = ovulationDay;
-    if (!isCurrentViewMonth || (!effectiveFertileStart && !effectiveFertileEnd)) {
-      const viewLastDayDt = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0, 12);
-      const viewLastIso = this._isoFromDate(viewLastDayDt);
-      const cycleStartIso = groupedStarts.filter((d) => d <= viewLastIso).pop() || null;
-      if (cycleStartIso) {
-        const cycleStartDt = this._parseISO(cycleStartIso);
-        if (cycleStartDt) {
-          const addDays = (base, n) => { const r = new Date(base); r.setDate(r.getDate() + n); return r; };
-          effectiveFertileStart = this._isoFromDate(addDays(cycleStartDt, 7));   // cycle day 8
-          effectiveFertileEnd = this._isoFromDate(addDays(cycleStartDt, 18));    // cycle day 19
-          effectiveOvulationDay = this._isoFromDate(addDays(cycleStartDt, 13)); // cycle day 14
-        }
-      }
-    }
-
-    const daysInMonth = this._monthDays(viewDate);
-
     // Gather grouped_starts and cycle length info for dynamic fertile/ovulation calculation
     const groupedStarts = Array.isArray(attrs.grouped_starts)
       ? attrs.grouped_starts.map((s) => this._normalizeISO(s)).filter(Boolean).sort()
@@ -555,6 +526,29 @@ class MenstruationGaugeCard extends HTMLElement {
     const effectiveAvgCycle = (rawOverride >= 20 && rawOverride <= 38)
       ? rawOverride
       : (rawAvgCycle >= 20 && rawAvgCycle <= 38 ? rawAvgCycle : 28);
+
+    // Compute effective fertile window and ovulation for the viewed month's cycle
+    // (used as model properties for cache keys and non-series consumers)
+    let effectiveFertileStart = fertileStart;
+    let effectiveFertileEnd = fertileEnd;
+    let effectiveOvulationDay = ovulationDay;
+    if (groupedStarts.length > 0) {
+      const viewLastDayDt = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0, 12);
+      const viewLastIso = this._isoFromDate(viewLastDayDt);
+      const viewCycleStartIso = groupedStarts.filter((d) => d <= viewLastIso).pop() || null;
+      if (viewCycleStartIso) {
+        const viewCycleIdx = groupedStarts.indexOf(viewCycleStartIso);
+        const viewNextCycleIso = groupedStarts[viewCycleIdx + 1] || predicted || null;
+        const fw = this._fertileWindowForCycle(viewCycleStartIso, viewNextCycleIso, effectiveAvgCycle);
+        if (fw) {
+          effectiveFertileStart = fw.fertileStart;
+          effectiveFertileEnd = fw.fertileEnd;
+          effectiveOvulationDay = fw.ovulationDay;
+        }
+      }
+    }
+
+    const daysInMonth = this._monthDays(viewDate);
 
     const series = [];
     for (let day = 1; day <= daysInMonth; day++) {

@@ -365,8 +365,8 @@ function testHistoricalCycleFertileOvulation() {
   card._viewDate = new Date(2025, 2, 1, 12, 0, 0, 0); // March 2025
 
   // A cycle started on 2025-03-05 (day 1 = Mar 5).
-  // Theoretical fertile window: day 8 = Mar 12 → day 19 = Mar 23.
-  // Ovulation: day 14 = Mar 18.
+  // Dynamic fertile window for 28-day cycle: floor(28/7)+1=5 to 28-floor(28/7)-1=23
+  // → fertileStartOffset=4 → Mar 9; fertileEndOffset=22 → Mar 27; ovulationOffset=13 → Mar 18.
   card._hass = makeHass({
     state: 'neutral',
     attributes: {
@@ -380,8 +380,8 @@ function testHistoricalCycleFertileOvulation() {
 
   const model = card._buildModel();
 
-  assert.strictEqual(model.fertileStart, '2025-03-12', 'historical fertile start must be cycle day 8');
-  assert.strictEqual(model.fertileEnd, '2025-03-23', 'historical fertile end must be cycle day 19');
+  assert.strictEqual(model.fertileStart, '2025-03-09', 'historical fertile start must be cycle day 5 (dynamic formula)');
+  assert.strictEqual(model.fertileEnd, '2025-03-27', 'historical fertile end must be cycle day 23 (dynamic formula)');
   assert.strictEqual(model.ovulationDay, '2025-03-18', 'historical ovulation must be cycle day 14');
   assert.ok(model.series.some((step) => step.fertile), 'fertile days must be present in historical series');
   assert.ok(model.series.some((step) => step.ovulation), 'ovulation day must be present in historical series');
