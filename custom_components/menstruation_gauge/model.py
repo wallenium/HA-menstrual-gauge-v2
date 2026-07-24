@@ -437,9 +437,9 @@ def build_cycle_model(
         # For 28-day: next_date - 15 = cycle_start + 13 = day 14 ✓
         ovulation_day = next_date - timedelta(days=effective_cycle - effective_cycle // 2 + 1)
         ovulation_day_iso = ovulation_day.isoformat()
-        # Fertile window proportional to cycle length: day (L//7 + 1) to day (L - L//7 - 1)
-        fertile_start = (next_date - timedelta(days=effective_cycle - effective_cycle // 7)).isoformat()
-        fertile_end = (next_date - timedelta(days=effective_cycle // 7 + 2)).isoformat()
+        # Fertile window spans 5 days before through 5 days after ovulation.
+        fertile_start = (ovulation_day - timedelta(days=5)).isoformat()
+        fertile_end = (ovulation_day + timedelta(days=5)).isoformat()
         days_until = (next_date - now).days
 
     state = STATE_NEUTRAL
