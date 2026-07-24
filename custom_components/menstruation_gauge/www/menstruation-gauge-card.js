@@ -548,6 +548,27 @@ class MenstruationGaugeCard extends HTMLElement {
       }
     }
 
+    // Fallback: if the grouped_starts-computed ovulation/fertile falls outside the viewed month
+    // but the sensor's attribute values are in it, prefer the sensor's values.
+    // This handles the common case where the current cycle start has not yet been recorded in
+    // grouped_starts (e.g., the period is still ongoing or not yet confirmed).
+    if (groupedStarts.length > 0) {
+      const viewYear = viewDate.getFullYear();
+      const viewMonth = viewDate.getMonth();
+      const effOvDt = effectiveOvulationDay ? this._parseISO(effectiveOvulationDay) : null;
+      const effOvInMonth = effOvDt && effOvDt.getFullYear() === viewYear && effOvDt.getMonth() === viewMonth;
+      if (!effOvInMonth && ovulationDay) {
+        const sensOvDt = this._parseISO(ovulationDay);
+        if (sensOvDt && sensOvDt.getFullYear() === viewYear && sensOvDt.getMonth() === viewMonth) {
+          effectiveOvulationDay = ovulationDay;
+          if (fertileStart && fertileEnd) {
+            effectiveFertileStart = fertileStart;
+            effectiveFertileEnd = fertileEnd;
+          }
+        }
+      }
+    }
+
     const daysInMonth = this._monthDays(viewDate);
 
     const series = [];
@@ -577,6 +598,15 @@ class MenstruationGaugeCard extends HTMLElement {
               : false;
             dayOvulation = fw.ovulationDay ? iso === fw.ovulationDay : false;
           }
+        }
+        // Fallback: if grouped_starts computation didn't mark this day, use sensor attributes directly.
+        // This handles the case where the current cycle start is not yet in grouped_starts.
+        if (!dayOvulation && ovulationDay && iso === ovulationDay) {
+          dayOvulation = true;
+        }
+        if (!dayFertile && fertileStart && fertileEnd
+            && this._dayDiff(iso, fertileStart) >= 0 && this._dayDiff(fertileEnd, iso) >= 0) {
+          dayFertile = true;
         }
       } else {
         // Fallback to sensor attributes (no grouped_starts yet)
@@ -912,13 +942,20 @@ class MenstruationGaugeCard extends HTMLElement {
     let ovulationMarker = '';
     if (showFertile) {
       const ovulationStep = model.series.find((s) => s.ovulation);
-      if (ovulationStep) {
-        const oDay = ovulationStep.day;
-        if (oDay >= 1 && oDay <= total) {
-          const angle = -90 + ((((oDay - 1) + 0.5) / total) * 360);
-          const pos = this._polar(cx, cy, rInner + extraBar * 0.46, angle);
-          ovulationMarker = `<circle cx="${pos.x.toFixed(1)}" cy="${pos.y.toFixed(1)}" r="5" fill="${palette.ovulation}" stroke="${palette.markerStroke}" stroke-width="1.5" opacity="0.90"></circle>`;
+      let oDay = ovulationStep ? ovulationStep.day : null;
+      // Fallback: if no series entry has ovulation flagged but model.ovulationDay falls in the
+      // viewed month, render the marker directly (e.g. series computation missed it).
+      if (oDay === null && model.ovulationDay) {
+        const ovDt = this._parseISO(model.ovulationDay);
+        if (ovDt && ovDt.getFullYear() === this._viewDate.getFullYear()
+            && ovDt.getMonth() === this._viewDate.getMonth()) {
+          oDay = ovDt.getDate();
         }
+      }
+      if (oDay !== null && oDay >= 1 && oDay <= total) {
+        const angle = -90 + ((((oDay - 1) + 0.5) / total) * 360);
+        const pos = this._polar(cx, cy, rInner + extraBar * 0.46, angle);
+        ovulationMarker = `<circle cx="${pos.x.toFixed(1)}" cy="${pos.y.toFixed(1)}" r="5" fill="${palette.ovulation}" stroke="${palette.markerStroke}" stroke-width="1.5" opacity="0.90"></circle>`;
       }
     }
 
