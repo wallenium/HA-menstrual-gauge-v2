@@ -487,6 +487,34 @@ class MenstruationGaugeCard extends HTMLElement {
       : null;
 
     const viewDate = this._viewDate || new Date();
+
+    // For historical months (or when sensor lacks fertile data), compute the
+    // theoretical fertile window (cycle days 8–19) and ovulation day (cycle
+    // day 14) from grouped_starts so indicators appear on every cycle.
+    const groupedStarts = Array.isArray(attrs.grouped_starts)
+      ? attrs.grouped_starts.map((x) => this._normalizeISO(x)).filter(Boolean)
+      : [];
+    const nowDate = new Date();
+    const isCurrentViewMonth = viewDate.getMonth() === nowDate.getMonth()
+      && viewDate.getFullYear() === nowDate.getFullYear();
+    let effectiveFertileStart = fertileStart;
+    let effectiveFertileEnd = fertileEnd;
+    let effectiveOvulationDay = ovulationDay;
+    if (!isCurrentViewMonth || (!effectiveFertileStart && !effectiveFertileEnd)) {
+      const viewLastDayDt = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0, 12);
+      const viewLastIso = this._isoFromDate(viewLastDayDt);
+      const cycleStartIso = groupedStarts.filter((d) => d <= viewLastIso).pop() || null;
+      if (cycleStartIso) {
+        const cycleStartDt = this._parseISO(cycleStartIso);
+        if (cycleStartDt) {
+          const addDays = (base, n) => { const r = new Date(base); r.setDate(r.getDate() + n); return r; };
+          effectiveFertileStart = this._isoFromDate(addDays(cycleStartDt, 7));   // cycle day 8
+          effectiveFertileEnd = this._isoFromDate(addDays(cycleStartDt, 18));    // cycle day 19
+          effectiveOvulationDay = this._isoFromDate(addDays(cycleStartDt, 13)); // cycle day 14
+        }
+      }
+    }
+
     const daysInMonth = this._monthDays(viewDate);
     const series = [];
     for (let day = 1; day <= daysInMonth; day++) {
@@ -496,8 +524,10 @@ class MenstruationGaugeCard extends HTMLElement {
         day,
         iso,
         confirmed: confirmedSet.has(iso),
-      fertile: fertileStart && fertileEnd ? (this._dayDiff(iso, fertileStart) >= 0 && this._dayDiff(fertileEnd, iso) >= 0) : false,
-      ovulation: ovulationDay ? iso === ovulationDay : false
+        fertile: effectiveFertileStart && effectiveFertileEnd
+          ? (this._dayDiff(iso, effectiveFertileStart) >= 0 && this._dayDiff(effectiveFertileEnd, iso) >= 0)
+          : false,
+        ovulation: effectiveOvulationDay ? iso === effectiveOvulationDay : false,
       });
     }
 
@@ -509,9 +539,9 @@ class MenstruationGaugeCard extends HTMLElement {
       confirmedSet,
       predicted,
       periodDuration,
-      fertileStart,
-      fertileEnd,
-      ovulationDay,
+      fertileStart: effectiveFertileStart,
+      fertileEnd: effectiveFertileEnd,
+      ovulationDay: effectiveOvulationDay,
       menarcheData,
       daysUntilMenarche,
       pregnancyInfo,
@@ -1972,6 +2002,6 @@ customElements.define('menstruation-gauge-card-editor', MenstruationGaugeCardEdi
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'menstruation-gauge-card',
-  name: this.hass.language.card_name,
-  description: this.hass.language.card_description
+  name: 'Menstruation Gauge Card',
+  description: 'A card to visualize menstruation cycle, fertile window, ovulation, and related symptoms.',
 });
