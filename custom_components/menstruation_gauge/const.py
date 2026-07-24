@@ -21,10 +21,13 @@ CONF_FAMILY_MENARCHE_AGE = "family_menarche_age"
 CONF_MENOPAUSE_ENABLED = "menopause_enabled"
 CONF_MENOPAUSE_START_DATE = "menopause_start_date"
 CONF_CYCLE_LENGTH_OVERRIDE = "cycle_length_override"
+CONF_NUM_PREDICTIONS = "num_predictions"
 
 DEFAULT_NAME = "Menstruation"
 DEFAULT_PERIOD_DURATION_DAYS = 5
 DEFAULT_CYCLE_LENGTH = 28
+DEFAULT_NUM_PREDICTIONS = 6
+MAX_NUM_PREDICTIONS = 12
 CYCLE_LENGTH_OVERRIDE_MIN = 20
 CYCLE_LENGTH_OVERRIDE_MAX = 38
 
@@ -34,6 +37,7 @@ ATTR_PRODUCT_USAGE = "product_usage"
 ATTR_GROUPED_STARTS = "grouped_starts"
 ATTR_BLEEDING_BLOCKS = "bleeding_blocks"
 ATTR_NEXT_PREDICTED_START = "next_predicted_start"
+ATTR_PREDICTED_CYCLE_STARTS = "predicted_cycle_starts"
 ATTR_AVG_CYCLE_LENGTH = "avg_cycle_length"
 ATTR_FERTILE_WINDOW_START = "fertile_window_start"
 ATTR_FERTILE_WINDOW_END = "fertile_window_end"

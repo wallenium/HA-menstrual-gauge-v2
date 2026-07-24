@@ -265,6 +265,32 @@ class ProductUsageBackendTests(unittest.TestCase):
         self.assertEqual(cycle.fertile_window_start, "2026-06-09")
         self.assertEqual(cycle.fertile_window_end, "2026-06-19")
 
+    def test_predict_future_starts_returns_six_predictions_with_avg_cycle_length(self) -> None:
+        predictions = model.predict_future_starts(
+            ["2026-01-01", "2026-01-29", "2026-02-26"],
+            num_cycles=6,
+        )
+        self.assertEqual(
+            predictions,
+            [
+                "2026-03-26",
+                "2026-04-23",
+                "2026-05-21",
+                "2026-06-18",
+                "2026-07-16",
+                "2026-08-13",
+            ],
+        )
+
+    def test_predict_future_starts_clamps_cycle_length_and_prediction_count(self) -> None:
+        predictions = model.predict_future_starts(
+            ["2026-01-01", "2026-03-15", "2026-05-27"],
+            num_cycles=20,
+        )
+        self.assertEqual(len(predictions), 12)
+        self.assertEqual(predictions[0], "2026-07-26")
+        self.assertEqual(predictions[1], "2026-09-24")
+
     def test_storage_normalizes_aliases_and_dates(self) -> None:
         entries = [
             {"created_at": "2026-07-18T09:15:00Z", "product": "pantyliners", "quantity": "2"},

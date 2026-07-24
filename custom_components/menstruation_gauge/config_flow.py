@@ -18,6 +18,7 @@ from .const import (
     CONF_ICON,
     CONF_MENOPAUSE_ENABLED,
     CONF_MENOPAUSE_START_DATE,
+    CONF_NUM_PREDICTIONS,
     CONF_PERIOD_DURATION_DAYS,
     CONF_PRE_MENARCHE_ENABLED,
     CONF_PREGNANCY_ENABLED,
@@ -26,6 +27,7 @@ from .const import (
     CONF_CYCLE_LENGTH_OVERRIDE,
     CYCLE_LENGTH_OVERRIDE_MAX,
     CYCLE_LENGTH_OVERRIDE_MIN,
+    DEFAULT_NUM_PREDICTIONS,
     DEFAULT_MENARCHE_AGE_MAX,
     DEFAULT_MENARCHE_AGE_MIN,
     DEFAULT_NAME,
@@ -33,6 +35,7 @@ from .const import (
     DOMAIN,
     SIGNAL_HISTORY_UPDATED,
     STORAGE_KEY,
+    MAX_NUM_PREDICTIONS,
 )
 
 
@@ -144,6 +147,7 @@ class MenstruationGaugeOptionsFlow(config_entries.OptionsFlow):
             )
             menopause_data = stored.get("menopause_data", {"is_menopause": False, "start_date": None})
             current_cycle_length_override = stored.get("cycle_length_override") or 0
+        current_num_predictions = self._entry.options.get(CONF_NUM_PREDICTIONS, DEFAULT_NUM_PREDICTIONS)
 
         if user_input is not None:
             # Validate optional date fields
@@ -181,6 +185,13 @@ class MenstruationGaugeOptionsFlow(config_entries.OptionsFlow):
                 pregnancy_enabled = bool(user_input.get(CONF_PREGNANCY_ENABLED, False))
                 pre_menarche_enabled = bool(user_input.get(CONF_PRE_MENARCHE_ENABLED, False))
                 menopause_enabled = bool(user_input.get(CONF_MENOPAUSE_ENABLED, False))
+                new_num_predictions = max(
+                    1,
+                    min(
+                        MAX_NUM_PREDICTIONS,
+                        int(user_input.get(CONF_NUM_PREDICTIONS, DEFAULT_NUM_PREDICTIONS)),
+                    ),
+                )
 
                 # Parse cycle length override (0 = auto/disabled, 20-38 = override)
                 raw_cycle_override = user_input.get(CONF_CYCLE_LENGTH_OVERRIDE, 0)
@@ -268,7 +279,13 @@ class MenstruationGaugeOptionsFlow(config_entries.OptionsFlow):
                     title=new_friendly_name,
                 )
 
-                return self.async_create_entry(title="", data={})
+                return self.async_create_entry(
+                    title="",
+                    data={
+                        **self._entry.options,
+                        CONF_NUM_PREDICTIONS: new_num_predictions,
+                    },
+                )
 
         # Build schema pre-filled with current values
         schema = vol.Schema(
@@ -311,6 +328,10 @@ class MenstruationGaugeOptionsFlow(config_entries.OptionsFlow):
                     CONF_CYCLE_LENGTH_OVERRIDE,
                     default=current_cycle_length_override,
                 ): vol.All(vol.Coerce(int), vol.Range(min=0, max=CYCLE_LENGTH_OVERRIDE_MAX)),
+                vol.Optional(
+                    CONF_NUM_PREDICTIONS,
+                    default=current_num_predictions,
+                ): vol.All(vol.Coerce(int), vol.Range(min=1, max=MAX_NUM_PREDICTIONS)),
             }
         )
 
