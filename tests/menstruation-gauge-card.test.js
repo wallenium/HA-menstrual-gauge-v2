@@ -59,7 +59,7 @@ global.ResizeObserver = class { observe() {} disconnect() {} };
 
 // Stub window with minimal ProductIcons so status icons resolve.
 const productIconsSrc = fs.readFileSync(
-  path.join(__dirname, '../custom_components/menstruation_gauge/www/product-icons.js'),
+  path.join(__dirname, '../custom_components/menstruation_gauge/www/menstruation-icons.js'),
   'utf8',
 );
 global.window = { customCards: [] };
@@ -351,6 +351,58 @@ function testFertileAndOvulationFromDateTimeAttributes() {
   assert.ok(html.includes('opacity="0.90"></circle>'), 'ovulation marker must be rendered');
 
   console.log('  ✓ fertile/ovulation render from datetime-formatted attributes');
+}
+
+// ---------------------------------------------------------------------------
+// D2) Historical cycles: fertile/ovulation computed from grouped_starts
+// ---------------------------------------------------------------------------
+
+function testHistoricalCycleFertileOvulation() {
+  const card = makeCard();
+  card.setConfig({ entity: 'sensor.menstruation', show_fertile_period: true });
+
+  // View a historical month (March 2025) – well before "now" (July 2026)
+  card._viewDate = new Date(2025, 2, 1, 12, 0, 0, 0); // March 2025
+
+  // A cycle started on 2025-03-05 (day 1 = Mar 5).
+  // Theoretical fertile window: day 8 = Mar 12 → day 19 = Mar 23.
+  // Ovulation: day 14 = Mar 18.
+  card._hass = makeHass({
+    state: 'neutral',
+    attributes: {
+      // No sensor-provided fertile data (only available for current cycle)
+      fertile_window_start: null,
+      fertile_window_end: null,
+      ovulation_day: null,
+      grouped_starts: ['2024-10-01', '2024-11-02', '2024-12-04', '2025-01-07', '2025-02-05', '2025-03-05'],
+    },
+  });
+
+  const model = card._buildModel();
+
+  assert.strictEqual(model.fertileStart, '2025-03-12', 'historical fertile start must be cycle day 8');
+  assert.strictEqual(model.fertileEnd, '2025-03-23', 'historical fertile end must be cycle day 19');
+  assert.strictEqual(model.ovulationDay, '2025-03-18', 'historical ovulation must be cycle day 14');
+  assert.ok(model.series.some((step) => step.fertile), 'fertile days must be present in historical series');
+  assert.ok(model.series.some((step) => step.ovulation), 'ovulation day must be present in historical series');
+
+  // Verify the specific days
+  const mar12 = model.series.find((s) => s.iso === '2025-03-12');
+  const mar18 = model.series.find((s) => s.iso === '2025-03-18');
+  const mar23 = model.series.find((s) => s.iso === '2025-03-23');
+  const mar1 = model.series.find((s) => s.iso === '2025-03-01');
+  assert.ok(mar12?.fertile, 'Mar 12 (day 8) must be fertile');
+  assert.ok(mar18?.fertile, 'Mar 18 (day 14) must be fertile');
+  assert.ok(mar18?.ovulation, 'Mar 18 (day 14) must be ovulation day');
+  assert.ok(mar23?.fertile, 'Mar 23 (day 19) must be fertile');
+  assert.ok(!mar1?.fertile, 'Mar 1 (day 1, before fertile window) must not be fertile');
+
+  card._render();
+  const html = card.shadowRoot.innerHTML;
+  assert.ok(html.includes('stroke-opacity=".62"'), 'fertile arc segments must be rendered for historical month');
+  assert.ok(html.includes('opacity="0.90"></circle>'), 'ovulation marker must be rendered for historical month');
+
+  console.log('  ✓ historical cycle: fertile/ovulation computed from grouped_starts');
 }
 
 // ---------------------------------------------------------------------------
@@ -721,6 +773,7 @@ const tests = [
   ['rerender-on-state-change', testRerenderOnStateChange],
   ['rerender-on-countdown-change', testRerenderOnCountdownChange],
   ['fertile-ovulation-datetime-attributes', testFertileAndOvulationFromDateTimeAttributes],
+  ['historical-cycle-fertile-ovulation', testHistoricalCycleFertileOvulation],
   ['pregnancy-mode-symptom-config', testPregnancyModeSymptomModalFields],
   ['pregnancy-mode-modal-field-visibility', testPregnancyModeModalHidesPeriodToggle],
   ['pregnancy-mode-symptom-save', testPregnancyModeSymptomSave],
