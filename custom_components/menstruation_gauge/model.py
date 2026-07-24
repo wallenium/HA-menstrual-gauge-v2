@@ -6,7 +6,16 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
 
-from .const import STATE_FERTILE, STATE_MENARCHE, STATE_NEUTRAL, STATE_PERIOD, STATE_PMS, STATE_PREGNANT, STATE_PRE_MENARCHE
+from .const import (
+    DEFAULT_PERIOD_DURATION_DAYS,
+    STATE_FERTILE,
+    STATE_MENARCHE,
+    STATE_NEUTRAL,
+    STATE_PERIOD,
+    STATE_PMS,
+    STATE_PREGNANT,
+    STATE_PRE_MENARCHE,
+)
 
 PREGNANCY_DAYS = 280  # Standard pregnancy duration in days (40 weeks)
 
@@ -382,8 +391,14 @@ def build_cycle_model(
         if block
     ]
     starts = grouped_cycle_starts(base_history)
-    next_start, avg_cycle = predict_next_start(starts)
     effective_duration, learned_avg_duration = learned_period_duration(period_duration_days, blocks)
+    next_start, avg_cycle = predict_next_start(starts)
+    duration_shift_days = max(0, effective_duration - DEFAULT_PERIOD_DURATION_DAYS)
+    if next_start and duration_shift_days:
+        shifted_next_date = date.fromisoformat(next_start) + timedelta(days=duration_shift_days)
+        next_start = shifted_next_date.isoformat()
+        if avg_cycle is not None:
+            avg_cycle += duration_shift_days
     current_period = current_period_details(blocks, symptoms, effective_duration, now)
 
     fertile_start: str | None = None
