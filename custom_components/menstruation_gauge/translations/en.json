@@ -30,7 +30,8 @@
           "estimated_menarche_date": "Estimated menarche date (YYYY-MM-DD)",
           "family_menarche_age": "Family menarche age (8–20, optional)",
           "menopause_enabled": "Enable menopause mode",
-          "menopause_start_date": "Menopause start date (YYYY-MM-DD)"
+          "menopause_start_date": "Menopause start date (YYYY-MM-DD)",
+          "cycle_length_override": "Cycle length override (days, 0 = auto)"
         },
         "data_description": {
           "period_duration_days": "Number of days the period typically lasts (1–14).",
@@ -40,7 +41,8 @@
           "estimated_menarche_date": "Estimated date of the first period. Used for countdown tracking.",
           "family_menarche_age": "Age of menarche in the family (mother/sister) used to estimate the expected age.",
           "menopause_enabled": "Activates menopause tracking mode.",
-          "menopause_start_date": "Date when menopause started (YYYY-MM-DD). Leave empty if unknown."
+          "menopause_start_date": "Date when menopause started (YYYY-MM-DD). Leave empty if unknown.",
+          "cycle_length_override": "Override the automatically calculated average cycle length. Set to 0 to use the auto-calculated value from your history (recommended). Set to 20–38 to manually fix the cycle length used for fertile window and ovulation calculations."
         }
       }
     },

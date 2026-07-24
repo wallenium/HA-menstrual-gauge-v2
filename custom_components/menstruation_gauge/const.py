@@ -20,9 +20,13 @@ CONF_ESTIMATED_MENARCHE_DATE = "estimated_menarche_date"
 CONF_FAMILY_MENARCHE_AGE = "family_menarche_age"
 CONF_MENOPAUSE_ENABLED = "menopause_enabled"
 CONF_MENOPAUSE_START_DATE = "menopause_start_date"
+CONF_CYCLE_LENGTH_OVERRIDE = "cycle_length_override"
 
 DEFAULT_NAME = "Menstruation"
 DEFAULT_PERIOD_DURATION_DAYS = 5
+DEFAULT_CYCLE_LENGTH = 28
+CYCLE_LENGTH_OVERRIDE_MIN = 20
+CYCLE_LENGTH_OVERRIDE_MAX = 38
 
 ATTR_HISTORY = "history"
 ATTR_SYMPTOM_HISTORY = "symptom_history"

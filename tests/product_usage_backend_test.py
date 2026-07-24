@@ -115,7 +115,7 @@ class _FakeStorage:
     def __init__(self) -> None:
         self.saved_args = None
 
-    async def async_save(self, *args) -> None:
+    async def async_save(self, *args, **kwargs) -> None:
         self.saved_args = args
 
 

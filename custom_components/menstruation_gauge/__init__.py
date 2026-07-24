@@ -243,6 +243,7 @@ class MenstruationRuntime:
     menopause_data: dict[str, Any] = field(default_factory=lambda: {"is_menopause": False, "start_date": None})
     noncycle_data: dict[str, Any] = field(default_factory=lambda: {"has_noncycle": False})
     unregister_midnight_listener: Callable[[], None] | None = None
+    cycle_length_override: int | None = None
 
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -695,6 +696,7 @@ async def _async_save_and_notify(hass: HomeAssistant, runtime: MenstruationRunti
         runtime.pre_menarche_data,
         runtime.menopause_data,
         runtime.noncycle_data,
+        cycle_length_override=runtime.cycle_length_override,
     )
     await _async_refresh_cycle_model(hass, {_entry_id_for_runtime(hass, runtime)})
 
@@ -1108,6 +1110,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         pre_menarche_data=stored.get("pre_menarche_data", {"signs": {}, "tanner_stage": None}),
         menopause_data=stored.get("menopause_data", {"is_menopause": False, "start_date": None}),
         noncycle_data=stored.get("noncycle_data", {"has_noncycle": False}),
+        cycle_length_override=stored.get("cycle_length_override"),
     )
 
     async def _async_handle_midnight_refresh(_now: datetime) -> None:

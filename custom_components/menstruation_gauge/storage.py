@@ -69,6 +69,7 @@ class MenstruationStorage:
                 "pre_menarche_data": {"signs": {}, "tanner_stage": None},
                 "menopause_data": {"is_menopause": False, "start_date": None},
                 "noncycle_data": {"has_noncycle": False},
+                "cycle_length_override": None,
             }
 
         history = data.get("history", [])
@@ -123,6 +124,17 @@ class MenstruationStorage:
             noncycle_data = {}
         noncycle_data.setdefault("has_noncycle", False)
 
+        raw_override = data.get("cycle_length_override")
+        cycle_length_override: int | None = None
+        if raw_override is not None:
+            try:
+                val = int(raw_override)
+                from .const import CYCLE_LENGTH_OVERRIDE_MAX, CYCLE_LENGTH_OVERRIDE_MIN
+                if CYCLE_LENGTH_OVERRIDE_MIN <= val <= CYCLE_LENGTH_OVERRIDE_MAX:
+                    cycle_length_override = val
+            except (TypeError, ValueError):
+                pass
+
         return {
             "history": normalized,
             "period_duration_days": days,
@@ -133,6 +145,7 @@ class MenstruationStorage:
             "pre_menarche_data": pre_menarche_data,
             "menopause_data": menopause_data,
             "noncycle_data": noncycle_data,
+            "cycle_length_override": cycle_length_override,
         }
 
     async def async_save(
@@ -146,8 +159,10 @@ class MenstruationStorage:
         pre_menarche_data: dict[str, Any] | None = None,
         menopause_data: dict[str, Any] | None = None,
         noncycle_data: dict[str, Any] | None = None,
+        cycle_length_override: int | None = None,
     ) -> None:
         """Save data to storage."""
+        from .const import CYCLE_LENGTH_OVERRIDE_MAX, CYCLE_LENGTH_OVERRIDE_MIN
         normalized = sorted({self._normalize_iso(raw) for raw in history if self._normalize_iso(raw)})
         days = max(1, min(14, int(period_duration_days)))
         symptoms = self._normalize_symptoms(symptom_history or [])
@@ -157,6 +172,14 @@ class MenstruationStorage:
         pre_men_data = pre_menarche_data or {"signs": {}, "tanner_stage": None}
         meno_data = menopause_data or {"is_menopause": False, "start_date": None}
         nc_data = noncycle_data if isinstance(noncycle_data, dict) else {"has_noncycle": False}
+        validated_override: int | None = None
+        if cycle_length_override is not None:
+            try:
+                val = int(cycle_length_override)
+                if CYCLE_LENGTH_OVERRIDE_MIN <= val <= CYCLE_LENGTH_OVERRIDE_MAX:
+                    validated_override = val
+            except (TypeError, ValueError):
+                pass
 
         await self._store.async_save(
             {
@@ -169,6 +192,7 @@ class MenstruationStorage:
                 "pre_menarche_data": pre_men_data,
                 "menopause_data": meno_data,
                 "noncycle_data": nc_data,
+                "cycle_length_override": validated_override,
             }
         )
 

@@ -362,6 +362,35 @@ class MenstruationGaugeCard extends HTMLElement {
     return Math.round((a.getTime() - b.getTime()) / 86400000);
   }
 
+  _addDaysToISO(iso, days) {
+    const d = this._parseISO(iso);
+    if (!d) return null;
+    return this._isoFromDate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + days, 12, 0, 0, 0));
+  }
+
+  _fertileWindowForCycle(cycleStart, nextCycleStart, avgCycleLength) {
+    if (!cycleStart) return null;
+    let cycleLen;
+    if (nextCycleStart) {
+      const len = this._dayDiff(nextCycleStart, cycleStart);
+      cycleLen = (len >= 20 && len <= 60) ? len : avgCycleLength;
+    } else {
+      cycleLen = avgCycleLength;
+    }
+    const cl = Math.max(20, Math.min(60, Math.round(cycleLen) || 28));
+    // Calculate ovulation and fertile window relative to cycle start
+    // ovulation = day floor(cl/2) from cycle start
+    const ovulationOffset = Math.floor(cl / 2) - 1;
+    // fertile window = days (cl//7 + 1) to (cl - cl//7 - 1) from cycle start
+    const fertileStartOffset = Math.floor(cl / 7);
+    const fertileEndOffset = cl - Math.floor(cl / 7) - 2;
+    return {
+      fertileStart: this._addDaysToISO(cycleStart, fertileStartOffset),
+      fertileEnd: this._addDaysToISO(cycleStart, fertileEndOffset),
+      ovulationDay: this._addDaysToISO(cycleStart, ovulationOffset),
+    };
+  }
+
   _monthDays(dt) {
     return new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate();
   }
@@ -488,16 +517,59 @@ class MenstruationGaugeCard extends HTMLElement {
 
     const viewDate = this._viewDate || new Date();
     const daysInMonth = this._monthDays(viewDate);
+
+    // Gather grouped_starts and cycle length info for dynamic fertile/ovulation calculation
+    const groupedStarts = Array.isArray(attrs.grouped_starts)
+      ? attrs.grouped_starts.map((s) => this._normalizeISO(s)).filter(Boolean).sort()
+      : [];
+    const rawAvgCycle = Number(attrs.avg_cycle_length);
+    const rawOverride = Number(attrs.cycle_length_override);
+    const effectiveAvgCycle = (rawOverride >= 20 && rawOverride <= 38)
+      ? rawOverride
+      : (rawAvgCycle >= 20 && rawAvgCycle <= 38 ? rawAvgCycle : 28);
+
     const series = [];
     for (let day = 1; day <= daysInMonth; day++) {
       const dt = new Date(viewDate.getFullYear(), viewDate.getMonth(), day, 12, 0, 0, 0);
       const iso = this._isoFromDate(dt);
+
+      let dayFertile = false;
+      let dayOvulation = false;
+
+      if (groupedStarts.length > 0) {
+        // Find which cycle this day belongs to (latest cycle start on or before this date)
+        let cycleStartForDay = null;
+        let nextCycleStartForDay = null;
+        for (let i = groupedStarts.length - 1; i >= 0; i--) {
+          if (groupedStarts[i] <= iso) {
+            cycleStartForDay = groupedStarts[i];
+            nextCycleStartForDay = groupedStarts[i + 1] || predicted || null;
+            break;
+          }
+        }
+        if (cycleStartForDay) {
+          const fw = this._fertileWindowForCycle(cycleStartForDay, nextCycleStartForDay, effectiveAvgCycle);
+          if (fw) {
+            dayFertile = fw.fertileStart && fw.fertileEnd
+              ? (this._dayDiff(iso, fw.fertileStart) >= 0 && this._dayDiff(fw.fertileEnd, iso) >= 0)
+              : false;
+            dayOvulation = fw.ovulationDay ? iso === fw.ovulationDay : false;
+          }
+        }
+      } else {
+        // Fallback to sensor attributes (no grouped_starts yet)
+        dayFertile = fertileStart && fertileEnd
+          ? (this._dayDiff(iso, fertileStart) >= 0 && this._dayDiff(fertileEnd, iso) >= 0)
+          : false;
+        dayOvulation = ovulationDay ? iso === ovulationDay : false;
+      }
+
       series.push({
         day,
         iso,
         confirmed: confirmedSet.has(iso),
-      fertile: fertileStart && fertileEnd ? (this._dayDiff(iso, fertileStart) >= 0 && this._dayDiff(fertileEnd, iso) >= 0) : false,
-      ovulation: ovulationDay ? iso === ovulationDay : false
+        fertile: dayFertile,
+        ovulation: dayOvulation,
       });
     }
 
@@ -816,12 +888,10 @@ class MenstruationGaugeCard extends HTMLElement {
     }).join('');
 
     let ovulationMarker = '';
-    if (showFertile && model.ovulationDay) {
-      const ovulationDt = this._parseISO(model.ovulationDay);
-      if (ovulationDt
-        && ovulationDt.getFullYear() === this._viewDate.getFullYear()
-        && ovulationDt.getMonth() === this._viewDate.getMonth()) {
-        const oDay = ovulationDt.getDate();
+    if (showFertile) {
+      const ovulationStep = model.series.find((s) => s.ovulation);
+      if (ovulationStep) {
+        const oDay = ovulationStep.day;
         if (oDay >= 1 && oDay <= total) {
           const angle = -90 + ((((oDay - 1) + 0.5) / total) * 360);
           const pos = this._polar(cx, cy, rInner + extraBar * 0.46, angle);

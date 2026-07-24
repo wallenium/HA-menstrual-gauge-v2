@@ -442,9 +442,10 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
 
   _phaseClass(day, cycleLength, showFertile) {
     if (!showFertile) return '';
-    const fertileStart = 8;
-    const fertileEnd = Math.min(19, cycleLength);
-    const ovulationDay = Math.min(Math.max(14, fertileStart), fertileEnd);
+    const cl = Math.max(20, Math.min(60, Math.round(cycleLength) || 28));
+    const fertileStart = Math.floor(cl / 7) + 1;
+    const fertileEnd = cl - Math.floor(cl / 7) - 1;
+    const ovulationDay = Math.floor(cl / 2);
     if (day === ovulationDay) return 'is-ovulation';
     if (day >= fertileStart && day <= fertileEnd) return 'is-fertile';
     return '';
