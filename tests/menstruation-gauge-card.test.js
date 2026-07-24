@@ -365,8 +365,8 @@ function testHistoricalCycleFertileOvulation() {
   card._viewDate = new Date(2025, 2, 1, 12, 0, 0, 0); // March 2025
 
   // A cycle started on 2025-03-05 (day 1 = Mar 5).
-  // Dynamic fertile window for 28-day cycle: floor(28/7)+1=5 to 28-floor(28/7)-1=23
-  // → fertileStartOffset=4 → Mar 9; fertileEndOffset=22 → Mar 27; ovulationOffset=13 → Mar 18.
+  // Dynamic fertile window for 28-day cycle: ovulationOffset=13 ± 5 days
+  // → fertileStartOffset=8 → Mar 13; fertileEndOffset=14 → Mar 19; ovulationOffset=13 → Mar 18.
   card._hass = makeHass({
     state: 'neutral',
     attributes: {
@@ -380,21 +380,27 @@ function testHistoricalCycleFertileOvulation() {
 
   const model = card._buildModel();
 
-  assert.strictEqual(model.fertileStart, '2025-03-09', 'historical fertile start must be cycle day 5 (dynamic formula)');
-  assert.strictEqual(model.fertileEnd, '2025-03-27', 'historical fertile end must be cycle day 23 (dynamic formula)');
+  assert.strictEqual(model.fertileStart, '2025-03-13', 'historical fertile start must be 5 days before ovulation (dynamic formula)');
+  assert.strictEqual(model.fertileEnd, '2025-03-19', 'historical fertile end must be 1 day after ovulation (dynamic formula)');
   assert.strictEqual(model.ovulationDay, '2025-03-18', 'historical ovulation must be cycle day 14');
   assert.ok(model.series.some((step) => step.fertile), 'fertile days must be present in historical series');
   assert.ok(model.series.some((step) => step.ovulation), 'ovulation day must be present in historical series');
 
   // Verify the specific days
   const mar12 = model.series.find((s) => s.iso === '2025-03-12');
+  const mar13 = model.series.find((s) => s.iso === '2025-03-13');
   const mar18 = model.series.find((s) => s.iso === '2025-03-18');
+  const mar19 = model.series.find((s) => s.iso === '2025-03-19');
+  const mar20 = model.series.find((s) => s.iso === '2025-03-20');
   const mar23 = model.series.find((s) => s.iso === '2025-03-23');
   const mar1 = model.series.find((s) => s.iso === '2025-03-01');
-  assert.ok(mar12?.fertile, 'Mar 12 (day 8) must be fertile');
+  assert.ok(!mar12?.fertile, 'Mar 12 (day 8, before window) must not be fertile');
+  assert.ok(mar13?.fertile, 'Mar 13 (day 9, 5 days before ovulation) must be fertile');
   assert.ok(mar18?.fertile, 'Mar 18 (day 14) must be fertile');
   assert.ok(mar18?.ovulation, 'Mar 18 (day 14) must be ovulation day');
-  assert.ok(mar23?.fertile, 'Mar 23 (day 19) must be fertile');
+  assert.ok(mar19?.fertile, 'Mar 19 (day 15, 1 day after ovulation) must be fertile');
+  assert.ok(!mar20?.fertile, 'Mar 20 (day 16, after window) must not be fertile');
+  assert.ok(!mar23?.fertile, 'Mar 23 (day 19, after window) must not be fertile');
   assert.ok(!mar1?.fertile, 'Mar 1 (day 1, before fertile window) must not be fertile');
 
   card._render();
