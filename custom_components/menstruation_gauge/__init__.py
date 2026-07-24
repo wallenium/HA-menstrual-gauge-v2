@@ -241,6 +241,7 @@ class MenstruationRuntime:
     menarche_data: dict[str, Any] = field(default_factory=lambda: {"tracking_active": False, "is_menarche": False, "menarche_date": None, "estimated_date": None, "family_menarche_age": None})
     pre_menarche_data: dict[str, Any] = field(default_factory=lambda: {"signs": {}, "tanner_stage": None})
     menopause_data: dict[str, Any] = field(default_factory=lambda: {"is_menopause": False, "start_date": None})
+    noncycle_data: dict[str, Any] = field(default_factory=lambda: {"has_noncycle": False})
     unregister_midnight_listener: Callable[[], None] | None = None
 
 
@@ -693,6 +694,7 @@ async def _async_save_and_notify(hass: HomeAssistant, runtime: MenstruationRunti
         runtime.menarche_data,
         runtime.pre_menarche_data,
         runtime.menopause_data,
+        runtime.noncycle_data,
     )
     await _async_refresh_cycle_model(hass, {_entry_id_for_runtime(hass, runtime)})
 
@@ -1105,6 +1107,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         menarche_data=stored.get("menarche_data", {"tracking_active": False, "is_menarche": False, "menarche_date": None, "estimated_date": None, "family_menarche_age": None}),
         pre_menarche_data=stored.get("pre_menarche_data", {"signs": {}, "tanner_stage": None}),
         menopause_data=stored.get("menopause_data", {"is_menopause": False, "start_date": None}),
+        noncycle_data=stored.get("noncycle_data", {"has_noncycle": False}),
     )
 
     async def _async_handle_midnight_refresh(_now: datetime) -> None:
@@ -1280,6 +1283,7 @@ def _smart_period_history_dates(
         menarche_data=runtime.menarche_data,
         pre_menarche_data=runtime.pre_menarche_data,
         menopause_data=runtime.menopause_data,
+        noncycle_data=runtime.noncycle_data,
         today=target_date,
     )
     current_period = model.current_period

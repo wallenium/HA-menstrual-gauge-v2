@@ -678,6 +678,7 @@ class MenstruationGaugeSensor(SensorEntity):
             menarche_data=runtime.menarche_data,
             pre_menarche_data=runtime.pre_menarche_data,
             menopause_data=runtime.menopause_data,
+            noncycle_data=runtime.noncycle_data,
             today=today,
         )
         usage_stats = _build_product_usage_stats(
@@ -753,6 +754,7 @@ class MenstruationGaugeSensor(SensorEntity):
             "menarche_data": model.menarche_data,
             ATTR_PRE_MENARCHE_DATA: model.pre_menarche_data,
             ATTR_MENOPAUSE_DATA: model.menopause_data,
+            "noncycle_data": model.noncycle_data,
             "profile": runtime.profile,
             "entry_id": self._entry.entry_id,
             "friendly_name": runtime.friendly_name,
