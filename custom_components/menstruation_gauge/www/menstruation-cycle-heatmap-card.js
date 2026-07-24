@@ -23,6 +23,8 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
       max_cycles: 18,
       period_duration_days: 5,
       show_fertile_period: true,
+      show_predicted_cycles: true,
+      num_predicted_cycles: 6,
       symptom_entities: [],
       cycle_alignment: 'top',
     };
@@ -37,6 +39,8 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
       period_duration_days: 5,
       title: 'Zyklus Heatmap',
       show_fertile_period: true,
+      show_predicted_cycles: true,
+      num_predicted_cycles: 6,
       symptom_entities: [],
       cycle_alignment: 'top',
       ...config,
@@ -222,6 +226,8 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
       period_duration_days: Number(cfg.period_duration_days || 5),
       title: String(cfg.title || ''),
       show_fertile_period: cfg.show_fertile_period !== false,
+      show_predicted_cycles: cfg.show_predicted_cycles !== false,
+      num_predicted_cycles: Math.max(1, Math.min(12, Number(cfg.num_predicted_cycles || 6))),
       cycle_alignment: String(cfg.cycle_alignment || 'top'),
       symptom_entities: Array.isArray(cfg.symptom_entities) ? cfg.symptom_entities : [],
     });
@@ -298,9 +304,9 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
     return starts;
   }
 
-  _buildCycles(groupedStarts, predictedNextStart) {
+  _buildCycles(groupedStarts, predictedCycleStarts) {
     const starts = Array.from(new Set((groupedStarts || []).map((iso) => this._normalizeISO(iso)).filter(Boolean))).sort();
-    if (starts.length < 2) return [];
+    if (starts.length < 1) return [];
 
     const cycles = [];
     for (let index = 0; index < starts.length - 1; index += 1) {
@@ -310,14 +316,19 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
       if (length > 0 && length <= 80) cycles.push({ start, end, length, predicted: false });
     }
 
-    const normalizedPredicted = this._normalizeISO(predictedNextStart);
-    const lastStart = starts[starts.length - 1];
-    if (normalizedPredicted && lastStart) {
-      const predictedLength = this._dayDiff(normalizedPredicted, lastStart);
-      if (predictedLength > 0 && predictedLength <= 80) {
-        cycles.push({ start: lastStart, end: normalizedPredicted, length: predictedLength, predicted: true });
+    const normalizedPredictedStarts = Array.from(
+      new Set((predictedCycleStarts || []).map((iso) => this._normalizeISO(iso)).filter(Boolean)),
+    ).sort();
+    let lastStart = starts[starts.length - 1];
+    normalizedPredictedStarts.forEach((predictedStart) => {
+      if (predictedStart && lastStart) {
+        const predictedLength = this._dayDiff(predictedStart, lastStart);
+        if (predictedLength > 0 && predictedLength <= 80) {
+          cycles.push({ start: lastStart, end: predictedStart, length: predictedLength, predicted: true });
+          lastStart = predictedStart;
+        }
       }
-    }
+    });
 
     return cycles;
   }
@@ -619,8 +630,17 @@ class MenstruationCycleHeatmapCard extends HTMLElement {
     const history = Array.isArray(attrs.history) ? attrs.history : [];
     const groupedStartsAttr = Array.isArray(attrs.grouped_starts) ? attrs.grouped_starts : [];
     const groupedStarts = groupedStartsAttr.length ? groupedStartsAttr : this._startsFromHistory(history);
-    const predictedNextStart = attrs.next_predicted_start || null;
-    const cycles = this._buildCycles(groupedStarts, predictedNextStart);
+    const showPredictedCycles = this._config.show_predicted_cycles !== false;
+    const maxPredictedCycles = Math.max(1, Math.min(12, Number(this._config.num_predicted_cycles || 6)));
+    const predictedStarts = Array.isArray(attrs.predicted_cycle_starts) ? attrs.predicted_cycle_starts : [];
+    const normalizedNextPredicted = this._normalizeISO(attrs.next_predicted_start || null);
+    const predictedCycleStarts = showPredictedCycles
+      ? predictedStarts.slice(0, maxPredictedCycles)
+      : [];
+    if (showPredictedCycles && predictedCycleStarts.length === 0 && normalizedNextPredicted) {
+      predictedCycleStarts.push(normalizedNextPredicted);
+    }
+    const cycles = this._buildCycles(groupedStarts, predictedCycleStarts);
 
     const maxCycles = Math.max(1, Number(this._config.max_cycles || 18));
     const visibleCycles = cycles.slice(-maxCycles);

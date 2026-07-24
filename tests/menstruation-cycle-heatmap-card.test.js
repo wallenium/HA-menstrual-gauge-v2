@@ -167,6 +167,28 @@ function testDarkModeActualPeriodStyleExists() {
   console.log('  ✓ keeps explicit dark-mode styling for actual period days');
 }
 
+function testBuildCyclesIncludesMultiplePredictions() {
+  const card = new CardClass();
+  const cycles = card._buildCycles(
+    ['2026-07-01', '2026-07-29'],
+    ['2026-08-26', '2026-09-23', '2026-10-21'],
+  );
+  assert.strictEqual(cycles.length, 4, 'should include 1 historical + 3 predicted cycles');
+  assert.deepStrictEqual(
+    cycles.map((cycle) => cycle.start),
+    ['2026-07-01', '2026-07-29', '2026-08-26', '2026-09-23'],
+  );
+  assert.deepStrictEqual(
+    cycles.map((cycle) => cycle.end),
+    ['2026-07-29', '2026-08-26', '2026-09-23', '2026-10-21'],
+  );
+  assert.deepStrictEqual(
+    cycles.map((cycle) => cycle.predicted),
+    [false, true, true, true],
+  );
+  console.log('  ✓ builds multiple predicted cycles from predicted_cycle_starts');
+}
+
 let failed = 0;
 
 [
@@ -174,6 +196,7 @@ let failed = 0;
   testRerendersOnMainEntityChange,
   testRerendersOnConfiguredSymptomEntityChange,
   testDarkModeActualPeriodStyleExists,
+  testBuildCyclesIncludesMultiplePredictions,
 ].forEach((fn) => {
   try {
     fn();

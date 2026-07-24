@@ -13,6 +13,8 @@ class MenstruationCycleHistoryCardRow extends HTMLElement {
       show_fertile_window: true,
       show_pregnancy_status: true,
       show_menarche_status: true,
+      show_predicted_cycles: true,
+      num_predicted_cycles: 6,
     };
   }
 
@@ -25,6 +27,8 @@ class MenstruationCycleHistoryCardRow extends HTMLElement {
       show_fertile_window: true,
       show_pregnancy_status: true,
       show_menarche_status: true,
+      show_predicted_cycles: true,
+      num_predicted_cycles: 6,
       ...config,
     };
     this._ensureRoot();
@@ -146,7 +150,7 @@ class MenstruationCycleHistoryCardRow extends HTMLElement {
     }).format(dt);
   }
 
-  _buildCycles(groupedStarts, predictedNextStart) {
+  _buildCycles(groupedStarts, predictedCycleStarts) {
     const starts = Array.from(new Set((groupedStarts || []).map((iso) => this._normalizeISO(iso)).filter(Boolean))).sort();
     if (starts.length < 1) return [];
 
@@ -160,14 +164,19 @@ class MenstruationCycleHistoryCardRow extends HTMLElement {
       }
     }
 
-    const normalizedPredicted = this._normalizeISO(predictedNextStart);
-    const lastStart = starts[starts.length - 1];
-    if (normalizedPredicted && lastStart) {
-      const predictedLength = this._dayDiff(normalizedPredicted, lastStart);
-      if (predictedLength > 0 && predictedLength <= 80) {
-        cycles.push({ start: lastStart, end: normalizedPredicted, length: predictedLength, predicted: true });
+    const normalizedPredictedStarts = Array.from(
+      new Set((predictedCycleStarts || []).map((iso) => this._normalizeISO(iso)).filter(Boolean)),
+    ).sort();
+    let lastStart = starts[starts.length - 1];
+    normalizedPredictedStarts.forEach((predictedStart) => {
+      if (predictedStart && lastStart) {
+        const predictedLength = this._dayDiff(predictedStart, lastStart);
+        if (predictedLength > 0 && predictedLength <= 80) {
+          cycles.push({ start: lastStart, end: predictedStart, length: predictedLength, predicted: true });
+          lastStart = predictedStart;
+        }
       }
-    }
+    });
 
     return cycles.reverse();
   }
@@ -186,8 +195,17 @@ class MenstruationCycleHistoryCardRow extends HTMLElement {
 
     const attrs = stateObj.attributes || {};
     const groupedStartsAttr = Array.isArray(attrs.grouped_starts) ? attrs.grouped_starts : [];
-    const predictedNextStart = attrs.next_predicted_start || null;
-    const cycles = this._buildCycles(groupedStartsAttr, predictedNextStart);
+    const showPredictedCycles = this._config.show_predicted_cycles !== false;
+    const maxPredictedCycles = Math.max(1, Math.min(12, Number(this._config.num_predicted_cycles || 6)));
+    const predictedStarts = Array.isArray(attrs.predicted_cycle_starts) ? attrs.predicted_cycle_starts : [];
+    const normalizedNextPredicted = this._normalizeISO(attrs.next_predicted_start || null);
+    const predictedCycleStarts = showPredictedCycles
+      ? predictedStarts.slice(0, maxPredictedCycles)
+      : [];
+    if (showPredictedCycles && predictedCycleStarts.length === 0 && normalizedNextPredicted) {
+      predictedCycleStarts.push(normalizedNextPredicted);
+    }
+    const cycles = this._buildCycles(groupedStartsAttr, predictedCycleStarts);
     const maxRows = Math.max(1, Number(this._config.max_rows || 12));
     const visibleCycles = cycles.slice(0, maxRows);
 

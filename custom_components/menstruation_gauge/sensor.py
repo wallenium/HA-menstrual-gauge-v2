@@ -35,6 +35,7 @@ from .const import (
     ATTR_HISTORY,
     ATTR_IS_PREGNANT,
     ATTR_NEXT_PREDICTED_START,
+    ATTR_PREDICTED_CYCLE_STARTS,
     ATTR_PERIOD_DURATION_DAYS,
     ATTR_PRE_MENARCHE_DATA,
     ATTR_PREGNANCY_DATA,
@@ -42,10 +43,19 @@ from .const import (
     ATTR_SYMPTOM_HISTORY,
     ATTR_WEEKS_PREGNANT,
     ATTR_MENOPAUSE_DATA,
+    CONF_NUM_PREDICTIONS,
+    DEFAULT_NUM_PREDICTIONS,
     DOMAIN,
+    MAX_NUM_PREDICTIONS,
     SIGNAL_HISTORY_UPDATED,
 )
-from .model import bleeding_blocks, build_cycle_model, grouped_cycle_starts, normalize_history
+from .model import (
+    bleeding_blocks,
+    build_cycle_model,
+    grouped_cycle_starts,
+    normalize_history,
+    predict_future_starts,
+)
 
 
 async def async_setup_entry(
@@ -718,6 +728,13 @@ class MenstruationGaugeSensor(SensorEntity):
 
         cycle_statistics = _build_cycle_statistics(model.grouped_starts, model.bleeding_blocks, today)
         current_bleeding_block = _get_current_bleeding_block(model.current_period)
+        raw_num_predictions = self._entry.options.get(CONF_NUM_PREDICTIONS, DEFAULT_NUM_PREDICTIONS)
+        try:
+            num_predictions = int(raw_num_predictions)
+        except (TypeError, ValueError):
+            num_predictions = DEFAULT_NUM_PREDICTIONS
+        num_predictions = max(1, min(MAX_NUM_PREDICTIONS, num_predictions))
+        predicted_cycle_starts = predict_future_starts(model.grouped_starts, num_predictions)
 
         # Compact history/grouped_starts for sensor broadcasting (full data stays in storage)
         sensor_history = _compact_history_for_sensor(model.history, today)
@@ -732,6 +749,7 @@ class MenstruationGaugeSensor(SensorEntity):
             ATTR_GROUPED_STARTS: sensor_grouped_starts,
             ATTR_BLEEDING_BLOCKS: model.bleeding_blocks,
             ATTR_NEXT_PREDICTED_START: model.next_predicted_start,
+            ATTR_PREDICTED_CYCLE_STARTS: predicted_cycle_starts,
             ATTR_AVG_CYCLE_LENGTH: model.avg_cycle_length,
             ATTR_FERTILE_WINDOW_START: model.fertile_window_start,
             ATTR_FERTILE_WINDOW_END: model.fertile_window_end,

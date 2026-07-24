@@ -31,6 +31,7 @@ class CycleModel:
     grouped_starts: list[str]
     bleeding_blocks: list[dict[str, str | int]]
     next_predicted_start: str | None
+    predicted_cycle_starts: list[str]
     avg_cycle_length: int | None
     fertile_window_start: str | None
     fertile_window_end: str | None
@@ -193,15 +194,12 @@ def current_period_details(
     }
 
 
-def predict_next_start(grouped_starts: list[str]) -> tuple[str | None, int | None]:
-    """Predict next cycle start based on recent cycle lengths."""
+def _predict_cycle_length_days(grouped_starts: list[str]) -> int | None:
+    """Predict cycle length in days from recent historical starts."""
     if not grouped_starts:
-        return None, None
-
+        return None
     if len(grouped_starts) == 1:
-        last = date.fromisoformat(grouped_starts[0])
-        return (last + timedelta(days=28)).isoformat(), 28
-
+        return 28
     lengths: list[int] = []
     start_index = max(1, len(grouped_starts) - 4)
     for idx in range(start_index, len(grouped_starts)):
@@ -210,10 +208,33 @@ def predict_next_start(grouped_starts: list[str]) -> tuple[str | None, int | Non
         diff = (current - prev).days
         if 10 < diff < 80:
             lengths.append(diff)
+    return round(sum(lengths) / len(lengths)) if lengths else 28
 
-    avg = round(sum(lengths) / len(lengths)) if lengths else 28
+
+def predict_next_start(grouped_starts: list[str]) -> tuple[str | None, int | None]:
+    """Predict next cycle start based on recent cycle lengths."""
+    if not grouped_starts:
+        return None, None
+
+    avg = _predict_cycle_length_days(grouped_starts)
+    if avg is None:
+        return None, None
     next_start = date.fromisoformat(grouped_starts[-1]) + timedelta(days=avg)
     return next_start.isoformat(), avg
+
+
+def predict_future_starts(grouped_starts: list[str], num_cycles: int = 6) -> list[str]:
+    """Predict multiple future cycle starts with realistic cycle bounds."""
+    if not grouped_starts:
+        return []
+    count = max(1, min(12, int(num_cycles)))
+    avg_days = _predict_cycle_length_days(grouped_starts)
+    cycle_days = max(20, min(60, int(avg_days or 28)))
+    last_start = date.fromisoformat(grouped_starts[-1])
+    return [
+        (last_start + timedelta(days=cycle_days * idx)).isoformat()
+        for idx in range(1, count + 1)
+    ]
 
 
 def normalize_symptoms(symptom_history: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -308,6 +329,7 @@ def build_cycle_model(
             grouped_starts=[],
             bleeding_blocks=[],
             next_predicted_start=None,
+            predicted_cycle_starts=[],
             avg_cycle_length=None,
             fertile_window_start=None,
             fertile_window_end=None,
@@ -335,6 +357,7 @@ def build_cycle_model(
             grouped_starts=[],
             bleeding_blocks=[],
             next_predicted_start=men_data.get("estimated_date"),
+            predicted_cycle_starts=[],
             avg_cycle_length=None,
             fertile_window_start=None,
             fertile_window_end=None,
@@ -368,6 +391,7 @@ def build_cycle_model(
                     grouped_starts=[],
                     bleeding_blocks=[],
                     next_predicted_start=None,
+                    predicted_cycle_starts=[],
                     avg_cycle_length=None,
                     fertile_window_start=None,
                     fertile_window_end=None,
@@ -406,6 +430,7 @@ def build_cycle_model(
     starts = grouped_cycle_starts(base_history)
     effective_duration, learned_avg_duration = learned_period_duration(period_duration_days, blocks)
     next_start, avg_cycle = predict_next_start(starts)
+    predicted_starts = predict_future_starts(starts)
     # When cycle length is auto (no detected starts) and noncycle data exists,
     # use the default period duration of 5 days for cycle phase calculations.
     if avg_cycle is None and nc_data.get("has_noncycle"):
@@ -414,6 +439,10 @@ def build_cycle_model(
     if next_start and duration_shift_days:
         shifted_next_date = date.fromisoformat(next_start) + timedelta(days=duration_shift_days)
         next_start = shifted_next_date.isoformat()
+        predicted_starts = [
+            (date.fromisoformat(predicted_iso) + timedelta(days=duration_shift_days)).isoformat()
+            for predicted_iso in predicted_starts
+        ]
         if avg_cycle is not None:
             avg_cycle += duration_shift_days
     current_period = current_period_details(blocks, symptoms, effective_duration, now)
@@ -457,6 +486,7 @@ def build_cycle_model(
         grouped_starts=starts,
         bleeding_blocks=blocks_payload,
         next_predicted_start=next_start,
+        predicted_cycle_starts=predicted_starts,
         avg_cycle_length=avg_cycle,
         fertile_window_start=fertile_start,
         fertile_window_end=fertile_end,

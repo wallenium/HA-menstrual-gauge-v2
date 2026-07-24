@@ -8,6 +8,8 @@ class MenstruationGaugeCard extends HTMLElement {
       theme_mode: 'auto',
       title: 'Cycle Gauge',
       show_fertile_period: true,
+      show_predicted_cycles: true,
+      num_predicted_cycles: 6,
       calendar_edit_enabled: true,
       period_duration_days: 5
     };
@@ -24,6 +26,8 @@ class MenstruationGaugeCard extends HTMLElement {
     this._config = {
       show_editor: true,
       show_fertile_period: true,
+      show_predicted_cycles: true,
+      num_predicted_cycles: 6,
       calendar_edit_enabled: true,
       period_duration_days: 5,
       ...config
@@ -478,7 +482,18 @@ class MenstruationGaugeCard extends HTMLElement {
     const history = this._normalizedHistory || [];
     const confirmedSet = new Set(history);
     const periodDuration = this._resolvePeriodDuration(attrs);
+    const predictedStartsAttr = Array.isArray(attrs.predicted_cycle_starts)
+      ? attrs.predicted_cycle_starts
+      : [];
     const predicted = this._normalizeISO(attrs.next_predicted_start);
+    const predictedStarts = Array.from(
+      new Set(
+        predictedStartsAttr
+          .map((iso) => this._normalizeISO(iso))
+          .filter(Boolean),
+      ),
+    ).sort();
+    if (!predictedStarts.length && predicted) predictedStarts.push(predicted);
     const fertileStart = this._normalizeISO(attrs.fertile_window_start);
     const fertileEnd = this._normalizeISO(attrs.fertile_window_end);
     const ovulationDay = this._normalizeISO(attrs.ovulation_day);
@@ -538,7 +553,9 @@ class MenstruationGaugeCard extends HTMLElement {
       const viewCycleStartIso = groupedStarts.filter((d) => d <= viewLastIso).pop() || null;
       if (viewCycleStartIso) {
         const viewCycleIdx = groupedStarts.indexOf(viewCycleStartIso);
-        const viewNextCycleIso = groupedStarts[viewCycleIdx + 1] || predicted || null;
+        const viewNextCycleIso = groupedStarts[viewCycleIdx + 1]
+          || predictedStarts.find((iso) => iso > viewCycleStartIso)
+          || null;
         const fw = this._fertileWindowForCycle(viewCycleStartIso, viewNextCycleIso, effectiveAvgCycle);
         if (fw) {
           effectiveFertileStart = fw.fertileStart;
@@ -586,7 +603,9 @@ class MenstruationGaugeCard extends HTMLElement {
         for (let i = groupedStarts.length - 1; i >= 0; i--) {
           if (groupedStarts[i] <= iso) {
             cycleStartForDay = groupedStarts[i];
-            nextCycleStartForDay = groupedStarts[i + 1] || predicted || null;
+            nextCycleStartForDay = groupedStarts[i + 1]
+              || predictedStarts.find((predictedIso) => predictedIso > groupedStarts[i])
+              || null;
             break;
           }
         }
@@ -632,6 +651,7 @@ class MenstruationGaugeCard extends HTMLElement {
       history,
       confirmedSet,
       predicted,
+      predictedStarts,
       periodDuration,
       fertileStart: effectiveFertileStart,
       fertileEnd: effectiveFertileEnd,
@@ -961,11 +981,17 @@ class MenstruationGaugeCard extends HTMLElement {
 
     let predictedMarker = '';
     let predictedBars = '';
-    const predictedDt = this._parseISO(model.predicted);
-    const showPredictedInView = predictedDt
-      && predictedDt.getFullYear() === this._viewDate.getFullYear()
-      && predictedDt.getMonth() === this._viewDate.getMonth();
-    if (showPredictedInView) {
+    const showPredictedCycles = this._config?.show_predicted_cycles !== false;
+    const maxPredictedCycles = Math.max(1, Math.min(12, Number(this._config?.num_predicted_cycles || 6)));
+    const predictedInView = showPredictedCycles
+      ? (model.predictedStarts || [])
+        .slice(0, maxPredictedCycles)
+        .map((iso) => this._parseISO(iso))
+        .filter((dt) => dt
+          && dt.getFullYear() === this._viewDate.getFullYear()
+          && dt.getMonth() === this._viewDate.getMonth())
+      : [];
+    predictedInView.forEach((predictedDt, predictedIndex) => {
       const pDay = predictedDt.getDate();
       const marker = (offset, fill, radius) => {
         const d = pDay + offset;
@@ -974,9 +1000,8 @@ class MenstruationGaugeCard extends HTMLElement {
         const pos = this._polar(cx, cy, rInner + extraBar + 3, angle);
         return `<circle cx="${pos.x.toFixed(1)}" cy="${pos.y.toFixed(1)}" r="${radius}" fill="${fill}" stroke="${palette.markerStroke}" stroke-width="2"></circle>`;
       };
-      predictedMarker = `${marker(-1, '#fb7185', '4.6')}${marker(0, palette.confirmed, '5.5')}${marker(1, '#fb7185', '4.6')}`;
-
-      predictedBars = Array.from({ length: safePeriodDuration }).map((_, idx) => {
+      predictedMarker += `${marker(-1, '#fb7185', '4.6')}${marker(0, palette.confirmed, '5.5')}${marker(1, '#fb7185', '4.6')}`;
+      predictedBars += Array.from({ length: safePeriodDuration }).map((_, idx) => {
         const dt = new Date(predictedDt);
         dt.setDate(dt.getDate() + idx);
         if (dt.getMonth() !== this._viewDate.getMonth() || dt.getFullYear() !== this._viewDate.getFullYear()) return '';
@@ -984,11 +1009,11 @@ class MenstruationGaugeCard extends HTMLElement {
         const startAngle = -90 + ((((day - 1) + 0.06) / total) * 360);
         const endAngle = -90 + ((((day - 0.06) / total) * 360));
         const dPath = this._arcPath(cx, cy, rInner + extraBar * 0.74, startAngle, endAngle);
-        const alpha = idx === 0 ? 0.60 : 0.38;
+        const alpha = idx === 0 ? Math.max(0.22, 0.60 - (predictedIndex * 0.08)) : Math.max(0.16, 0.38 - (predictedIndex * 0.05));
         const sw = idx === 0 ? 8.6 : 7.2;
-        return `<path d="${dPath}" fill="none" stroke="${palette.confirmed}" stroke-width="${sw}" stroke-linecap="round" stroke-opacity="${alpha}"></path>`;
+        return `<path d="${dPath}" fill="none" stroke="${palette.confirmed}" stroke-width="${sw}" stroke-linecap="round" stroke-opacity="${alpha.toFixed(2)}"></path>`;
       }).join('');
-    }
+    });
 
     const handA = this._polar(cx, cy, rInner - 2, handAngle);
     const handB = this._polar(cx, cy, rInner + extraBar - 2, handAngle);
@@ -1571,6 +1596,7 @@ class MenstruationGaugeCard extends HTMLElement {
       model.pregnancyInfo?.trimester,
       countdown,
       model.predicted || '',
+      (model.predictedStarts || []).join(','),
       model.daysUntilMenarche,
       isOverdueSoon ? 1 : 0,
       this._editorOpen ? 1 : 0,
@@ -1584,6 +1610,8 @@ class MenstruationGaugeCard extends HTMLElement {
       model.ovulationDay || '',
       this._modalIso || '',
       canEdit ? 1 : 0,
+      this._config?.show_predicted_cycles !== false ? 1 : 0,
+      Math.max(1, Math.min(12, Number(this._config?.num_predicted_cycles || 6))),
       this._resolveThemeMode(),
       cardTitle,
       friendlyName,
@@ -1803,6 +1831,8 @@ class MenstruationGaugeCardEditor extends HTMLElement {
     this._config = {
       theme_mode: 'auto',
       show_fertile_period: true,
+      show_predicted_cycles: true,
+      num_predicted_cycles: 6,
       calendar_edit_enabled: true,
       period_duration_days: 5,
       ...config
@@ -1842,6 +1872,8 @@ class MenstruationGaugeCardEditor extends HTMLElement {
         theme_light: 'hell',
         theme_dark: 'dunkel',
         show_fertile: 'Fruchtbare Phase anzeigen',
+        show_predicted: 'Prognostizierte Zyklen anzeigen',
+        num_predicted: 'Anzahl prognostizierter Zyklen (1-12)',
         calendar_edit: 'Neue Einträge im Kalender erlauben',
       },
       en: {
@@ -1858,6 +1890,8 @@ class MenstruationGaugeCardEditor extends HTMLElement {
         theme_light: 'light',
         theme_dark: 'dark',
         show_fertile: 'Show fertile period',
+        show_predicted: 'Show predicted cycles',
+        num_predicted: 'Number of predicted cycles (1-12)',
         calendar_edit: 'Allow new entries through calendar',
       },
     };
@@ -1961,6 +1995,12 @@ class MenstruationGaugeCardEditor extends HTMLElement {
       if (target.id === 'title') return this._handleInput('title', target.value);
       if (target.id === 'theme_mode') return this._handleInput('theme_mode', target.value);
       if (target.id === 'show_fertile_period') return this._handleInput('show_fertile_period', !!target.checked);
+      if (target.id === 'show_predicted_cycles') return this._handleInput('show_predicted_cycles', !!target.checked);
+      if (target.id === 'num_predicted_cycles') {
+        const parsed = Number(target.value);
+        if (!Number.isFinite(parsed)) return;
+        return this._handleInput('num_predicted_cycles', Math.max(1, Math.min(12, Math.round(parsed))));
+      }
       if (target.id === 'calendar_edit_enabled') return this._handleInput('calendar_edit_enabled', !!target.checked);
     };
 
@@ -2073,6 +2113,11 @@ class MenstruationGaugeCardEditor extends HTMLElement {
           </select>
         </div>
         <label class="check"><input type="checkbox" id="show_fertile_period" ${this._config.show_fertile_period !== false ? 'checked' : ''}> ${this._t('show_fertile')}</label>
+        <label class="check"><input type="checkbox" id="show_predicted_cycles" ${this._config.show_predicted_cycles !== false ? 'checked' : ''}> ${this._t('show_predicted')}</label>
+        <div class="row">
+          <label>${this._t('num_predicted')}</label>
+          <input id="num_predicted_cycles" type="number" min="1" max="12" value="${Math.max(1, Math.min(12, Number(this._config.num_predicted_cycles || 6)))}">
+        </div>
         <label class="check"><input type="checkbox" id="calendar_edit_enabled" ${this._config.calendar_edit_enabled !== false ? 'checked' : ''}> ${this._t('calendar_edit')}</label>
       </div>
     `;
