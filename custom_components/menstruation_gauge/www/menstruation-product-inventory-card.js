@@ -466,9 +466,11 @@ class MenstruationProductInventoryCard extends HTMLElement {
           <div class="row">
             <div class="product-header">
               <div class="product-name">${this._t(product)}</div>
-              <div class="product-icon">${this._getProductIconSvg(product)}</div>
+              <div class="product-icon-wrapper">
+                <div class="product-icon">${this._getProductIconSvg(product)}</div>
+                ${product !== "cup" ? `<div class="stock ${status}">${displayQuantity}<span>${product === "underwear" ? this._t("available") : this._t(`status_${status}`)}</span></div>` : ""}
+              </div>
             </div>
-            <div class="stock ${status}">${displayQuantity}<span>${product === "underwear" ? this._t("available") : this._t(`status_${status}`)}</span></div>
             ${product === "underwear" ? `<div class="meta-inline">${this._t("in_use")}: ${Math.max(0, Math.min(underwearTotalOwned, underwearInUse))} / ${underwearTotalOwned}</div>` : ""}
             ${showWashNeeded ? `<div class="wash-needed">🧺 ${this._t("wash_needed")}</div>` : ""}
             ${showUnderwearBuyRecommendation ? `<div class="meta-inline">${this._t("buy_recommendation")}: ${underwearRecommendedBuy}</div>` : ""}
@@ -525,13 +527,14 @@ class MenstruationProductInventoryCard extends HTMLElement {
         .error { color: var(--error-color); margin-bottom: 10px; font-size: 0.9rem; }
         .rows { display: grid; gap: 12px; }
         .row { border: 1px solid var(--mg-border); border-radius: 12px; padding: 10px; background: linear-gradient(135deg, var(--mg-surface-accent), transparent); }
-        .product-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
-        .product-name { flex: 1; font-weight: 600; color: var(--primary-text-color); }
-        .product-icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--primary-color, #8e44ad); opacity: 0.85; }
+        .product-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 8px; }
+        .product-name { flex: 1; font-weight: 600; color: var(--primary-text-color); padding-top: 2px; }
+        .product-icon-wrapper { display: flex; flex-direction: column; align-items: center; gap: 2px; flex-shrink: 0; }
+        .product-icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; color: var(--primary-color, #8e44ad); opacity: 0.85; }
         .product-icon svg { width: 100%; height: 100%; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
         .product-icon img { width: 100%; height: 100%; object-fit: contain; display: block; }
-        .stock { font-size: 1.5rem; font-weight: 700; display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
-        .stock span { font-size: 0.8rem; font-weight: 500; }
+        .stock { font-size: 1rem; font-weight: 700; display: flex; align-items: baseline; gap: 4px; }
+        .stock span { font-size: 0.7rem; font-weight: 500; }
         .stock.good { color: var(--mg-status-success); }
         .stock.warning { color: var(--mg-status-warning); }
         .stock.critical { color: var(--mg-status-error); }
@@ -552,6 +555,7 @@ class MenstruationProductInventoryCard extends HTMLElement {
         }
         @media (max-width: 600px) {
           .product-icon { width: 32px; height: 32px; }
+          .stock { font-size: 0.9rem; }
         }
       </style>
       <ha-card>
